@@ -210,7 +210,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v4';
+const APP_VERSION='v5';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -544,9 +544,9 @@ function pmDrawShape(ctx,s,f,ox,oy){
     ctx.closePath(); ctx.stroke();
   }
   else if(s.type==='arrow'){
-    const head=Math.max(lw*2.2, r*0.38);
-    ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r-head*0.7,0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(r,0); ctx.lineTo(r-head,-head*0.62); ctx.lineTo(r-head,head*0.62); ctx.closePath(); ctx.fill();
+    const head=Math.max(lw*3, r*0.58);   // 矢の先（大きめで見やすく）
+    ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r-head*0.75,0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r,0); ctx.lineTo(r-head,-head*0.7); ctx.lineTo(r-head,head*0.7); ctx.closePath(); ctx.fill();
   }
   ctx.restore();
 }
