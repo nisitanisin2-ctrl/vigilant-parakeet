@@ -1,1 +1,11 @@
-# vigilant-parakeet
+# 写真メモ
+
+写真にメモを書き添えて、1枚の画像として保存・共有できるPWAアプリ。
+
+- 📷 カメラ撮影・🖼 写真ファイル読み込み（ピンチズーム・ドラッグ移動対応）
+- メモの色（14色）・大きさ・字体（ゴシック/明朝/等幅/丸文字）・太字/斜体/下線・背景 白/黒
+- 👁 プレビューで仕上がりを確認 → 📸 スクショ保存（ファイル名指定可）・📤 共有（LINE・メール等）
+- オフライン動作（Service Worker）・ホーム画面に追加して単独アプリとして使えます
+
+GitHub Pages（Settings → Pages → main / root）を有効にすると
+`https://nisitanisin2-ctrl.github.io/vigilant-parakeet/` で公開されます。
