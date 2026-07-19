@@ -167,6 +167,22 @@ body {
     <button class="pm-sizebtn" style="font-style:italic" onpointerdown="event.preventDefault()" onclick="pmDeco('italic')">I</button>
     <button class="pm-sizebtn" style="text-decoration:underline" onpointerdown="event.preventDefault()" onclick="pmDeco('underline')">U</button>
   </div>
+  <!-- 日付の挿入（今日／カレンダー選択。文書＝メモに入力、写真＝四隅にスタンプ） -->
+  <div class="pm-tools">
+    <span class="pm-tool-lb">日付</span>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmDateToday()">📅 今日</button>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmDatePick()">🗓 カレンダー</button>
+    <span class="pm-tool-lb">挿入先</span>
+    <button class="pm-sizebtn" id="pmTgMemo" onpointerdown="event.preventDefault()" onclick="pmSetDateTarget('memo')">文書</button>
+    <button class="pm-sizebtn" id="pmTgPhoto" onpointerdown="event.preventDefault()" onclick="pmSetDateTarget('photo')">写真</button>
+    <span class="pm-tool-lb" id="pmPosLb">位置</span>
+    <button class="pm-sizebtn pm-posbtn" id="pmPos_lt" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('lt')">左上</button>
+    <button class="pm-sizebtn pm-posbtn" id="pmPos_rt" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('rt')">右上</button>
+    <button class="pm-sizebtn pm-posbtn" id="pmPos_lb" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('lb')">左下</button>
+    <button class="pm-sizebtn pm-posbtn" id="pmPos_rb" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('rb')">右下</button>
+    <button class="pm-sizebtn" id="pmStampDel" onclick="pmStampClear()" style="display:none">日付を消す</button>
+  </div>
+  <input type="date" id="pmDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmDatePicked(this.value)">
   <div class="pm-actions">
     <button class="pm-shot" onclick="pmPreview()">👁 プレビュー</button>
     <button class="pm-shot" onclick="pmScreenshot()">📸 スクショ</button>
@@ -193,7 +209,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v1';
+const APP_VERSION='v2';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -321,7 +337,14 @@ function pmClamp(){
 function pmRedraw(){
   const c=pmCanvasEl(); if(!c) return; const ctx=c.getContext('2d');
   ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,c.width,c.height);
-  if(pmImg){ const iw=pmImg.naturalWidth, ih=pmImg.naturalHeight; ctx.drawImage(pmImg,0,0,iw,ih, pmView.tx,pmView.ty, iw*pmView.scale, ih*pmView.scale); }
+  if(pmImg){
+    const iw=pmImg.naturalWidth, ih=pmImg.naturalHeight;
+    ctx.drawImage(pmImg,0,0,iw,ih, pmView.tx,pmView.ty, iw*pmView.scale, ih*pmView.scale);
+    // 日付スタンプ：見えている写真の範囲の隅に重ねて表示（書き出しでは写真そのものの隅に入る）
+    const x0=Math.max(0,pmView.tx), y0=Math.max(0,pmView.ty);
+    const x1=Math.min(c.width, pmView.tx+iw*pmView.scale), y1=Math.min(c.height, pmView.ty+ih*pmView.scale);
+    pmDrawStamp(ctx, {x:x0, y:y0, w:x1-x0, h:y1-y0});
+  }
   const em=document.getElementById('pmEmpty'); if(em) em.style.display=pmImg?'none':'flex';
   const zr=document.getElementById('pmZoomReset'); if(zr) zr.style.display=pmImg?'block':'none';
 }
@@ -435,6 +458,80 @@ function pmFont(fam){
 function pmDeco(cmd){
   const ed=document.getElementById('pmMemo'); if(!ed) return; ed.focus();
   try{ document.execCommand(cmd, false, null); }catch(_){}
+}
+
+/* ── 日付の挿入（今日／カレンダー） ──
+   挿入先と写真スタンプの位置は設定として保存し、次回も同じ場所に入る */
+let pmPrefs={ target:'photo', pos:'rb' };   // target: 'memo'(文書)|'photo'(写真), pos: lt/rt/lb/rb
+try{ const p=JSON.parse(localStorage.getItem('photomemo_prefs')||'{}');
+  if(p.target==='memo'||p.target==='photo') pmPrefs.target=p.target;
+  if(['lt','rt','lb','rb'].includes(p.pos)) pmPrefs.pos=p.pos; }catch(_){}
+function pmSavePrefs(){ try{ localStorage.setItem('photomemo_prefs', JSON.stringify(pmPrefs)); }catch(_){} }
+let pmStamp=null;   // 写真に載せる日付 {text, pos}（書き出し時に写真の隅に描く）
+function pmDateStr(y,m,d){ return `${y}/${m}/${d}`; }
+function pmDateToday(){ const t=new Date(); pmInsertDate(pmDateStr(t.getFullYear(), t.getMonth()+1, t.getDate())); }
+function pmDatePick(){   // 端末標準のカレンダーで日付を選ぶ
+  const inp=document.getElementById('pmDateInput');
+  const t=new Date(); const p=n=>String(n).padStart(2,'0');
+  if(!inp.value) inp.value=`${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())}`;
+  try{ if(inp.showPicker) inp.showPicker(); else inp.click(); }catch(_){ try{ inp.click(); }catch(__){} }
+}
+function pmDatePicked(v){
+  if(!v) return;
+  const [y,m,d]=v.split('-').map(Number);
+  if(!y||!m||!d) return;
+  pmInsertDate(pmDateStr(y,m,d));
+}
+function pmInsertDate(str){
+  if(pmPrefs.target==='memo'){ pmMemoInsertText(str); return; }
+  if(!pmImg){ toast('先に写真を入れてください（挿入先を「文書」にするとメモに入ります）'); return; }
+  pmStamp={ text:str, pos:pmPrefs.pos };
+  pmRedraw(); pmDateUiSync();
+  toast('写真に日付を入れました（位置ボタンで移動できます）');
+}
+/* メモ（contenteditable）のカーソル位置に文字を挿入。カーソルが無ければ末尾に */
+function pmMemoInsertText(t){
+  const ed=document.getElementById('pmMemo'); if(!ed) return; ed.focus();
+  const s=getSelection();
+  let inEd=false;
+  if(s && s.rangeCount){ let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement; inEd=!!(n && ed.contains(n)); }
+  if(!inEd && s){ const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false); s.removeAllRanges(); s.addRange(r); }
+  try{ document.execCommand('insertText', false, t); }catch(_){ ed.textContent+=t; }
+}
+function pmSetDateTarget(t){ pmPrefs.target=t; pmSavePrefs(); pmDateUiSync(); }
+function pmSetDatePos(p){
+  pmPrefs.pos=p; pmSavePrefs();
+  if(pmStamp){ pmStamp.pos=p; pmRedraw(); }
+  pmDateUiSync();
+}
+function pmStampClear(){ pmStamp=null; pmRedraw(); pmDateUiSync(); }
+function pmDateUiSync(){
+  const tm=document.getElementById('pmTgMemo'), tp=document.getElementById('pmTgPhoto');
+  if(tm) tm.classList.toggle('on', pmPrefs.target==='memo');
+  if(tp) tp.classList.toggle('on', pmPrefs.target==='photo');
+  const showPos=pmPrefs.target==='photo';
+  const lb=document.getElementById('pmPosLb'); if(lb) lb.style.display=showPos?'':'none';
+  ['lt','rt','lb','rb'].forEach(p=>{ const b=document.getElementById('pmPos_'+p);
+    if(b){ b.style.display=showPos?'':'none'; b.classList.toggle('on', pmPrefs.pos===p); } });
+  const del=document.getElementById('pmStampDel'); if(del) del.style.display=pmStamp?'':'none';
+}
+/* 日付スタンプを描く。rect＝写真が描かれている範囲（表示キャンバス／書き出しキャンバス共通） */
+function pmDrawStamp(ctx, rect){
+  if(!pmStamp || rect.w<10 || rect.h<10) return;
+  const size=Math.max(12, Math.round(Math.min(rect.w, rect.h*1.6)*0.05));
+  const pad=Math.round(size*0.5);
+  ctx.save();
+  ctx.font=`bold ${size}px sans-serif`;
+  ctx.textBaseline='alphabetic';
+  const tw=ctx.measureText(pmStamp.text).width;
+  const pos=pmStamp.pos||'rb';
+  const x = (pos==='lt'||pos==='lb') ? rect.x+pad : rect.x+rect.w-pad-tw;
+  const y = (pos==='lt'||pos==='rt') ? rect.y+pad+size : rect.y+rect.h-pad;
+  ctx.lineJoin='round'; ctx.lineWidth=Math.max(2, size/7); ctx.strokeStyle='rgba(0,0,0,0.75)';
+  ctx.strokeText(pmStamp.text, x, y);
+  ctx.fillStyle='#ffb300';   // 日付カメラ風のオレンジ
+  ctx.fillText(pmStamp.text, x, y);
+  ctx.restore();
 }
 /* メモ（contenteditable）を行ごとの「文字の連なり」（文字・色・大きさ・太字・斜体・下線）に分解する */
 function pmMemoLines(){
@@ -577,7 +674,7 @@ function pmBuildShotCanvas(){
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
   const ctx=cv.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
   if(pmBg==='black' && memoH){ ctx.fillStyle='#000000'; ctx.fillRect(0,photoH,W,memoH); }   // メモ部分の背景を黒に
-  if(pmImg) ctx.drawImage(pmImg,0,0,iw,ih, 0,0,W,photoH);
+  if(pmImg){ ctx.drawImage(pmImg,0,0,iw,ih, 0,0,W,photoH); pmDrawStamp(ctx,{x:0,y:0,w:W,h:photoH}); }   // 日付スタンプも書き出しに入れる
   ctx.textBaseline='alphabetic';
   let y=photoH+pad;
   drawLines.forEach(l=>{
@@ -614,6 +711,7 @@ window.addEventListener('load', ()=>{
   pmSetupCanvas();
   pmFitView(); pmRedraw();
   pmApplyBg();
+  pmDateUiSync();
 });
 
 if("serviceWorker" in navigator){
