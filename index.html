@@ -133,8 +133,16 @@ body {
     <button class="pm-zoomreset" id="pmZoomReset" onclick="pmResetZoom()" style="display:none">⤢ 全体</button>
   </div>
   <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで下のボタンで色・大きさ・太字等を変えられます。図形ボタンで写真に〇→□も置けます）" onkeydown="event.stopPropagation()"></div>
-  <!-- 文字ツールはメモの下に置く（選択時に出るコピー等のメニューは選択の上側に出るため、重ならない） -->
-  <div class="pm-tools">
+  <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる）。
+       ツールボタンはメモの下に置く（選択時に出るコピー等のメニューと重ならないため） -->
+  <div class="pm-tools pm-tabbar">
+    <button class="pm-sizebtn" id="pmTab_text" onpointerdown="event.preventDefault()" onclick="pmToolTab('text')">✏️ 文字</button>
+    <button class="pm-sizebtn" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕ 図形</button>
+    <button class="pm-sizebtn" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅 日付</button>
+    <button class="pm-sizebtn" id="pmShapeDel" onclick="pmDelShape()" style="display:none">🗑 図形を消す</button>
+  </div>
+  <!-- 文字タブ：色・背景・大きさ・装飾 -->
+  <div class="pm-tools" id="pmPanel_text" style="display:none">
     <span class="pm-tool-lb">色</span>
     <button class="pm-color" style="background:var(--text,#333)" title="標準" onpointerdown="event.preventDefault()" onclick="pmColor('')"></button>
     <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmColor('#e53935')"></button>
@@ -157,20 +165,35 @@ body {
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmSizeStep(-1)">Ａ−</button>
     <span class="pm-tool-lb" id="pmSizeNow" title="今の文字サイズ">48</span>
     <button class="pm-sizebtn" style="font-size:16px" onpointerdown="event.preventDefault()" onclick="pmSizeStep(1)">Ａ＋</button>
-    <span class="pm-tool-lb">図形</span>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('circle')">〇</button>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('rect')">□</button>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('arrow')">→</button>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('tri')">△</button>
-    <button class="pm-sizebtn" id="pmShapeDel" onclick="pmDelShape()" style="display:none">🗑 図形を消す</button>
     <span class="pm-tool-lb">装飾</span>
     <button class="pm-sizebtn" style="font-weight:bold" onpointerdown="event.preventDefault()" onclick="pmDeco('bold')">B</button>
     <button class="pm-sizebtn" style="font-style:italic" onpointerdown="event.preventDefault()" onclick="pmDeco('italic')">I</button>
     <button class="pm-sizebtn" style="text-decoration:underline" onpointerdown="event.preventDefault()" onclick="pmDeco('underline')">U</button>
   </div>
-  <!-- 日付の挿入（今日／カレンダー選択。文書＝メモに入力、写真＝四隅にスタンプ） -->
-  <div class="pm-tools">
-    <span class="pm-tool-lb">日付</span>
+  <!-- 図形タブ：置く図形・色・大きさ -->
+  <div class="pm-tools" id="pmPanel_shape" style="display:none">
+    <span class="pm-tool-lb">置く</span>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('circle')">〇</button>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('rect')">□</button>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('arrow')">→</button>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('tri')">△</button>
+    <span class="pm-tool-lb">色</span>
+    <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmColor('#e53935')"></button>
+    <button class="pm-color" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmColor('#1e88e5')"></button>
+    <button class="pm-color" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmColor('#2e7d32')"></button>
+    <button class="pm-color" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmColor('#fb8c00')"></button>
+    <button class="pm-color" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmColor('#8e24aa')"></button>
+    <button class="pm-color" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmColor('#e91e63')"></button>
+    <button class="pm-color" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmColor('#f9a825')"></button>
+    <button class="pm-color" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmColor('#00acc1')"></button>
+    <button class="pm-color" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmColor('#ffffff')"></button>
+    <button class="pm-color" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmColor('#000000')"></button>
+    <span class="pm-tool-lb">大きさ</span>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmSizeStep(-1)">小</button>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmSizeStep(1)">大</button>
+  </div>
+  <!-- 日付タブ：今日／カレンダー・挿入先・位置 -->
+  <div class="pm-tools" id="pmPanel_date" style="display:none">
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmDateToday()">📅 今日</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmDatePick()">🗓 カレンダー</button>
     <span class="pm-tool-lb">挿入先</span>
@@ -210,7 +233,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v5';
+const APP_VERSION='v6';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -510,6 +533,16 @@ function pmDelShape(){
 function pmShapeSyncUi(){
   const del=document.getElementById('pmShapeDel');
   if(del) del.style.display = pmSelShape>=0 ? '' : 'none';
+  if(pmSelShape>=0 && pmToolOpen!=='shape') pmToolTab('shape');   // 図形を選んだら図形タブを開く
+}
+/* ── ツールタブ（文字／図形／日付）：使う時だけパネルを開いて画面をスッキリさせる ── */
+let pmToolOpen='';   // 開いているタブ '' | 'text' | 'shape' | 'date'
+function pmToolTab(name){
+  pmToolOpen = (pmToolOpen===name) ? '' : name;   // 同じタブをもう一度＝閉じる
+  ['text','shape','date'].forEach(t=>{
+    const p=document.getElementById('pmPanel_'+t); if(p) p.style.display = (pmToolOpen===t)?'':'none';
+    const b=document.getElementById('pmTab_'+t);  if(b) b.classList.toggle('on', pmToolOpen===t);
+  });
 }
 /* 押した位置の図形/ハンドルを探す（キャンバス座標） */
 function pmShapeHit(cp){
