@@ -132,7 +132,7 @@ body {
     </div>
     <button class="pm-zoomreset" id="pmZoomReset" onclick="pmResetZoom()" style="display:none">⤢ 全体</button>
   </div>
-  <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで下のボタンで色・大きさ・太字等を変えられます。図形ボタンで写真に〇→□も置けます）" onkeydown="event.stopPropagation()"></div>
+  <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで下のボタンで色・大きさ・太字等を変えられます。図形ボタンで写真に〇→□も置けます）" onfocus="pmDeselShape()" onkeydown="event.stopPropagation()"></div>
   <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる）。
        ツールボタンはメモの下に置く（選択時に出るコピー等のメニューと重ならないため） -->
   <div class="pm-tools pm-tabbar">
@@ -178,19 +178,19 @@ body {
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('arrow')">→</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('tri')">△</button>
     <span class="pm-tool-lb">色</span>
-    <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmColor('#e53935')"></button>
-    <button class="pm-color" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmColor('#1e88e5')"></button>
-    <button class="pm-color" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmColor('#2e7d32')"></button>
-    <button class="pm-color" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmColor('#fb8c00')"></button>
-    <button class="pm-color" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmColor('#8e24aa')"></button>
-    <button class="pm-color" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmColor('#e91e63')"></button>
-    <button class="pm-color" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmColor('#f9a825')"></button>
-    <button class="pm-color" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmColor('#00acc1')"></button>
-    <button class="pm-color" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmColor('#ffffff')"></button>
-    <button class="pm-color" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmColor('#000000')"></button>
+    <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e53935')"></button>
+    <button class="pm-color" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#1e88e5')"></button>
+    <button class="pm-color" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#2e7d32')"></button>
+    <button class="pm-color" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#fb8c00')"></button>
+    <button class="pm-color" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#8e24aa')"></button>
+    <button class="pm-color" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e91e63')"></button>
+    <button class="pm-color" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#f9a825')"></button>
+    <button class="pm-color" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#00acc1')"></button>
+    <button class="pm-color" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#ffffff')"></button>
+    <button class="pm-color" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#000000')"></button>
     <span class="pm-tool-lb">大きさ</span>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmSizeStep(-1)">小</button>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmSizeStep(1)">大</button>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmShapeSizeStep(-1)">小</button>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmShapeSizeStep(1)">大</button>
     <span class="pm-tool-lb">太さ</span>
     <button class="pm-sizebtn pm-thbtn" id="pmTh_thin" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(0.5)">細</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh_mid" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(1)">中</button>
@@ -237,7 +237,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v7';
+const APP_VERSION='v8';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -418,15 +418,11 @@ function pmPointerUp(e){ if(!pmPointers.has(e.pointerId)) return; pmPointers.del
 /* ── メモ（下半分）：色・大きさ・字体・装飾 ── */
 /* メモ欄（contenteditable）のプレーン文字を取り出す */
 function pmMemoText(){ const ed=document.getElementById('pmMemo'); return ed ? (ed.innerText||'').replace(/\u200B/g,'') : ''; }
-/* 選択した部分（または以後の入力）の文字色を変える。空文字＝標準色。
-   図形を選択中は図形の色を変える */
+/* 選択した部分（または以後の入力）の文字色を変える。空文字＝標準色
+   （文字タブ専用。図形の色は図形タブの pmShapeColorSet で変える） */
 function pmColor(c){
-  const ed=document.getElementById('pmMemo'); if(!ed) return;
+  const ed=document.getElementById('pmMemo'); if(!ed) return; ed.focus();
   const col = c || getComputedStyle(ed).color;   // 標準＝メモ欄の既定色
-  if(pmSelShape>=0 && pmShapes[pmSelShape]){
-    pmShapes[pmSelShape].color=col; pmShapeColor=col; pmRedraw(); return;
-  }
-  ed.focus();
   try{ document.execCommand('styleWithCSS', false, true); document.execCommand('foreColor', false, col); }catch(_){}
 }
 /* 文字サイズの段階（既定は48。そこから上下できる） */
@@ -451,11 +447,6 @@ function pmUpdateSizeNow(px){
 /* 文字の大きさを1段階 上げる/下げる。
    範囲選択中＝その文字を変更／カーソルだけ＝これから入力する文字の大きさを指定 */
 function pmSizeStep(dir){
-  if(pmSelShape>=0 && pmShapes[pmSelShape]){   // 図形を選択中＝図形の大きさを変える
-    const sh=pmShapes[pmSelShape];
-    sh.size=Math.max(12, sh.size*(dir>0?1.25:0.8));
-    pmRedraw(); return;
-  }
   const ed=document.getElementById('pmMemo'); if(!ed) return; ed.focus();
   const s=getSelection(); if(!s || !s.rangeCount) return;
   const cur=pmSelSize();
@@ -518,6 +509,23 @@ let pmSelShape=-1;        // 選択中の図形のindex（-1=なし）
 let pmShapeGesture=null;  // ドラッグ中 {mode:'move'|'handle', idx, dx, dy}
 let pmShapeColor='#e53935';   // 次に置く図形の色（最後に使った色を覚える）
 let pmShapeThick=1;           // 次に置く図形の線の太さ（0.5=細, 1=中, 2=太）
+/* 図形の色を設定（図形タブ専用）：選択中の図形に適用し、次に置く図形にも引き継ぐ */
+function pmShapeColorSet(c){
+  pmShapeColor=c;
+  if(pmSelShape>=0 && pmShapes[pmSelShape]){ pmShapes[pmSelShape].color=c; pmRedraw(); }
+  else toast('この色で次の図形を置きます（図形をタップして選ぶと色変更）');
+}
+/* 図形の大きさを一段階 変える（図形タブ専用） */
+function pmShapeSizeStep(dir){
+  if(!(pmSelShape>=0 && pmShapes[pmSelShape])){ toast('大きさを変える図形をタップして選んでください'); return; }
+  const sh=pmShapes[pmSelShape];
+  sh.size=Math.max(12, sh.size*(dir>0?1.25:0.8));
+  pmRedraw();
+}
+/* メモ欄に触れたら図形の選択を解除（文字の操作と図形の操作が混ざらないように） */
+function pmDeselShape(){
+  if(pmSelShape>=0){ pmSelShape=-1; pmShapeSyncUi(); pmRedraw(); }
+}
 /* 線の太さを設定：選択中の図形に適用し、次に置く図形にも引き継ぐ */
 function pmSetShapeThick(v){
   pmShapeThick=v;
