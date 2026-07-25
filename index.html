@@ -260,6 +260,8 @@ body {
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('tri')">△</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddText()">あ 文字</button>
     <button class="pm-sizebtn" id="pmTextEdit" onpointerdown="event.preventDefault()" onclick="pmEditText()" style="display:none">✎ 文字を直す</button>
+    <button class="pm-sizebtn pm-vtbtn" id="pmTxtH" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(false)">横書き</button>
+    <button class="pm-sizebtn pm-vtbtn" id="pmTxtV" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(true)">縦書き</button>
     <span class="pm-tool-lb">色</span>
     <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e53935')"></button>
     <button class="pm-color" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#1e88e5')"></button>
@@ -404,7 +406,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v21';
+const APP_VERSION='v22';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -881,12 +883,33 @@ let pmDraft2=null;        // なぞって置いている途中の矢印 {x1,y1,x
 let pmShapeColor='#e53935';   // 次に置く図形の色（最後に使った色を覚える）
 let pmShapeThick=1;           // 次に置く図形の線の太さ（0.5=細, 1=中, 2=太, 3=極太）
 let pmShapeOutline='';        // 次に置く図形のフチの色（空＝なし）
+let pmTextVert=false;         // 次に置く文字を縦書きにするか
+/* 縦書きで寝かせて描く文字（長音符・かっこ類） */
+const PM_VROT='ー－—―〜～ｰ(（)）[［]］{｛}｝<＜>＞【】「」『』…‥';
+/* 写真の上の文字を 横書き／縦書き に切り替える */
+function pmSetTextVert(v){
+  pmTextVert=v;
+  const apply=sh=>{ if(sh && sh.type==='text') sh.vt=v; };
+  if(pmGroupActive() && pmSelGroup.some(i=>pmShapes[i] && pmShapes[i].type==='text')){
+    pmPushUndo(); pmGroupApply(apply); pmRedraw(); pmDraftSave();
+  } else if(pmSelShape>=0 && pmShapes[pmSelShape] && pmShapes[pmSelShape].type==='text'){
+    pmPushUndo(); apply(pmShapes[pmSelShape]); pmRedraw(); pmDraftSave();
+  }
+  pmTextVertSyncUi();
+}
+function pmTextVertSyncUi(){
+  const sel=(pmSelShape>=0)?pmShapes[pmSelShape]:null;
+  const cur=(sel && sel.type==='text') ? !!sel.vt : pmTextVert;
+  const h=document.getElementById('pmTxtH'), v=document.getElementById('pmTxtV');
+  if(h) h.classList.toggle('on', !cur);
+  if(v) v.classList.toggle('on', cur);
+}
 /* フチ（縁取り）の色を設定：選んでいるものに適用し、次に置くものにも引き継ぐ */
 function pmSetShapeOutline(c){
   pmShapeOutline=c;
   if(pmGroupActive()){ pmPushUndo(); pmGroupApply(s=>s.oc=c); pmRedraw(); pmDraftSave(); }
   else if(pmSelShape>=0 && pmShapes[pmSelShape]){ pmPushUndo(); pmShapes[pmSelShape].oc=c; pmRedraw(); pmDraftSave(); }
-  pmOutlineSyncUi();
+  pmOutlineSyncUi(); pmTextVertSyncUi();
 }
 function pmOutlineSyncUi(){
   const cur = (pmSelShape>=0 && pmShapes[pmSelShape]) ? (pmShapes[pmSelShape].oc||'') : pmShapeOutline;
@@ -928,7 +951,7 @@ function pmThickSyncUi(){
    ['pmTh2_thin',0.5],['pmTh2_mid',1],['pmTh2_bold',2],['pmTh2_xbold',3]].forEach(([id,v])=>{
     const b=document.getElementById(id); if(b) b.classList.toggle('on', cur===v);
   });
-  pmOutlineSyncUi();
+  pmOutlineSyncUi(); pmTextVertSyncUi();
 }
 function pmToImg(cp){ return {x:(cp.x-pmView.tx)/pmView.scale, y:(cp.y-pmView.ty)/pmView.scale}; }
 /* 写真の外（黒い余白）に出ないよう、座標を写真の中に収める */
@@ -958,7 +981,7 @@ async function pmAddText(txt){
   const ic=pmToImg({x:c.width/2, y:c.height/2});
   const iw=pmIW(), ih=pmIH();
   pmShapes.push({ type:'text', text:t, x:Math.max(0,Math.min(iw,ic.x)), y:Math.max(0,Math.min(ih,ic.y)),
-    size:Math.max(16, Math.min(iw,ih)*0.09), angle:0, color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline });
+    size:Math.max(16, Math.min(iw,ih)*0.09), angle:0, color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline, vt:pmTextVert });
   pmSelShape=pmShapes.length-1;
   pmShapeSyncUi(); pmRedraw(); pmDraftSave();
   toast('文字を置きました（ドラッグで移動・ハンドルで回転と大きさ）');
@@ -1184,6 +1207,10 @@ function pmRelayout(){
 const _pmMeas=document.createElement('canvas').getContext('2d');
 function pmShapeRadius(s){
   if(s.type==='text'){
+    if(s.vt){   // 縦書きは文字数ぶんの高さで見る
+      const nch=[...(s.text||'')].length||1;
+      return Math.max(s.size*0.7, nch*s.size*1.05/2);
+    }
     _pmMeas.font=`bold ${s.size}px sans-serif`;
     const w=_pmMeas.measureText(s.text||'').width;
     return Math.max(s.size*0.7, w/2);
@@ -1282,8 +1309,20 @@ function pmDrawShape(ctx,s,f,ox,oy){
     ctx.font=`bold ${fs}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.lineJoin='round'; ctx.lineWidth=Math.max(2, fs*0.17);
     ctx.strokeStyle= oc || (pmIsLight(s.color)?'rgba(0,0,0,0.8)':'rgba(255,255,255,0.92)');
-    ctx.strokeText(s.text||'',0,0);
-    ctx.fillStyle=s.color; ctx.fillText(s.text||'',0,0);
+    ctx.fillStyle=s.color;
+    if(s.vt){   // 縦書き：1文字ずつ下へ並べる
+      const chars=[...(s.text||'')], lh=fs*1.05;
+      let ty=-(chars.length*lh)/2 + lh/2;
+      chars.forEach(ch=>{
+        ctx.save(); ctx.translate(0,ty);
+        if(PM_VROT.indexOf(ch)>=0) ctx.rotate(Math.PI/2);   // 長音符・かっこは寝かせる
+        ctx.strokeText(ch,0,0); ctx.fillText(ch,0,0);
+        ctx.restore(); ty+=lh;
+      });
+    } else {
+      ctx.strokeText(s.text||'',0,0);
+      ctx.fillText(s.text||'',0,0);
+    }
     ctx.restore(); return;
   }
   ctx.lineJoin='round'; ctx.lineCap='round';
