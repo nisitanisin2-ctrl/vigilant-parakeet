@@ -93,6 +93,7 @@ body {
 .pm-color { width: 29px; height: 29px; border: none; border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation;
   box-shadow: inset 0 0 0 1.5px rgba(128,138,158,.45); transition: transform .1s; }
 .pm-color:active { transform: scale(1.18); }
+.pm-color.on { box-shadow: inset 0 0 0 1.5px rgba(128,138,158,.45), 0 0 0 3px var(--pm-acc); }
 /* ツールのボタン：枠線をなくし、薄い面だけにする（線が減って画面が静かになる） */
 .pm-sizebtn { padding: 8px 13px; border: none; border-radius: 8px; font-size: 15px;
   background: var(--pm-chip); color: var(--text); font-weight: bold; cursor: pointer; touch-action: manipulation;
@@ -277,6 +278,13 @@ body {
     <button class="pm-sizebtn pm-thbtn" id="pmTh_thin" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(0.5)">細</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh_mid" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(1)">中</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh_bold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(2)">太</button>
+    <button class="pm-sizebtn pm-thbtn" id="pmTh_xbold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(3)">極太</button>
+    <span class="pm-tool-lb">フチ</span>
+    <button class="pm-sizebtn pm-ocbtn" data-oc="" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('')">なし</button>
+    <button class="pm-color pm-ocbtn" data-oc="#ffffff" style="background:#ffffff" title="白" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffffff')"></button>
+    <button class="pm-color pm-ocbtn" data-oc="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#000000')"></button>
+    <button class="pm-color pm-ocbtn" data-oc="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffd400')"></button>
+    <button class="pm-color pm-ocbtn" data-oc="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#e53935')"></button>
     <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
         <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearShapes()">全部消す</button>
   </div>
@@ -297,6 +305,13 @@ body {
     <button class="pm-sizebtn pm-thbtn" id="pmTh2_thin" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(0.5)">細</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh2_mid" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(1)">中</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh2_bold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(2)">太</button>
+    <button class="pm-sizebtn pm-thbtn" id="pmTh2_xbold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(3)">極太</button>
+    <span class="pm-tool-lb">フチ</span>
+    <button class="pm-sizebtn pm-ocbtn" data-oc="" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('')">なし</button>
+    <button class="pm-color pm-ocbtn" data-oc="#ffffff" style="background:#ffffff" title="白" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffffff')"></button>
+    <button class="pm-color pm-ocbtn" data-oc="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#000000')"></button>
+    <button class="pm-color pm-ocbtn" data-oc="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffd400')"></button>
+    <button class="pm-color pm-ocbtn" data-oc="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#e53935')"></button>
     <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
   <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearPen()">手書きを消す</button>
   </div>
@@ -389,7 +404,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v20';
+const APP_VERSION='v21';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -610,7 +625,7 @@ function pmPointerDown(e){ if(!pmImg) return; const c=pmCanvasEl(); if(e.target!
   if(pmPenMode){   // 手書き：なぞった点をためていく（写真の外にはみ出さないよう収める）
     const ic=pmClampToImg(pmToImg(cp));
     pmPenCur={ type:'pen', x:ic.x, y:ic.y, size:Math.max(3, Math.min(pmIW(),pmIH())*0.006),
-      color:pmShapeColor, t:pmShapeThick, pts:[{x:ic.x,y:ic.y}] };
+      color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline, pts:[{x:ic.x,y:ic.y}] };
     pmPanLast=null; return;
   }
   if(pmPlaceMode==='arrow'){   // 矢印：なぞった向き・長さで置く
@@ -674,7 +689,7 @@ function pmPointerUp(e){ if(!pmPointers.has(e.pointerId)) return; pmPointers.del
         pmPushUndo();
         pmShapes.push({ type:'arrow', x:(pmDraft2.x1+pmDraft2.x2)/2, y:(pmDraft2.y1+pmDraft2.y2)/2,
           size:d/2, angle:Math.atan2(pmDraft2.y2-pmDraft2.y1, pmDraft2.x2-pmDraft2.x1),
-          color:pmShapeColor, t:pmShapeThick });
+          color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline });
         pmSelShape=pmShapes.length-1;
         pmPlaceMode=''; pmModeSyncUi(); pmShapeSyncUi(); pmDraftSave();
       }
@@ -864,7 +879,19 @@ let pmSelShape=-1;        // 選択中の図形のindex（-1=なし）
 let pmShapeGesture=null;  // ドラッグ中 {mode:'move'|'handle', idx, dx, dy}
 let pmDraft2=null;        // なぞって置いている途中の矢印 {x1,y1,x2,y2}
 let pmShapeColor='#e53935';   // 次に置く図形の色（最後に使った色を覚える）
-let pmShapeThick=1;           // 次に置く図形の線の太さ（0.5=細, 1=中, 2=太）
+let pmShapeThick=1;           // 次に置く図形の線の太さ（0.5=細, 1=中, 2=太, 3=極太）
+let pmShapeOutline='';        // 次に置く図形のフチの色（空＝なし）
+/* フチ（縁取り）の色を設定：選んでいるものに適用し、次に置くものにも引き継ぐ */
+function pmSetShapeOutline(c){
+  pmShapeOutline=c;
+  if(pmGroupActive()){ pmPushUndo(); pmGroupApply(s=>s.oc=c); pmRedraw(); pmDraftSave(); }
+  else if(pmSelShape>=0 && pmShapes[pmSelShape]){ pmPushUndo(); pmShapes[pmSelShape].oc=c; pmRedraw(); pmDraftSave(); }
+  pmOutlineSyncUi();
+}
+function pmOutlineSyncUi(){
+  const cur = (pmSelShape>=0 && pmShapes[pmSelShape]) ? (pmShapes[pmSelShape].oc||'') : pmShapeOutline;
+  document.querySelectorAll('.pm-ocbtn').forEach(b=>b.classList.toggle('on', (b.dataset.oc||'')===cur));
+}
 /* 図形の色を設定（図形タブ専用）：選択中の図形に適用し、次に置く図形にも引き継ぐ */
 function pmShapeColorSet(c){
   pmShapeColor=c;
@@ -897,9 +924,11 @@ function pmSetShapeThick(v){
 }
 function pmThickSyncUi(){
   const cur=(pmSelShape>=0 && pmShapes[pmSelShape]) ? (pmShapes[pmSelShape].t||1) : pmShapeThick;
-  [['pmTh_thin',0.5],['pmTh_mid',1],['pmTh_bold',2],['pmTh2_thin',0.5],['pmTh2_mid',1],['pmTh2_bold',2]].forEach(([id,v])=>{
+  [['pmTh_thin',0.5],['pmTh_mid',1],['pmTh_bold',2],['pmTh_xbold',3],
+   ['pmTh2_thin',0.5],['pmTh2_mid',1],['pmTh2_bold',2],['pmTh2_xbold',3]].forEach(([id,v])=>{
     const b=document.getElementById(id); if(b) b.classList.toggle('on', cur===v);
   });
+  pmOutlineSyncUi();
 }
 function pmToImg(cp){ return {x:(cp.x-pmView.tx)/pmView.scale, y:(cp.y-pmView.ty)/pmView.scale}; }
 /* 写真の外（黒い余白）に出ないよう、座標を写真の中に収める */
@@ -912,7 +941,7 @@ function pmAddShape(type){
   const ic=pmToImg({x:c.width/2, y:c.height/2});   // いま見えている中央に置く
   const iw=pmIW(), ih=pmIH();
   pmShapes.push({ type, x:Math.max(0,Math.min(iw,ic.x)), y:Math.max(0,Math.min(ih,ic.y)),
-    size:Math.max(24, Math.min(iw,ih)*0.14), angle:0, color:pmShapeColor, t:pmShapeThick });
+    size:Math.max(24, Math.min(iw,ih)*0.14), angle:0, color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline });
   pmSelShape=pmShapes.length-1;
   pmShapeSyncUi(); pmRedraw(); pmDraftSave();
   toast('図形を置きました（ドラッグで移動・丸いハンドルで回転と大きさ）');
@@ -929,7 +958,7 @@ async function pmAddText(txt){
   const ic=pmToImg({x:c.width/2, y:c.height/2});
   const iw=pmIW(), ih=pmIH();
   pmShapes.push({ type:'text', text:t, x:Math.max(0,Math.min(iw,ic.x)), y:Math.max(0,Math.min(ih,ic.y)),
-    size:Math.max(16, Math.min(iw,ih)*0.09), angle:0, color:pmShapeColor, t:pmShapeThick });
+    size:Math.max(16, Math.min(iw,ih)*0.09), angle:0, color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline });
   pmSelShape=pmShapes.length-1;
   pmShapeSyncUi(); pmRedraw(); pmDraftSave();
   toast('文字を置きました（ドラッグで移動・ハンドルで回転と大きさ）');
@@ -1025,7 +1054,7 @@ function pmPenFinish(cur){
   const cx=(x1+x2)/2, cy=(y1+y2)/2;
   let r=0; pts.forEach(p=>{ r=Math.max(r, Math.hypot(p.x-cx, p.y-cy)); });
   r=Math.max(6, r);
-  return { type:'pen', x:cx, y:cy, size:r, angle:0, color:cur.color, t:cur.t, nrm:1,
+  return { type:'pen', x:cx, y:cy, size:r, angle:0, color:cur.color, t:cur.t, oc:cur.oc||'', nrm:1,
     wf:(cur.size||6)/r,                      // 線の太さ（大きさに対する割合）
     pts: pts.map(p=>({ x:(p.x-cx)/r, y:(p.y-cy)/r })) };
 }
@@ -1232,39 +1261,50 @@ function pmPenWidth(s,f){
   return Math.max(1.5, base*f*(s.t||1));
 }
 function pmDrawShape(ctx,s,f,ox,oy){
+  const oc=s.oc||'';                       // フチ（縁取り）の色。空なら付けない
   if(s.type==='pen'){   // 手書き：なぞった点をつないで描く
     const pts=pmPenPoints(s); if(pts.length<1) return;
-    ctx.save();
-    ctx.strokeStyle=s.color; ctx.lineWidth=pmPenWidth(s,f); ctx.lineJoin='round'; ctx.lineCap='round';
-    ctx.beginPath();
-    pts.forEach((pt,i)=>{ const px=ox+pt.x*f, py=oy+pt.y*f; i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
-    if(pts.length===1){ const pt=pts[0]; ctx.lineTo(ox+pt.x*f+0.1, oy+pt.y*f+0.1); }
-    ctx.stroke(); ctx.restore(); return;
+    const w=pmPenWidth(s,f);
+    ctx.save(); ctx.lineJoin='round'; ctx.lineCap='round';
+    const path=()=>{ ctx.beginPath();
+      pts.forEach((pt,i)=>{ const px=ox+pt.x*f, py=oy+pt.y*f; i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
+      if(pts.length===1){ const pt=pts[0]; ctx.lineTo(ox+pt.x*f+0.1, oy+pt.y*f+0.1); } };
+    if(oc){ path(); ctx.strokeStyle=oc; ctx.lineWidth=w+Math.max(2, w*0.7); ctx.stroke(); }
+    path(); ctx.strokeStyle=s.color; ctx.lineWidth=w; ctx.stroke();
+    ctx.restore(); return;
   }
   const x=ox+s.x*f, y=oy+s.y*f, r=Math.max(4, s.size*f);
-  const lw=Math.max(1.5, r*0.12*(s.t||1));   // 線の太さ（細0.5／中1／太2）
+  const lw=Math.max(1.5, r*0.12*(s.t||1));   // 線の太さ（細0.5／中1／太2／極太3）
+  const ow=Math.max(2, lw*0.7);              // フチのはみ出し幅
   ctx.save(); ctx.translate(x,y); ctx.rotate(s.angle||0);
   if(s.type==='text'){   // 写真の上の文字（どんな写真でも読めるよう縁取りを付ける）
     const fs=Math.max(8, r);
     ctx.font=`bold ${fs}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.lineJoin='round'; ctx.lineWidth=Math.max(2, fs*0.17);
-    ctx.strokeStyle=pmIsLight(s.color)?'rgba(0,0,0,0.8)':'rgba(255,255,255,0.92)';
+    ctx.strokeStyle= oc || (pmIsLight(s.color)?'rgba(0,0,0,0.8)':'rgba(255,255,255,0.92)');
     ctx.strokeText(s.text||'',0,0);
     ctx.fillStyle=s.color; ctx.fillText(s.text||'',0,0);
     ctx.restore(); return;
   }
-  ctx.strokeStyle=s.color; ctx.fillStyle=s.color; ctx.lineWidth=lw; ctx.lineJoin='round'; ctx.lineCap='round';
-  if(s.type==='circle'){ ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke(); }
-  else if(s.type==='rect'){ ctx.strokeRect(-r,-r*0.7,r*2,r*1.4); }
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  /* フチありなら、太い線で下地を描いてから本来の色を重ねる */
+  const stroke2=(pathFn)=>{
+    if(oc){ pathFn(); ctx.strokeStyle=oc; ctx.lineWidth=lw+ow; ctx.stroke(); }
+    pathFn(); ctx.strokeStyle=s.color; ctx.lineWidth=lw; ctx.stroke();
+  };
+  if(s.type==='circle'){ stroke2(()=>{ ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); }); }
+  else if(s.type==='rect'){ stroke2(()=>{ ctx.beginPath(); ctx.rect(-r,-r*0.7,r*2,r*1.4); }); }
   else if(s.type==='tri'){
-    ctx.beginPath();
-    for(let i=0;i<3;i++){ const a=-Math.PI/2+i*2*Math.PI/3; const px=Math.cos(a)*r, py=Math.sin(a)*r; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
-    ctx.closePath(); ctx.stroke();
+    stroke2(()=>{ ctx.beginPath();
+      for(let i=0;i<3;i++){ const a=-Math.PI/2+i*2*Math.PI/3; const px=Math.cos(a)*r, py=Math.sin(a)*r; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+      ctx.closePath(); });
   }
   else if(s.type==='arrow'){
     const head=Math.max(lw*3, r*0.58);   // 矢の先（大きめで見やすく）
-    ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r-head*0.75,0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(r,0); ctx.lineTo(r-head,-head*0.7); ctx.lineTo(r-head,head*0.7); ctx.closePath(); ctx.fill();
+    stroke2(()=>{ ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r-head*0.75,0); });
+    const headPath=()=>{ ctx.beginPath(); ctx.moveTo(r,0); ctx.lineTo(r-head,-head*0.7); ctx.lineTo(r-head,head*0.7); ctx.closePath(); };
+    if(oc){ headPath(); ctx.strokeStyle=oc; ctx.fillStyle=oc; ctx.lineWidth=ow*1.6; ctx.stroke(); ctx.fill(); }
+    headPath(); ctx.fillStyle=s.color; ctx.fill();
   }
   ctx.restore();
 }
