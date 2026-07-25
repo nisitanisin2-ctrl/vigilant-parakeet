@@ -106,8 +106,12 @@ body {
 .pm-tabbar .pm-tab { background: transparent; color: var(--text-light); font-size: 16.5px; padding: 11px 8px;
   border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .pm-tabbar .pm-tab.on { background: var(--pm-soft); color: var(--pm-acc); border-bottom-color: var(--pm-acc); }
-.pm-tabbar .pm-side { background: transparent; color: var(--text-light); font-size: 17px; padding: 10px 9px; }
-.pm-tabbar .pm-side:active { background: var(--pm-chip); }
+.pm-tabbar .pm-side { background: var(--pm-soft); color: var(--pm-acc); border: 1.5px solid var(--pm-acc);
+  font-size: 17px; padding: 8px 8px; line-height: 1; }
+.pm-tabbar .pm-side:active { background: var(--pm-acc); color: #fff; }
+.pm-tabbar .pm-side[disabled] { background: transparent; border-color: var(--pm-line); color: var(--text-light); opacity: .45; }
+.pm-del { background: rgba(192,57,43,.12); border: 1.5px solid #c0392b; color: #c0392b; }
+.pm-del:active { background: #c0392b; color: #fff; }
 .pm-tabbar .pm-spacer { flex: 1; }
 /* パネルはすっと開く */
 .pm-panel { animation: pmPanelIn .16s ease-out; }
@@ -218,7 +222,7 @@ body {
     <button class="pm-sizebtn pm-tab" id="pmTab_pen" onpointerdown="event.preventDefault()" onclick="pmToolTab('pen')">✍️手書き</button>
     <button class="pm-sizebtn pm-tab" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅 日付</button>
     <span class="pm-spacer"></span><button class="pm-sizebtn pm-side" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled title="元に戻す">↩︎</button>
-        <button class="pm-sizebtn pm-side" id="pmShapeDel" onclick="pmDelShape()" style="display:none" title="選んだ図形を消す">🗑</button>
+<button class="pm-sizebtn pm-side" id="pmRedoBtn" onpointerdown="event.preventDefault()" onclick="pmRedo()" disabled title="やり直す">↪︎</button>
   </div>
   <!-- 文字タブ：色・背景・大きさ・装飾 -->
   <div class="pm-tools pm-panel" id="pmPanel_text" style="display:none">
@@ -260,6 +264,7 @@ body {
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('tri')">△</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddText()">あ 文字</button>
     <button class="pm-sizebtn" id="pmTextEdit" onpointerdown="event.preventDefault()" onclick="pmEditText()" style="display:none">✎ 文字を直す</button>
+    <button class="pm-sizebtn pm-del" id="pmShapeDel" onclick="pmDelShape()" style="display:none">🗑 消す</button>
     <button class="pm-sizebtn pm-vtbtn" id="pmTxtH" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(false)">横書き</button>
     <button class="pm-sizebtn pm-vtbtn" id="pmTxtV" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(true)">縦書き</button>
     <span class="pm-tool-lb">色</span>
@@ -406,7 +411,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v22';
+const APP_VERSION='v23';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -1128,7 +1133,7 @@ function pmClearShapes(){
   toast('図形をすべて消しました（↩︎戻すで元に戻せます）');
 }
 /* ── 元に戻す（図形・文字・手書き・日付・写真の向きの操作を1手ずつ戻す） ── */
-let pmUndoStack=[];
+let pmUndoStack=[], pmRedoStack=[];
 /* memoOp=true のときはメモの中身も一緒に覚える（文字の書式変更を戻せるように） */
 function pmSnapshot(memoOp){
   const ed=document.getElementById('pmMemo');
@@ -1137,17 +1142,36 @@ function pmSnapshot(memoOp){
 function pmPushUndo(memoOp){
   pmUndoStack.push(pmSnapshot(memoOp));
   if(pmUndoStack.length>40) pmUndoStack.shift();
+  pmRedoStack=[];   // 新しい操作をしたら「進む」はできなくなる
   pmUndoSyncUi();
 }
 function pmUndoSyncUi(){
   const b=document.getElementById('pmUndoBtn'); if(b) b.disabled = pmUndoStack.length===0;
+  const r=document.getElementById('pmRedoBtn'); if(r) r.disabled = pmRedoStack.length===0;
+}
+/* 覚えておいた状態に戻す（戻す・進むで共用） */
+function pmApplySnapshot(j){
+  let st; try{ st=JSON.parse(j); }catch(_){ return false; }
+  pmShapes=st.sh||[]; pmStamp=st.st||null; pmSelShape=-1; pmSelGroup=[];
+  if(st.mh!=null){ const ed=document.getElementById('pmMemo'); if(ed) ed.innerHTML=st.mh; }
+  if((st.rot||0)!==pmRot){ pmRot=st.rot||0; pmApplyRot(); pmFitView(); }
+  return true;
 }
 function pmUndo(){
   const j=pmUndoStack.pop(); if(!j){ pmUndoSyncUi(); return; }
-  let st; try{ st=JSON.parse(j); }catch(_){ pmUndoSyncUi(); return; }
-  pmShapes=st.sh||[]; pmStamp=st.st||null; pmSelShape=-1; pmSelGroup=[];
-  if(st.mh!=null){ const ed=document.getElementById('pmMemo'); if(ed) ed.innerHTML=st.mh; }   // 文字の書式も戻す
-  if((st.rot||0)!==pmRot){ pmRot=st.rot||0; pmApplyRot(); pmFitView(); }
+  let hasMemo=false; try{ hasMemo = JSON.parse(j).mh!=null; }catch(_){}
+  pmRedoStack.push(pmSnapshot(hasMemo));   // 進む用に今の状態を控える
+  if(pmRedoStack.length>40) pmRedoStack.shift();
+  if(!pmApplySnapshot(j)){ pmUndoSyncUi(); return; }
+  pmUndoSyncUi(); pmShapeSyncUi(); pmDateUiSync(); pmRedraw(); pmDraftSave();
+}
+/* 進む（やり直す）：戻したものをもう一度やり直す */
+function pmRedo(){
+  const j=pmRedoStack.pop(); if(!j){ pmUndoSyncUi(); return; }
+  let hasMemo=false; try{ hasMemo = JSON.parse(j).mh!=null; }catch(_){}
+  pmUndoStack.push(pmSnapshot(hasMemo));   // 戻す用に今の状態を控える
+  if(pmUndoStack.length>40) pmUndoStack.shift();
+  if(!pmApplySnapshot(j)){ pmUndoSyncUi(); return; }
   pmUndoSyncUi(); pmShapeSyncUi(); pmDateUiSync(); pmRedraw(); pmDraftSave();
 }
 function pmShapeSyncUi(){
