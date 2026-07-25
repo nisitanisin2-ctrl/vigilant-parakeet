@@ -284,6 +284,12 @@ body {
     <button class="pm-sizebtn pm-posbtn" id="pmPos_rt" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('rt')">右上</button>
     <button class="pm-sizebtn pm-posbtn" id="pmPos_lb" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('lb')">左下</button>
     <button class="pm-sizebtn pm-posbtn" id="pmPos_rb" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('rb')">右下</button>
+    <span class="pm-tool-lb">表示</span>
+    <button class="pm-sizebtn pm-dfbtn" id="pmDf_ymd_slash" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('ymd_slash')"></button>
+    <button class="pm-sizebtn pm-dfbtn" id="pmDf_ymd_kanji" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('ymd_kanji')"></button>
+    <button class="pm-sizebtn pm-dfbtn" id="pmDf_wareki" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('wareki')"></button>
+    <button class="pm-sizebtn pm-dfbtn" id="pmDf_md_kanji" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('md_kanji')"></button>
+    <button class="pm-sizebtn pm-dfbtn" id="pmDf_md_slash" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('md_slash')"></button>
     <button class="pm-sizebtn" id="pmStampDel" onclick="pmStampClear()" style="display:none">日付を消す</button>
   </div>
   <div class="pm-memowrap" id="pmMemoWrap">
@@ -336,7 +342,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v14';
+const APP_VERSION='v15';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -1031,11 +1037,13 @@ function pmDeco(cmd){
 
 /* ── 日付の挿入（今日／カレンダー） ──
    挿入先と写真スタンプの位置は設定として保存し、次回も同じ場所に入る */
-let pmPrefs={ target:'photo', pos:'rb', q:'orig' };   // target: 'memo'|'photo', pos: lt/rt/lb/rb, q: 画質
+const PM_DFMTS=['ymd_slash','ymd_kanji','wareki','md_kanji','md_slash'];   // 日付の表示のしかた
+let pmPrefs={ target:'photo', pos:'rb', q:'orig', df:'ymd_slash' };   // target: 'memo'|'photo', pos: lt/rt/lb/rb, q: 画質
 try{ const p=JSON.parse(localStorage.getItem('photomemo_prefs')||'{}');
   if(p.target==='memo'||p.target==='photo') pmPrefs.target=p.target;
   if(['lt','rt','lb','rb'].includes(p.pos)) pmPrefs.pos=p.pos;
-  if(['orig','high','std'].includes(p.q)) pmPrefs.q=p.q; }catch(_){}
+  if(['orig','high','std'].includes(p.q)) pmPrefs.q=p.q;
+  if(PM_DFMTS.includes(p.df)) pmPrefs.df=p.df; }catch(_){}
 function pmSavePrefs(){ try{ localStorage.setItem('photomemo_prefs', JSON.stringify(pmPrefs)); }catch(_){} }
 /* ── 書き出しの画質（元のサイズ／高精細／標準） ── */
 const PM_QMAX=8000;   // これ以上はブラウザが扱えないことがあるので上限
@@ -1057,8 +1065,38 @@ function pmQualitySyncUi(){
   if(n) n.textContent = pmImg ? `書き出し 横${pmOutWidth()}px（写真は${pmIW()}×${pmIH()}px）` : '';
 }
 let pmStamp=null;   // 写真に載せる日付 {text, pos}（書き出し時に写真の隅に描く）
-function pmDateStr(y,m,d){ return `${y}/${m}/${d}`; }
-function pmDateToday(){ const t=new Date(); pmInsertDate(pmDateStr(t.getFullYear(), t.getMonth()+1, t.getDate())); }
+/* 元号（開始日）。これより前は西暦のまま出す */
+const PM_ERAS=[{n:'令和',y:2019,m:5,d:1},{n:'平成',y:1989,m:1,d:8},{n:'昭和',y:1926,m:12,d:25}];
+function pmWareki(y,m,d){
+  const v=y*10000+m*100+d;
+  for(const e of PM_ERAS){
+    if(v >= e.y*10000+e.m*100+e.d){ const yy=y-e.y+1; return `${e.n}${yy===1?'元':yy}年${m}月${d}日`; }
+  }
+  return `${y}年${m}月${d}日`;
+}
+/* 指定の書き方で日付の文字を作る */
+function pmDateFmtOf(fmt,y,m,d){
+  switch(fmt){
+    case 'ymd_kanji': return `${y}年${m}月${d}日`;
+    case 'wareki':    return pmWareki(y,m,d);
+    case 'md_kanji':  return `${m}月${d}日`;
+    case 'md_slash':  return `${m}/${d}`;
+    default:          return `${y}/${m}/${d}`;
+  }
+}
+function pmDateStr(y,m,d){ return pmDateFmtOf(pmPrefs.df,y,m,d); }
+/* 表示のしかたを変える（すでに写真に入れた日付も書き換える） */
+function pmSetDateFmt(f){
+  pmPrefs.df=f; pmSavePrefs();
+  if(pmStamp && pmStamp.ymd){
+    pmPushUndo();
+    pmStamp.text=pmDateFmtOf(f, pmStamp.ymd[0], pmStamp.ymd[1], pmStamp.ymd[2]);
+    pmRedraw(); pmDraftSave();
+  }
+  pmDateUiSync();
+}
+function pmDateToday(){ const t=new Date(); const y=t.getFullYear(), m=t.getMonth()+1, d=t.getDate();
+  pmInsertDate(pmDateStr(y,m,d), [y,m,d]); }
 function pmDatePick(){   // 端末標準のカレンダーで日付を選ぶ
   const inp=document.getElementById('pmDateInput');
   const t=new Date(); const p=n=>String(n).padStart(2,'0');
@@ -1069,13 +1107,13 @@ function pmDatePicked(v){
   if(!v) return;
   const [y,m,d]=v.split('-').map(Number);
   if(!y||!m||!d) return;
-  pmInsertDate(pmDateStr(y,m,d));
+  pmInsertDate(pmDateStr(y,m,d), [y,m,d]);
 }
-function pmInsertDate(str){
+function pmInsertDate(str, ymd){
   if(pmPrefs.target==='memo'){ pmMemoInsertText(str); return; }
   if(!pmImg){ toast('先に写真を入れてください（挿入先を「文書」にするとメモに入ります）'); return; }
   pmPushUndo();
-  pmStamp={ text:str, pos:pmPrefs.pos };
+  pmStamp={ text:str, pos:pmPrefs.pos, ymd:ymd||null };
   pmRedraw(); pmDateUiSync(); pmDraftSave();
   toast('写真に日付を入れました（位置ボタンで移動できます）');
 }
@@ -1098,6 +1136,13 @@ function pmSetDatePos(p){
 }
 function pmStampClear(){ if(pmStamp) pmPushUndo(); pmStamp=null; pmRedraw(); pmDateUiSync(); pmDraftSave(); }
 function pmDateUiSync(){
+  // 「表示」のボタンには、今日の日付をその書き方で表示する（見たまま選べる）
+  const t=new Date(), Y=t.getFullYear(), M=t.getMonth()+1, D=t.getDate();
+  PM_DFMTS.forEach(f=>{
+    const b=document.getElementById('pmDf_'+f); if(!b) return;
+    b.textContent=pmDateFmtOf(f,Y,M,D);
+    b.classList.toggle('on', pmPrefs.df===f);
+  });
   const tm=document.getElementById('pmTgMemo'), tp=document.getElementById('pmTgPhoto');
   if(tm) tm.classList.toggle('on', pmPrefs.target==='memo');
   if(tp) tp.classList.toggle('on', pmPrefs.target==='photo');
