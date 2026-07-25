@@ -183,9 +183,7 @@ body {
     </div>
     <button class="pm-zoomreset" id="pmZoomReset" onclick="pmResetZoom()" style="display:none">⤢ 全体</button>
   </div>
-  <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで下のボタンで色・大きさ・太字等を変えられます。図形ボタンで写真に〇→□も置けます）" onfocus="pmDeselShape()" onkeydown="event.stopPropagation()"></div>
-  <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる）。
-       ツールボタンはメモの下に置く（選択時に出るコピー等のメニューと重ならないため） -->
+  <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる） -->
   <div class="pm-tools pm-tabbar">
         <button class="pm-sizebtn pm-tab" id="pmTab_text" onpointerdown="event.preventDefault()" onclick="pmToolTab('text')">✏️ 文字</button>
     <button class="pm-sizebtn pm-tab" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕ 図形</button>
@@ -279,6 +277,7 @@ body {
     <button class="pm-sizebtn pm-posbtn" id="pmPos_rb" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('rb')">右下</button>
     <button class="pm-sizebtn" id="pmStampDel" onclick="pmStampClear()" style="display:none">日付を消す</button>
   </div>
+  <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで上のボタンで色・大きさ・太字等を変えられます）" onfocus="pmDeselShape()" onkeydown="event.stopPropagation()"></div>
   <input type="date" id="pmDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmDatePicked(this.value)">
 </div>
 
@@ -319,7 +318,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v12';
+const APP_VERSION='v13';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
