@@ -121,7 +121,20 @@ body {
 /* メモ欄の背景色（白/黒を選べる） */
 .pm-memo.bg-white { background: #ffffff; color: #222222; }
 .pm-memo.bg-black { background: #000000; color: #ffffff; }
-.pm-actions { flex-shrink: 0; display: flex; gap: 8px; }
+.pm-actions { flex-shrink: 0; display: flex; gap: 8px; order: -1; }   /* 縦持ちでは写真の上に出す */
+/* 右側の列。縦持ちでは無いものとして扱い、今までどおり縦一列に並べる */
+.pm-sidecol { display: contents; }
+/* 横持ち：左に写真、右に編集ツール（幅に余裕があるときだけ2列にする） */
+@media (orientation: landscape) and (min-width: 600px) {
+  .pm-body { flex-direction: row; align-items: stretch; gap: 10px;
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .pm-photo { flex: 1 1 56%; min-width: 0; }
+  .pm-sidecol { display: flex; flex-direction: column; flex: 0 0 44%; max-width: 520px;
+    min-width: 0; gap: 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .pm-actions { order: 0; }
+  .pm-memowrap { flex: 1 1 auto; min-height: 90px; }
+  .pm-memo { font-size: 24px; }
+}
 .pm-shot { flex: 1; padding: 13px 10px; border: none; border-radius: 10px; font-size: 14.5px; font-weight: bold;
   cursor: pointer; touch-action: manipulation; background: var(--pm-chip); color: var(--text);
   transition: background .14s, transform .08s, box-shadow .14s; }
@@ -198,11 +211,6 @@ body {
 <div class="pm-body">
   <input type="file" id="pmPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="pmPhotoChange(event)">
   <input type="file" id="pmFileInput" accept="image/*" style="display:none" onchange="pmPhotoChange(event)">
-  <div class="pm-actions">
-    <button class="pm-shot" onclick="pmPreview()">👁 プレビュー</button>
-    <button class="pm-shot" onclick="pmScreenshot()">📸 スクショ</button>
-    <button class="pm-shot primary" onclick="pmScreenshot(true)">📤 共有</button>
-  </div>
   <div class="pm-photo" id="pmPhotoArea">
     <canvas id="pmCanvas" class="pm-canvas"></canvas>
     <div class="pm-empty" id="pmEmpty">写真がありません</div>
@@ -218,6 +226,13 @@ body {
       <button class="pm-zoomreset" onclick="pmRotatePhoto(1)" title="右に90°回す">↻</button>
       <button class="pm-zoomreset" id="pmZoomReset" onclick="pmResetZoom()" style="display:none">⤢ 全体</button>
     </div>
+  </div>
+  <!-- 右側（横持ち時）にまとめる：操作ボタン・タブ・設定・メモ -->
+  <div class="pm-sidecol" id="pmSideCol">
+  <div class="pm-actions">
+    <button class="pm-shot" onclick="pmPreview()">👁 プレビュー</button>
+    <button class="pm-shot" onclick="pmScreenshot()">📸 スクショ</button>
+    <button class="pm-shot primary" onclick="pmScreenshot(true)">📤 共有</button>
   </div>
   <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる） -->
   <div class="pm-tools pm-tabbar">
@@ -355,6 +370,7 @@ body {
     </div>
   </div>
   <input type="date" id="pmDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmDatePicked(this.value)">
+  </div>
 </div>
 
 <!-- 保存設定（書き出す画像の大きさ） -->
@@ -413,7 +429,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v24';
+const APP_VERSION='v25';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
