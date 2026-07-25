@@ -106,10 +106,12 @@ body {
 .pm-tabbar .pm-tab { background: transparent; color: var(--text-light); font-size: 16.5px; padding: 11px 8px;
   border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .pm-tabbar .pm-tab.on { background: var(--pm-soft); color: var(--pm-acc); border-bottom-color: var(--pm-acc); }
-.pm-tabbar .pm-side { background: var(--pm-soft); color: var(--pm-acc); border: 1.5px solid var(--pm-acc);
-  font-size: 17px; padding: 8px 8px; line-height: 1; }
-.pm-tabbar .pm-side:active { background: var(--pm-acc); color: #fff; }
-.pm-tabbar .pm-side[disabled] { background: transparent; border-color: var(--pm-line); color: var(--text-light); opacity: .45; }
+.pm-editbtn { padding: 9px 13px; border: 1.5px solid var(--pm-acc); border-radius: 9px;
+  background: rgba(0,0,0,.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  color: #fff; font-size: 17px; font-weight: bold; line-height: 1;
+  cursor: pointer; touch-action: manipulation; transition: transform .08s, background .14s; }
+.pm-editbtn:active { transform: scale(.94); background: var(--pm-acc); }
+.pm-editbtn[disabled] { border-color: rgba(255,255,255,.25); color: rgba(255,255,255,.4); }
 .pm-del { background: rgba(192,57,43,.12); border: 1.5px solid #c0392b; color: #c0392b; }
 .pm-del:active { background: #c0392b; color: #fff; }
 .pm-tabbar .pm-spacer { flex: 1; }
@@ -207,6 +209,8 @@ body {
     <div class="pm-shootrow">
       <button class="pm-shoot" onclick="document.getElementById('pmPhotoInput').click()">📷 カメラ</button>
       <button class="pm-shoot" onclick="document.getElementById('pmFileInput').click()">🖼 ファイル</button>
+      <button class="pm-editbtn" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled title="元に戻す">↩︎</button>
+      <button class="pm-editbtn" id="pmRedoBtn" onpointerdown="event.preventDefault()" onclick="pmRedo()" disabled title="やり直す">↪︎</button>
     </div>
     <div class="pm-penbadge" id="pmPenBadge" style="display:none" onclick="pmModeOff()"></div>
     <div class="pm-toprow" id="pmTopRow" style="display:none">
@@ -221,8 +225,6 @@ body {
     <button class="pm-sizebtn pm-tab" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕ 図形</button>
     <button class="pm-sizebtn pm-tab" id="pmTab_pen" onpointerdown="event.preventDefault()" onclick="pmToolTab('pen')">✍️手書き</button>
     <button class="pm-sizebtn pm-tab" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅 日付</button>
-    <span class="pm-spacer"></span><button class="pm-sizebtn pm-side" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled title="元に戻す">↩︎</button>
-<button class="pm-sizebtn pm-side" id="pmRedoBtn" onpointerdown="event.preventDefault()" onclick="pmRedo()" disabled title="やり直す">↪︎</button>
   </div>
   <!-- 文字タブ：色・背景・大きさ・装飾 -->
   <div class="pm-tools pm-panel" id="pmPanel_text" style="display:none">
@@ -411,7 +413,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v23';
+const APP_VERSION='v24';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
