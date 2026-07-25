@@ -1,4 +1,4 @@
-const CACHE = 'photomemo-v16';
+const CACHE = 'photomemo-v17';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
