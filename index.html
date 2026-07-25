@@ -248,6 +248,7 @@ body {
     <button class="pm-sizebtn" style="font-style:italic" onpointerdown="event.preventDefault()" onclick="pmDeco('italic')">I</button>
     <button class="pm-sizebtn" style="text-decoration:underline" onpointerdown="event.preventDefault()" onclick="pmDeco('underline')">U</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmOpenPhrases()">📋 定型文</button>
+        <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
   </div>
   <!-- 図形タブ：置く図形・色・大きさ -->
   <div class="pm-tools pm-panel" id="pmPanel_shape" style="display:none">
@@ -276,7 +277,8 @@ body {
     <button class="pm-sizebtn pm-thbtn" id="pmTh_thin" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(0.5)">細</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh_mid" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(1)">中</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh_bold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(2)">太</button>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearShapes()">全部消す</button>
+    <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
+        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearShapes()">全部消す</button>
   </div>
   <!-- 手書きタブ：このタブを開いている間は、写真をなぞって線が描ける -->
   <div class="pm-tools pm-panel" id="pmPanel_pen" style="display:none">
@@ -295,7 +297,8 @@ body {
     <button class="pm-sizebtn pm-thbtn" id="pmTh2_thin" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(0.5)">細</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh2_mid" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(1)">中</button>
     <button class="pm-sizebtn pm-thbtn" id="pmTh2_bold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(2)">太</button>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearPen()">手書きを消す</button>
+    <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
+  <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearPen()">手書きを消す</button>
   </div>
   <!-- 日付タブ：今日／カレンダー・挿入先・位置 -->
   <div class="pm-tools pm-panel" id="pmPanel_date" style="display:none">
@@ -386,7 +389,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v19';
+const APP_VERSION='v20';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -500,7 +503,7 @@ function pmPhotoChange(e){
   img.onload=()=>{
     pmPushUndo();
     pmImgOrig=img; pmImg=img; pmImgBlob=f; pmRot=0;
-    pmShapes=[]; pmSelShape=-1;   // 写真を変えたら図形はリセット
+    pmShapes=[]; pmSelShape=-1; pmSelGroup=[];   // 写真を変えたら図形はリセット
     pmSetupCanvas(); pmFitView(); pmRedraw(); pmShapeSyncUi(); pmQualitySyncUi(); pmDraftSave(true);
     try{ URL.revokeObjectURL(url); }catch(_){}
   };
@@ -567,6 +570,14 @@ function pmRedraw(){
         pmView.scale, pmView.tx, pmView.ty);
     }
     if(pmSelShape>=0 && pmShapes[pmSelShape]) pmDrawShapeSel(ctx,pmShapes[pmSelShape],pmView.scale,pmView.tx,pmView.ty);
+    if(pmGroupActive()) pmDrawGroupSel(ctx,pmView.scale,pmView.tx,pmView.ty);
+    if(pmRectDraft){   // 囲んでいる最中の枠
+      const d=pmRectDraft;
+      ctx.save(); ctx.setLineDash([7,5]); ctx.strokeStyle=PM_ACC; ctx.lineWidth=2;
+      ctx.strokeRect(pmView.tx+Math.min(d.x1,d.x2)*pmView.scale, pmView.ty+Math.min(d.y1,d.y2)*pmView.scale,
+        Math.abs(d.x2-d.x1)*pmView.scale, Math.abs(d.y2-d.y1)*pmView.scale);
+      ctx.restore();
+    }
     // 日付スタンプ：見えている写真の範囲の隅に重ねて表示（書き出しでは写真そのものの隅に入る）
     const x0=Math.max(0,pmView.tx), y0=Math.max(0,pmView.ty);
     const x1=Math.min(c.width, pmView.tx+iw*pmView.scale), y1=Math.min(c.height, pmView.ty+ih*pmView.scale);
@@ -587,6 +598,15 @@ function pmPointerDown(e){ if(!pmImg) return; const c=pmCanvasEl(); if(e.target!
   pmPointers.set(e.pointerId, pmClientToCanvas(e.clientX,e.clientY));
   if(pmPointers.size>=2){ pmStartPinch(); pmPanLast=null; pmShapeGesture=null; pmPenCur=null; pmDraft2=null; return; }
   const cp=pmPointers.get(e.pointerId);
+  if(pmRectMode){   // 囲んで選ぶ
+    const ic=pmClampToImg(pmToImg(cp)); pmRectDraft={x1:ic.x,y1:ic.y,x2:ic.x,y2:ic.y};
+    pmPanLast=null; return;
+  }
+  if(pmGroupActive()){   // まとめて選んだものを動かす／回す
+    const gh=pmGroupHit(cp);
+    if(gh){ pmPushUndo(); pmShapeGesture=gh; pmPanLast=null; return; }
+    pmSelGroup=[]; pmShapeSyncUi(); pmRedraw();   // 枠の外を押した＝選択解除
+  }
   if(pmPenMode){   // 手書き：なぞった点をためていく（写真の外にはみ出さないよう収める）
     const ic=pmClampToImg(pmToImg(cp));
     pmPenCur={ type:'pen', x:ic.x, y:ic.y, size:Math.max(3, Math.min(pmIW(),pmIH())*0.006),
@@ -604,6 +624,17 @@ function pmPointerDown(e){ if(!pmImg) return; const c=pmCanvasEl(); if(e.target!
 function pmPointerMove(e){ if(!pmPointers.has(e.pointerId)) return; e.preventDefault();
   const cp=pmClientToCanvas(e.clientX,e.clientY); pmPointers.set(e.pointerId,cp);
   if(pmPointers.size>=2 && pmPinch){ pmShapeGesture=null; pmPenCur=null; pmDraft2=null; pmDoPinch(); pmRedraw(); return; }
+  if(pmRectDraft){ const ic=pmClampToImg(pmToImg(cp)); pmRectDraft.x2=ic.x; pmRectDraft.y2=ic.y; pmRedraw(); return; }
+  if(pmShapeGesture && pmShapeGesture.mode==='gmove'){
+    const ic=pmToImg(cp); pmGroupMove(ic.x-pmShapeGesture.px, ic.y-pmShapeGesture.py);
+    pmShapeGesture.px=ic.x; pmShapeGesture.py=ic.y; pmRedraw(); return;
+  }
+  if(pmShapeGesture && pmShapeGesture.mode==='ghandle'){
+    const ic=pmToImg(cp); const gs=pmShapeGesture;
+    const ang=Math.atan2(ic.y-gs.cy, ic.x-gs.cx), dist=Math.max(1,Math.hypot(ic.x-gs.cx, ic.y-gs.cy));
+    pmGroupTransform(gs.cx, gs.cy, ang-gs.lastAng, dist/gs.lastDist);
+    gs.lastAng=ang; gs.lastDist=dist; pmRedraw(); return;
+  }
   if(pmPenCur){ const ic=pmClampToImg(pmToImg(cp)); pmPenCur.pts.push({x:ic.x,y:ic.y}); pmRedraw(); return; }
   if(pmDraft2){ const ic=pmToImg(cp); pmDraft2.x2=ic.x; pmDraft2.y2=ic.y; pmRedraw(); return; }
   if(pmShapeGesture){
@@ -626,6 +657,7 @@ function pmPointerMove(e){ if(!pmPointers.has(e.pointerId)) return; e.preventDef
 function pmPointerUp(e){ if(!pmPointers.has(e.pointerId)) return; pmPointers.delete(e.pointerId);
   if(pmPointers.size<2) pmPinch=null;
   if(pmPointers.size===0){
+    if(pmRectDraft){ pmRectFinish(); pmPanLast=null; return; }
     if(pmPenCur && pmPenCur.pts.length<2){   // ほぼ動いていない＝タップ。図形があれば選んでモードを抜ける
       const hit=pmShapeHitAt(pmPenCur.pts[0]);
       pmPenCur=null;
@@ -836,11 +868,16 @@ let pmShapeThick=1;           // 次に置く図形の線の太さ（0.5=細, 1=
 /* 図形の色を設定（図形タブ専用）：選択中の図形に適用し、次に置く図形にも引き継ぐ */
 function pmShapeColorSet(c){
   pmShapeColor=c;
+  if(pmGroupActive()){ pmPushUndo(); pmGroupApply(s=>s.color=c); pmRedraw(); pmDraftSave(); return; }
   if(pmSelShape>=0 && pmShapes[pmSelShape]){ pmPushUndo(); pmShapes[pmSelShape].color=c; pmRedraw(); pmDraftSave(); }
   else toast('この色で次の図形を置きます（図形をタップして選ぶと色変更）');
 }
 /* 図形の大きさを一段階 変える（図形タブ専用） */
 function pmShapeSizeStep(dir){
+  if(pmGroupActive()){   // まとめて選んだものは中心を軸に拡大・縮小
+    const g=pmGroupBox(); if(!g) return;
+    pmPushUndo(); pmGroupTransform(g.cx, g.cy, 0, dir>0?1.25:0.8); pmRedraw(); pmDraftSave(); return;
+  }
   if(!(pmSelShape>=0 && pmShapes[pmSelShape])){ toast('大きさを変える図形をタップして選んでください'); return; }
   pmPushUndo();
   const sh=pmShapes[pmSelShape];
@@ -854,6 +891,7 @@ function pmDeselShape(){
 /* 線の太さを設定：選択中の図形に適用し、次に置く図形にも引き継ぐ */
 function pmSetShapeThick(v){
   pmShapeThick=v;
+  if(pmGroupActive()){ pmPushUndo(); pmGroupApply(s=>s.t=v); pmRedraw(); pmDraftSave(); pmThickSyncUi(); return; }
   if(pmSelShape>=0 && pmShapes[pmSelShape]){ pmPushUndo(); pmShapes[pmSelShape].t=v; pmRedraw(); pmDraftSave(); }
   pmThickSyncUi();
 }
@@ -921,6 +959,64 @@ function pmPenToggle(){
   pmModeSyncUi();
   if(pmPenMode) toast('写真の上をなぞると線が描けます（もう一度押すと解除）');
 }
+/* ── □で囲んでまとめて選ぶ（手書きの「あ」のように複数の線でできた形を一括で扱う）── */
+let pmSelGroup=[];      // まとめて選んだ図形のindex一覧
+let pmRectMode=false;   // 囲んで選ぶモード
+let pmRectDraft=null;   // 囲んでいる最中の枠（写真座標）
+function pmGroupActive(){ return pmSelGroup.length>0; }
+/* 選んだ図形全体を囲む枠 */
+function pmGroupBox(){
+  let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
+  pmSelGroup.forEach(i=>{ const s=pmShapes[i]; if(!s) return; const r=pmShapeRadius(s);
+    x1=Math.min(x1,s.x-r); y1=Math.min(y1,s.y-r); x2=Math.max(x2,s.x+r); y2=Math.max(y2,s.y+r); });
+  if(!isFinite(x1)) return null;
+  return { x1,y1,x2,y2, cx:(x1+x2)/2, cy:(y1+y2)/2, r:Math.max(12, Math.hypot(x2-x1,y2-y1)/2) };
+}
+function pmGroupApply(fn){ pmSelGroup.forEach(i=>{ const s=pmShapes[i]; if(s) fn(s); }); }
+/* まとめて動かす */
+function pmGroupMove(dx,dy){
+  pmGroupApply(s=>{ s.x+=dx; s.y+=dy;
+    if(s.type==='pen' && s.pts && !s.nrm) s.pts.forEach(p=>{ p.x+=dx; p.y+=dy; }); });
+}
+/* まとめて回す・大きさを変える（中心cx,cyのまわりで dA ラジアン回し、k倍する） */
+function pmGroupTransform(cx,cy,dA,k){
+  const c=Math.cos(dA), sn=Math.sin(dA);
+  pmGroupApply(s=>{
+    const rx=(s.x-cx)*k, ry=(s.y-cy)*k;
+    s.x=cx+rx*c-ry*sn; s.y=cy+rx*sn+ry*c;
+    s.angle=(s.angle||0)+dA;
+    s.size=Math.max(4,(s.size||10)*k);
+    if(s.type==='pen' && s.pts && !s.nrm){
+      s.pts=s.pts.map(p=>{ const px=(p.x-cx)*k, py=(p.y-cy)*k;
+        return { x:cx+px*c-py*sn, y:cy+px*sn+py*c }; });
+    }
+  });
+}
+/* 「範囲で選ぶ」ボタン */
+function pmRectToggle(){
+  if(!pmImg){ toast('先に写真を入れてください'); return; }
+  pmPenMode=false; pmPlaceMode='';
+  pmRectMode=!pmRectMode;
+  if(pmRectMode){ pmSelShape=-1; pmSelGroup=[]; }
+  pmModeSyncUi(); pmShapeSyncUi(); pmRedraw();
+  if(pmRectMode) toast('写真の上で四角く囲むと、中の図形をまとめて選べます');
+}
+/* 囲み終わり：枠の中にある図形をまとめて選ぶ */
+function pmRectFinish(){
+  const d=pmRectDraft; pmRectDraft=null;
+  if(!d){ pmRedraw(); return; }
+  const x1=Math.min(d.x1,d.x2), x2=Math.max(d.x1,d.x2);
+  const y1=Math.min(d.y1,d.y2), y2=Math.max(d.y1,d.y2);
+  if(Math.abs(x2-x1)*pmView.scale<8 || Math.abs(y2-y1)*pmView.scale<8){ pmRedraw(); return; }
+  const hit=[];
+  pmShapes.forEach((s,i)=>{ if(s.x>=x1 && s.x<=x2 && s.y>=y1 && s.y<=y2) hit.push(i); });
+  if(!hit.length){ toast('囲んだ中に図形がありませんでした'); pmRedraw(); return; }
+  pmSelGroup=hit; pmSelShape=-1; pmRectMode=false;
+  pmModeSyncUi();
+  if(pmToolOpen!=='shape') pmToolTab('shape');   // 大きさ・色を変えられるタブへ
+  pmShapeSyncUi(); pmRedraw();
+  toast(hit.length+'個をまとめて選びました（枠の中をドラッグで移動・丸で回転と大きさ）');
+}
 /* 描き終えた手書きを、他の図形と同じように動かせる形に変換する */
 function pmPenFinish(cur){
   const pts=cur.pts;
@@ -935,18 +1031,20 @@ function pmPenFinish(cur){
 }
 function pmModeSyncUi(){
   const pen=document.getElementById('pmPenBtn'); if(pen) pen.classList.toggle('on', pmPenMode);
-  const c=pmCanvasEl(); if(c) c.classList.toggle('penmode', pmPenMode || pmPlaceMode==='arrow');
+  const c=pmCanvasEl(); if(c) c.classList.toggle('penmode', pmPenMode || pmPlaceMode==='arrow' || pmRectMode);
+  document.querySelectorAll('.pm-rectbtn').forEach(b=>b.classList.toggle('on', pmRectMode));
   const bd=document.getElementById('pmPenBadge');
   if(bd){
     if(pmPenMode) bd.textContent='✏️ 手書き中（押すと解除）';
     else if(pmPlaceMode==='arrow') bd.textContent='→ 矢印を引きます（押すと解除）';
-    bd.style.display = (pmPenMode || pmPlaceMode==='arrow') ? '' : 'none';
+    else if(pmRectMode) bd.textContent='□ 囲んで選びます（押すと解除）';
+    bd.style.display = (pmPenMode || pmPlaceMode==='arrow' || pmRectMode) ? '' : 'none';
   }
 }
 /* 手書き・矢印のモードをやめる */
 function pmModeOff(){
-  if(!pmPenMode && !pmPlaceMode) return;
-  pmPenMode=false; pmPlaceMode='';
+  if(!pmPenMode && !pmPlaceMode && !pmRectMode) return;
+  pmPenMode=false; pmPlaceMode=''; pmRectMode=false;
   if(pmToolOpen==='pen') pmToolTab('shape');   // 手書きタブから抜ける
   pmModeSyncUi();
 }
@@ -954,11 +1052,16 @@ function pmModeOff(){
 function pmClearPen(){
   if(!pmShapes.some(x=>x.type==='pen')){ toast('消す手書きがありません'); return; }
   pmPushUndo();
-  pmShapes=pmShapes.filter(x=>x.type!=='pen'); pmSelShape=-1;
+  pmShapes=pmShapes.filter(x=>x.type!=='pen'); pmSelShape=-1; pmSelGroup=[];
   pmShapeSyncUi(); pmRedraw(); pmDraftSave();
   toast('手書きを消しました（↩︎戻すで元に戻せます）');
 }
 function pmDelShape(){
+  if(pmGroupActive()){   // まとめて選んだものを全部消す
+    pmPushUndo();
+    pmSelGroup.slice().sort((a,b)=>b-a).forEach(i=>pmShapes.splice(i,1));
+    pmSelGroup=[]; pmShapeSyncUi(); pmRedraw(); pmDraftSave(); return;
+  }
   if(pmSelShape<0) return;
   pmPushUndo();
   pmShapes.splice(pmSelShape,1); pmSelShape=-1;
@@ -968,7 +1071,7 @@ function pmDelShape(){
 function pmClearShapes(){
   if(!pmShapes.length){ toast('消す図形がありません'); return; }
   pmPushUndo();
-  pmShapes=[]; pmSelShape=-1;
+  pmShapes=[]; pmSelShape=-1; pmSelGroup=[];
   pmShapeSyncUi(); pmRedraw(); pmDraftSave();
   toast('図形をすべて消しました（↩︎戻すで元に戻せます）');
 }
@@ -990,7 +1093,7 @@ function pmUndoSyncUi(){
 function pmUndo(){
   const j=pmUndoStack.pop(); if(!j){ pmUndoSyncUi(); return; }
   let st; try{ st=JSON.parse(j); }catch(_){ pmUndoSyncUi(); return; }
-  pmShapes=st.sh||[]; pmStamp=st.st||null; pmSelShape=-1;
+  pmShapes=st.sh||[]; pmStamp=st.st||null; pmSelShape=-1; pmSelGroup=[];
   if(st.mh!=null){ const ed=document.getElementById('pmMemo'); if(ed) ed.innerHTML=st.mh; }   // 文字の書式も戻す
   if((st.rot||0)!==pmRot){ pmRot=st.rot||0; pmApplyRot(); pmFitView(); }
   pmUndoSyncUi(); pmShapeSyncUi(); pmDateUiSync(); pmRedraw(); pmDraftSave();
@@ -998,7 +1101,8 @@ function pmUndo(){
 function pmShapeSyncUi(){
   const sel=(pmSelShape>=0)?pmShapes[pmSelShape]:null;
   const del=document.getElementById('pmShapeDel');
-  if(del) del.style.display = sel ? '' : 'none';
+  if(del) del.style.display = (sel||pmGroupActive()) ? '' : 'none';
+  document.querySelectorAll('.pm-rectbtn').forEach(b=>b.classList.toggle('on', pmRectMode));
   const te=document.getElementById('pmTextEdit');
   if(te) te.style.display = (sel && sel.type==='text') ? '' : 'none';
   if(sel && pmToolOpen!=='shape') pmToolTab('shape');   // 図形を選んだら図形タブを開く
@@ -1013,6 +1117,7 @@ function pmToolTab(name){
     const b=document.getElementById('pmTab_'+t);  if(b) b.classList.toggle('on', pmToolOpen===t);
   });
   // 手書きタブを開いている間だけ「なぞって描く」状態にする
+  if(pmToolOpen!=='shape' && pmToolOpen!=='pen' && pmToolOpen!=='text') pmRectMode=false;
   if(pmToolOpen==='pen'){
     pmPlaceMode='';
     if(!pmImg){ toast('先に写真を入れてください'); pmPenMode=false; }
@@ -1022,6 +1127,7 @@ function pmToolTab(name){
   }
   pmModeSyncUi();
   if(pmToolOpen==='shape' || pmToolOpen==='pen') pmThickSyncUi();
+  requestAnimationFrame(pmRelayout);   // パネルの高さが変わるので写真の枠を合わせ直す
   pmMemoVisSync();
 }
 /* 文字を書く時以外（図形・日付・写真）はメモ欄を隠して、写真を大きく使えるようにする */
@@ -1038,6 +1144,7 @@ function pmMemoVisible(){ const w=document.getElementById('pmMemoWrap'); return 
 function pmRelayout(){
   const c=pmCanvasEl(); if(!c) return;
   const r=c.getBoundingClientRect(); if(r.width<1||r.height<1) return;
+  if(Math.abs(r.width-c.width)<2 && Math.abs(r.height-c.height)<2) return;   // 枠が変わっていなければ何もしない
   const ratio=(pmView.fit>0) ? pmView.scale/pmView.fit : 1;   // いまの拡大率（全体表示＝1）
   c.width=Math.max(1,Math.round(r.width)); c.height=Math.max(1,Math.round(r.height));
   pmFitView();
@@ -1058,6 +1165,19 @@ function pmShapeRadius(s){
     return Math.max(8, m);
   }
   return s.size;
+}
+/* まとめ選択中：枠の中＝移動、右のハンドル＝回転と大きさ */
+function pmGroupHit(cp){
+  const g=pmGroupBox(); if(!g) return null;
+  const hx=pmView.tx+(g.cx+g.r)*pmView.scale, hy=pmView.ty+g.cy*pmView.scale;
+  if(Math.hypot(cp.x-hx,cp.y-hy)<=24){
+    const ic=pmToImg(cp);
+    return { mode:'ghandle', cx:g.cx, cy:g.cy,
+      lastAng:Math.atan2(ic.y-g.cy, ic.x-g.cx), lastDist:Math.max(1,Math.hypot(ic.x-g.cx, ic.y-g.cy)) };
+  }
+  const ic=pmToImg(cp);
+  if(ic.x>=g.x1 && ic.x<=g.x2 && ic.y>=g.y1 && ic.y<=g.y2) return { mode:'gmove', px:ic.x, py:ic.y };
+  return null;
 }
 /* 写真上の座標にある図形を探す（見つからなければ -1） */
 function pmShapeHitAt(ic){
@@ -1157,6 +1277,18 @@ function pmIsLight(col){
   const hex=/^[0-9a-f]{2}$/i.test(m[1]);
   const r=hex?parseInt(m[1],16):+m[1], g=hex?parseInt(m[2],16):+m[2], b=hex?parseInt(m[3],16):+m[3];
   return (0.299*r+0.587*g+0.114*b)/255 > 0.6;
+}
+/* まとめて選んだ図形の枠とハンドル（画面表示のみ） */
+function pmDrawGroupSel(ctx,f,ox,oy){
+  const g=pmGroupBox(); if(!g) return;
+  ctx.save();
+  ctx.setLineDash([7,5]); ctx.strokeStyle=PM_ACC; ctx.lineWidth=2.5;
+  ctx.strokeRect(ox+g.x1*f, oy+g.y1*f, (g.x2-g.x1)*f, (g.y2-g.y1)*f);
+  ctx.setLineDash([]);
+  const hx=ox+(g.cx+g.r)*f, hy=oy+g.cy*f;
+  ctx.fillStyle=PM_ACC; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(hx,hy,10,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.restore();
 }
 /* 選択中の図形の枠とハンドル（画面表示のみ。書き出しには入れない） */
 function pmDrawShapeSel(ctx,s,f,ox,oy){
