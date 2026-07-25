@@ -31,6 +31,11 @@
     --bg: #0f1626;
   }
 }
+/* 写真メモの色は「基準色1つ＋グレーの濃淡」に統一する */
+:root { --pm-acc: #1565c0; --pm-soft: rgba(21,101,192,.12); --pm-chip: rgba(120,132,156,.13); --pm-line: rgba(120,132,156,.30); }
+@media (prefers-color-scheme: dark) {
+  :root { --pm-soft: rgba(21,101,192,.28); --pm-chip: rgba(150,170,210,.16); --pm-line: rgba(150,170,210,.26); }
+}
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; height: 100%; }
 body {
@@ -51,30 +56,56 @@ body {
 .pm-body { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px;
   /* 下は少し広めに空ける（ボタンが画面の端にくっつかないように。iPhoneのホームバーも避ける） */
   padding: 8px 10px calc(18px + env(safe-area-inset-bottom, 0px)); }
-.pm-photo { position: relative; flex: 1 1 64%; min-height: 0; background: #000; border-radius: 8px; overflow: hidden; }
+.pm-photo { position: relative; flex: 1 1 64%; min-height: 0; background: #000; border-radius: 12px; overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,.12); }
 .pm-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .pm-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #888; font-size: 14px; pointer-events: none; }
 .pm-shootrow { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 8px; }
-.pm-shoot { padding: 8px 12px; border: none; border-radius: 7px; background: rgba(21,101,192,0.92); color: #fff; font-size: 13.5px; font-weight: bold; cursor: pointer; touch-action: manipulation; }
+.pm-shoot { padding: 9px 13px; border: 1px solid rgba(255,255,255,.28); border-radius: 9px; background: rgba(0,0,0,.55);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  color: #fff; font-size: 13.5px; font-weight: bold; cursor: pointer; touch-action: manipulation; transition: transform .08s; }
+.pm-shoot:active { transform: scale(.95); }
 .pm-zoomreset { position: absolute; right: 8px; top: 8px; padding: 5px 10px; border: none; border-radius: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; cursor: pointer; touch-action: manipulation; }
 .pm-memo { flex: 0 1 36%; min-height: 70px; overflow-y: auto; padding: 9px 10px; font-size: 28.8px; line-height: 1.35;   /* 既定48px×表示0.6倍 */
-  border: 1px solid var(--save-item-border); border-radius: 8px; background: var(--cell-bg, #fff); color: var(--text);
+  border: 1px solid var(--pm-line); border-radius: 10px; background: var(--cell-bg, #fff); color: var(--text);
   -webkit-user-modify: read-write; word-break: break-word; }
 .pm-memo:empty::before { content: attr(data-ph); color: var(--text-light); pointer-events: none; font-size: 15px; }
 /* 文字ツール（色・大きさ。選択した部分に適用） */
-.pm-tools { flex-shrink: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.pm-tool-lb { font-size: 11.5px; font-weight: bold; color: var(--text-light); margin-left: 2px; }
-.pm-color { width: 26px; height: 26px; border: 2px solid var(--save-item-border); border-radius: 50%; cursor: pointer; touch-action: manipulation; padding: 0; }
-.pm-color:active { transform: scale(1.15); }
-.pm-sizebtn { padding: 4px 9px; border: 1px solid var(--save-item-border); border-radius: 6px;
-  background: var(--save-item-bg); color: var(--text); font-weight: bold; cursor: pointer; touch-action: manipulation; }
-.pm-sizebtn.on { background: #1565c0; border-color: #1565c0; color: #fff; }
+.pm-tools { flex-shrink: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+/* ラベルの前だけ広めに空けて、まとまりが見えるようにする */
+.pm-tool-lb { font-size: 11px; font-weight: bold; color: var(--text-light); margin-left: 10px; letter-spacing: .02em; }
+.pm-tools > .pm-tool-lb:first-child { margin-left: 0; }
+.pm-color { width: 26px; height: 26px; border: none; border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation;
+  box-shadow: inset 0 0 0 1.5px rgba(128,138,158,.45); transition: transform .1s; }
+.pm-color:active { transform: scale(1.18); }
+/* ツールのボタン：枠線をなくし、薄い面だけにする（線が減って画面が静かになる） */
+.pm-sizebtn { padding: 7px 11px; border: none; border-radius: 8px; font-size: 13.5px;
+  background: var(--pm-chip); color: var(--text); font-weight: bold; cursor: pointer; touch-action: manipulation;
+  transition: background .14s, color .14s, transform .08s; }
+.pm-sizebtn:active { transform: scale(.94); }
+.pm-sizebtn[disabled] { opacity: .35; }
+.pm-sizebtn.on { background: var(--pm-acc); color: #fff; }
+/* タブ：下線でつながって見せる */
+.pm-tabbar { gap: 2px; border-bottom: 1px solid var(--pm-line); }
+.pm-tabbar .pm-tab { background: transparent; color: var(--text-light); padding: 8px 11px;
+  border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.pm-tabbar .pm-tab.on { background: var(--pm-soft); color: var(--pm-acc); border-bottom-color: var(--pm-acc); }
+.pm-tabbar .pm-side { background: transparent; color: var(--text-light); font-size: 12.5px; }
+.pm-tabbar .pm-side:active { background: var(--pm-chip); }
+.pm-tabbar .pm-spacer { flex: 1; }
+/* パネルはすっと開く */
+.pm-panel { animation: pmPanelIn .16s ease-out; }
+@keyframes pmPanelIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
 /* メモ欄の背景色（白/黒を選べる） */
 .pm-memo.bg-white { background: #ffffff; color: #222222; }
 .pm-memo.bg-black { background: #000000; color: #ffffff; }
 .pm-actions { flex-shrink: 0; display: flex; gap: 8px; margin-top: 2px; }
-.pm-shot { flex: 1; padding: 13px; border-radius: 8px; font-size: 14.5px; font-weight: bold; cursor: pointer; touch-action: manipulation;
-  background: var(--save-item-bg); color: var(--text); border: 1px solid var(--save-item-border); }
+.pm-shot { flex: 1; padding: 13px 10px; border: none; border-radius: 10px; font-size: 14.5px; font-weight: bold;
+  cursor: pointer; touch-action: manipulation; background: var(--pm-chip); color: var(--text);
+  transition: background .14s, transform .08s, box-shadow .14s; }
+.pm-shot:active { transform: scale(.97); }
+/* 主役のボタン（共有）だけ塗りつぶして目立たせる */
+.pm-shot.primary { background: var(--pm-acc); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
 /* モーダル（プレビュー用） */
 .modal-overlay {
   display: none; position: fixed; inset: 0;
@@ -108,16 +139,16 @@ body {
 /* 定型文リスト */
 .ph-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .ph-row { display: flex; align-items: center; gap: 6px; }
-.ph-txt { flex: 1; text-align: left; padding: 10px 12px; font-size: 14.5px; border: 1px solid var(--save-item-border);
-  border-radius: 7px; background: var(--save-item-bg); color: var(--text); cursor: pointer; touch-action: manipulation; }
-.ph-mini { flex-shrink: 0; padding: 10px 10px; border: 1px solid var(--save-item-border); border-radius: 7px;
-  background: var(--save-item-bg); color: var(--text); font-size: 13px; cursor: pointer; touch-action: manipulation; }
+.ph-txt { flex: 1; text-align: left; padding: 11px 13px; font-size: 14.5px; border: none;
+  border-radius: 9px; background: var(--pm-chip); color: var(--text); cursor: pointer; touch-action: manipulation; }
+.ph-mini { flex-shrink: 0; padding: 11px 11px; border: none; border-radius: 9px;
+  background: var(--pm-chip); color: var(--text); font-size: 13px; cursor: pointer; touch-action: manipulation; }
 .ph-del { color: #c0392b; }
 .ph-add { flex-shrink: 0; display: flex; gap: 6px; }
 .ph-add input { flex: 1; min-width: 0; padding: 9px 10px; font-size: 15px; border: 1px solid var(--save-item-border);
   border-radius: 7px; background: var(--cell-bg, #fff); color: var(--text); }
 /* 手書きモード中はキャンバスの縁を光らせて分かるようにする */
-.pm-canvas.penmode { outline: 3px solid #ffb300; outline-offset: -3px; }
+.pm-canvas.penmode { outline: 3px solid var(--pm-acc); outline-offset: -3px; }
 /* 簡易トースト通知 */
 .app-toast {
   position:fixed; left:50%; bottom:18px; transform:translateX(-50%) translateY(8px);
@@ -151,15 +182,15 @@ body {
   <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる）。
        ツールボタンはメモの下に置く（選択時に出るコピー等のメニューと重ならないため） -->
   <div class="pm-tools pm-tabbar">
-    <button class="pm-sizebtn" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled>↩︎ 戻す</button>
-    <button class="pm-sizebtn" id="pmTab_text" onpointerdown="event.preventDefault()" onclick="pmToolTab('text')">✏️ 文字</button>
-    <button class="pm-sizebtn" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕ 図形</button>
-    <button class="pm-sizebtn" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅 日付</button>
-    <button class="pm-sizebtn" id="pmTab_photo" onpointerdown="event.preventDefault()" onclick="pmToolTab('photo')">🖼 写真</button>
-    <button class="pm-sizebtn" id="pmShapeDel" onclick="pmDelShape()" style="display:none">🗑 消す</button>
+        <button class="pm-sizebtn pm-tab" id="pmTab_text" onpointerdown="event.preventDefault()" onclick="pmToolTab('text')">✏️ 文字</button>
+    <button class="pm-sizebtn pm-tab" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕ 図形</button>
+    <button class="pm-sizebtn pm-tab" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅 日付</button>
+    <button class="pm-sizebtn pm-tab" id="pmTab_photo" onpointerdown="event.preventDefault()" onclick="pmToolTab('photo')">🖼 写真</button>
+    <span class="pm-spacer"></span><button class="pm-sizebtn pm-side" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled>↩︎ 戻す</button>
+        <button class="pm-sizebtn pm-side" id="pmShapeDel" onclick="pmDelShape()" style="display:none">🗑 消す</button>
   </div>
   <!-- 文字タブ：色・背景・大きさ・装飾 -->
-  <div class="pm-tools" id="pmPanel_text" style="display:none">
+  <div class="pm-tools pm-panel" id="pmPanel_text" style="display:none">
     <span class="pm-tool-lb">色</span>
     <button class="pm-color" style="background:var(--text,#333)" title="標準" onpointerdown="event.preventDefault()" onclick="pmColor('')"></button>
     <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmColor('#e53935')"></button>
@@ -189,7 +220,7 @@ body {
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmOpenPhrases()">📋 定型文</button>
   </div>
   <!-- 図形タブ：置く図形・色・大きさ -->
-  <div class="pm-tools" id="pmPanel_shape" style="display:none">
+  <div class="pm-tools pm-panel" id="pmPanel_shape" style="display:none">
     <span class="pm-tool-lb">置く</span>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('circle')">〇</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('rect')">□</button>
@@ -219,7 +250,7 @@ body {
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearShapes()">全部消す</button>
   </div>
   <!-- 写真タブ：向きの回転・書き出しの画質 -->
-  <div class="pm-tools" id="pmPanel_photo" style="display:none">
+  <div class="pm-tools pm-panel" id="pmPanel_photo" style="display:none">
     <span class="pm-tool-lb">向き</span>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmRotatePhoto(-1)">↺ 左90°</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmRotatePhoto(1)">↻ 右90°</button>
@@ -230,7 +261,7 @@ body {
     <span class="pm-tool-lb" id="pmQNote"></span>
   </div>
   <!-- 日付タブ：今日／カレンダー・挿入先・位置 -->
-  <div class="pm-tools" id="pmPanel_date" style="display:none">
+  <div class="pm-tools pm-panel" id="pmPanel_date" style="display:none">
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmDateToday()">📅 今日</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmDatePick()">🗓 カレンダー</button>
     <span class="pm-tool-lb">挿入先</span>
@@ -247,7 +278,7 @@ body {
   <div class="pm-actions">
     <button class="pm-shot" onclick="pmPreview()">👁 プレビュー</button>
     <button class="pm-shot" onclick="pmScreenshot()">📸 スクショ</button>
-    <button class="pm-shot" onclick="pmScreenshot(true)">📤 共有</button>
+    <button class="pm-shot primary" onclick="pmScreenshot(true)">📤 共有</button>
   </div>
 </div>
 
@@ -281,14 +312,14 @@ body {
       <div class="shotprev-imgwrap"><img id="shotPrevImg" alt="プレビュー"></div>
       <div class="shotprev-actions">
         <button class="pm-shot" onclick="shotPrevDeliver(false)">📸 スクショ</button>
-        <button class="pm-shot" onclick="shotPrevDeliver(true)">📤 共有</button>
+        <button class="pm-shot primary" onclick="shotPrevDeliver(true)">📤 共有</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-const APP_VERSION='v10';
+const APP_VERSION='v11';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -782,6 +813,27 @@ function pmToolTab(name){
   if(pmToolOpen!=='shape' && (pmPenMode||pmPlaceMode)){ pmPenMode=false; pmPlaceMode=''; pmModeSyncUi(); }   // タブを離れたら描画モード解除
   if(pmToolOpen==='shape') pmThickSyncUi();
   if(pmToolOpen==='photo') pmQualitySyncUi();
+  pmMemoVisSync();
+}
+/* 文字を書く時以外（図形・日付・写真）はメモ欄を隠して、写真を大きく使えるようにする */
+function pmMemoVisSync(){
+  const ed=document.getElementById('pmMemo'); if(!ed) return;
+  const show = (pmToolOpen==='' || pmToolOpen==='text');
+  const cur = ed.style.display!=='none';
+  if(show===cur) return;
+  ed.style.display = show ? '' : 'none';
+  requestAnimationFrame(pmRelayout);   // 枠が変わるのでキャンバスを合わせ直す
+}
+function pmMemoVisible(){ const ed=document.getElementById('pmMemo'); return !!ed && ed.style.display!=='none'; }
+/* 表示枠が変わった時に、拡大の度合いを保ったままキャンバスを作り直す */
+function pmRelayout(){
+  const c=pmCanvasEl(); if(!c) return;
+  const r=c.getBoundingClientRect(); if(r.width<1||r.height<1) return;
+  const ratio=(pmView.fit>0) ? pmView.scale/pmView.fit : 1;   // いまの拡大率（全体表示＝1）
+  c.width=Math.max(1,Math.round(r.width)); c.height=Math.max(1,Math.round(r.height));
+  pmFitView();
+  if(pmImg && Math.abs(ratio-1)>0.01){ pmView.scale=pmView.fit*ratio; pmClamp(); }
+  pmRedraw();
 }
 /* 図形のおおよその半径（当たり判定・選択枠に使う。画像基準px） */
 const _pmMeas=document.createElement('canvas').getContext('2d');
@@ -861,6 +913,7 @@ function pmDrawShape(ctx,s,f,ox,oy){
   }
   ctx.restore();
 }
+const PM_ACC='#1565c0';   // 画面の基準色（選択枠などに使う）
 /* 色が明るいか（文字の縁取りの色を決めるのに使う） */
 function pmIsLight(col){
   const m=/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(col||'').replace('#',''))
@@ -874,12 +927,12 @@ function pmIsLight(col){
 function pmDrawShapeSel(ctx,s,f,ox,oy){
   const x=ox+s.x*f, y=oy+s.y*f, r=pmShapeRadius(s)*f*1.15+6;
   ctx.save();
-  ctx.setLineDash([6,5]); ctx.strokeStyle='#1565c0'; ctx.lineWidth=2;
+  ctx.setLineDash([6,5]); ctx.strokeStyle=PM_ACC; ctx.lineWidth=2;
   ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.stroke();
   ctx.setLineDash([]);
   if(s.type!=='pen'){   // 手書きは回転・大きさ変更なし＝ハンドルを出さない
     const hx=x+Math.cos(s.angle||0)*r, hy=y+Math.sin(s.angle||0)*r;
-    ctx.fillStyle='#1565c0'; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5;
+    ctx.fillStyle=PM_ACC; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5;
     ctx.beginPath(); ctx.arc(hx,hy,9,0,Math.PI*2); ctx.fill(); ctx.stroke();
   }
   ctx.restore();
@@ -942,7 +995,9 @@ function pmInsertDate(str){
 }
 /* メモ（contenteditable）のカーソル位置に文字を挿入。カーソルが無ければ末尾に */
 function pmMemoInsertText(t){
-  const ed=document.getElementById('pmMemo'); if(!ed) return; ed.focus();
+  const ed=document.getElementById('pmMemo'); if(!ed) return;
+  if(!pmMemoVisible() && pmToolOpen!=='text') pmToolTab('text');   // 隠れている時は文字タブを開いて見せる
+  ed.focus();
   const s=getSelection();
   let inEd=false;
   if(s && s.rangeCount){ let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement; inEd=!!(n && ed.contains(n)); }
