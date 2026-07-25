@@ -65,7 +65,13 @@ body {
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   color: #fff; font-size: 13.5px; font-weight: bold; cursor: pointer; touch-action: manipulation; transition: transform .08s; }
 .pm-shoot:active { transform: scale(.95); }
-.pm-zoomreset { position: absolute; right: 8px; top: 8px; padding: 5px 10px; border: none; border-radius: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; cursor: pointer; touch-action: manipulation; }
+.hdr-right { display: flex; align-items: center; gap: 8px; }
+.hdr-btn { padding: 6px 11px; border: 1px solid rgba(255,255,255,.45); border-radius: 8px;
+  background: rgba(255,255,255,.18); color: #fff; font-size: 13px; font-weight: bold;
+  cursor: pointer; touch-action: manipulation; transition: background .14s, transform .08s; }
+.hdr-btn:active { transform: scale(.95); background: rgba(255,255,255,.32); }
+.pm-toprow { position: absolute; right: 8px; top: 8px; display: flex; gap: 6px; }
+.pm-zoomreset { padding: 6px 11px; border: none; border-radius: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; cursor: pointer; touch-action: manipulation; }
 /* メモ欄：枠の中に操作ボタンを浮かせるため、外側の枠で包む */
 .pm-memowrap { position: relative; flex: 0 1 36%; min-height: 70px; display: flex; }
 .pm-caret { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
@@ -96,7 +102,7 @@ body {
 .pm-sizebtn.on { background: var(--pm-acc); color: #fff; }
 /* タブ：下線でつながって見せる */
 .pm-tabbar { gap: 2px; border-bottom: 1px solid var(--pm-line); }
-.pm-tabbar .pm-tab { background: transparent; color: var(--text-light); font-size: 16.5px; padding: 11px 10px;
+.pm-tabbar .pm-tab { background: transparent; color: var(--text-light); font-size: 16.5px; padding: 11px 8px;
   border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .pm-tabbar .pm-tab.on { background: var(--pm-soft); color: var(--pm-acc); border-bottom-color: var(--pm-acc); }
 .pm-tabbar .pm-side { background: transparent; color: var(--text-light); font-size: 17px; padding: 10px 9px; }
@@ -176,7 +182,10 @@ body {
 
 <div class="app-header">
   <span>📝 写真メモ</span>
-  <span class="app-ver" id="appVer"></span>
+  <span class="hdr-right">
+    <button class="hdr-btn" onclick="pmOpenSaveSet()">⚙ 保存設定</button>
+    <span class="app-ver" id="appVer"></span>
+  </span>
 </div>
 
 <div class="pm-body">
@@ -195,14 +204,18 @@ body {
       <button class="pm-shoot" onclick="document.getElementById('pmFileInput').click()">🖼 ファイル</button>
     </div>
     <div class="pm-penbadge" id="pmPenBadge" style="display:none" onclick="pmModeOff()"></div>
-    <button class="pm-zoomreset" id="pmZoomReset" onclick="pmResetZoom()" style="display:none">⤢ 全体</button>
+    <div class="pm-toprow" id="pmTopRow" style="display:none">
+      <button class="pm-zoomreset" onclick="pmRotatePhoto(-1)" title="左に90°回す">↺</button>
+      <button class="pm-zoomreset" onclick="pmRotatePhoto(1)" title="右に90°回す">↻</button>
+      <button class="pm-zoomreset" id="pmZoomReset" onclick="pmResetZoom()" style="display:none">⤢ 全体</button>
+    </div>
   </div>
   <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる） -->
   <div class="pm-tools pm-tabbar">
         <button class="pm-sizebtn pm-tab" id="pmTab_text" onpointerdown="event.preventDefault()" onclick="pmToolTab('text')">✏️ 文字</button>
     <button class="pm-sizebtn pm-tab" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕ 図形</button>
+    <button class="pm-sizebtn pm-tab" id="pmTab_pen" onpointerdown="event.preventDefault()" onclick="pmToolTab('pen')">✍️手書き</button>
     <button class="pm-sizebtn pm-tab" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅 日付</button>
-    <button class="pm-sizebtn pm-tab" id="pmTab_photo" onpointerdown="event.preventDefault()" onclick="pmToolTab('photo')">🖼 写真</button>
     <span class="pm-spacer"></span><button class="pm-sizebtn pm-side" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled title="元に戻す">↩︎</button>
         <button class="pm-sizebtn pm-side" id="pmShapeDel" onclick="pmDelShape()" style="display:none" title="選んだ図形を消す">🗑</button>
   </div>
@@ -244,7 +257,6 @@ body {
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmArrowMode()">→</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('tri')">△</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddText()">あ 文字</button>
-    <button class="pm-sizebtn" id="pmPenBtn" onpointerdown="event.preventDefault()" onclick="pmPenToggle()">✏️ 手書き</button>
     <button class="pm-sizebtn" id="pmTextEdit" onpointerdown="event.preventDefault()" onclick="pmEditText()" style="display:none">✎ 文字を直す</button>
     <span class="pm-tool-lb">色</span>
     <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e53935')"></button>
@@ -266,16 +278,24 @@ body {
     <button class="pm-sizebtn pm-thbtn" id="pmTh_bold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(2)">太</button>
     <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearShapes()">全部消す</button>
   </div>
-  <!-- 写真タブ：向きの回転・書き出しの画質 -->
-  <div class="pm-tools pm-panel" id="pmPanel_photo" style="display:none">
-    <span class="pm-tool-lb">向き</span>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmRotatePhoto(-1)">↺ 左90°</button>
-    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmRotatePhoto(1)">↻ 右90°</button>
-    <span class="pm-tool-lb">保存の画質</span>
-    <button class="pm-sizebtn pm-qbtn" id="pmQ_orig" onpointerdown="event.preventDefault()" onclick="pmSetQuality('orig')">元のサイズ</button>
-    <button class="pm-sizebtn pm-qbtn" id="pmQ_high" onpointerdown="event.preventDefault()" onclick="pmSetQuality('high')">高精細</button>
-    <button class="pm-sizebtn pm-qbtn" id="pmQ_std" onpointerdown="event.preventDefault()" onclick="pmSetQuality('std')">標準</button>
-    <span class="pm-tool-lb" id="pmQNote"></span>
+  <!-- 手書きタブ：このタブを開いている間は、写真をなぞって線が描ける -->
+  <div class="pm-tools pm-panel" id="pmPanel_pen" style="display:none">
+    <span class="pm-tool-lb">色</span>
+    <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e53935')"></button>
+    <button class="pm-color" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#1e88e5')"></button>
+    <button class="pm-color" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#2e7d32')"></button>
+    <button class="pm-color" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#fb8c00')"></button>
+    <button class="pm-color" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#8e24aa')"></button>
+    <button class="pm-color" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e91e63')"></button>
+    <button class="pm-color" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#f9a825')"></button>
+    <button class="pm-color" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#00acc1')"></button>
+    <button class="pm-color" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#ffffff')"></button>
+    <button class="pm-color" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#000000')"></button>
+    <span class="pm-tool-lb">太さ</span>
+    <button class="pm-sizebtn pm-thbtn" id="pmTh2_thin" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(0.5)">細</button>
+    <button class="pm-sizebtn pm-thbtn" id="pmTh2_mid" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(1)">中</button>
+    <button class="pm-sizebtn pm-thbtn" id="pmTh2_bold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(2)">太</button>
+    <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearPen()">手書きを消す</button>
   </div>
   <!-- 日付タブ：今日／カレンダー・挿入先・位置 -->
   <div class="pm-tools pm-panel" id="pmPanel_date" style="display:none">
@@ -308,6 +328,25 @@ body {
     </div>
   </div>
   <input type="date" id="pmDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmDatePicked(this.value)">
+</div>
+
+<!-- 保存設定（書き出す画像の大きさ） -->
+<div class="modal-overlay" id="pmSaveSetOverlay" onclick="if(event.target===this)pmCloseSaveSet()">
+  <div class="modal">
+    <div class="modal-header">
+      <span>⚙ 保存設定</span>
+      <button class="modal-close" onclick="pmCloseSaveSet()">✕</button>
+    </div>
+    <div class="shotprev-body">
+      <div class="mode-hint">スクショ・共有で書き出す画像の大きさです。「元のサイズ」なら写真の画質そのままで保存できます（元より大きくは引き伸ばしません）。</div>
+      <div class="pm-tools">
+        <button class="pm-sizebtn pm-qbtn" id="pmQ_orig" onclick="pmSetQuality('orig')">元のサイズ</button>
+        <button class="pm-sizebtn pm-qbtn" id="pmQ_high" onclick="pmSetQuality('high')">高精細</button>
+        <button class="pm-sizebtn pm-qbtn" id="pmQ_std" onclick="pmSetQuality('std')">標準</button>
+      </div>
+      <div class="mode-hint" id="pmQNote"></div>
+    </div>
+  </div>
 </div>
 
 <!-- 定型文（よく使う言葉をワンタップで入力。追加・削除できる） -->
@@ -347,7 +386,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v18';
+const APP_VERSION='v19';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -535,6 +574,7 @@ function pmRedraw(){
   }
   const em=document.getElementById('pmEmpty'); if(em) em.style.display=pmImg?'none':'flex';
   const zr=document.getElementById('pmZoomReset'); if(zr) zr.style.display=pmImg?'block':'none';
+  const tr=document.getElementById('pmTopRow'); if(tr) tr.style.display=pmImg?'flex':'none';
 }
 function pmClientToCanvas(x,y){ const c=pmCanvasEl(); const r=c.getBoundingClientRect(); return {x:(x-r.left)*c.width/r.width, y:(y-r.top)*c.height/r.height}; }
 function pmTwo(){ const it=pmPointers.values(); return [it.next().value, it.next().value]; }
@@ -819,7 +859,7 @@ function pmSetShapeThick(v){
 }
 function pmThickSyncUi(){
   const cur=(pmSelShape>=0 && pmShapes[pmSelShape]) ? (pmShapes[pmSelShape].t||1) : pmShapeThick;
-  [['pmTh_thin',0.5],['pmTh_mid',1],['pmTh_bold',2]].forEach(([id,v])=>{
+  [['pmTh_thin',0.5],['pmTh_mid',1],['pmTh_bold',2],['pmTh2_thin',0.5],['pmTh2_mid',1],['pmTh2_bold',2]].forEach(([id,v])=>{
     const b=document.getElementById(id); if(b) b.classList.toggle('on', cur===v);
   });
 }
@@ -904,7 +944,20 @@ function pmModeSyncUi(){
   }
 }
 /* 手書き・矢印のモードをやめる */
-function pmModeOff(){ if(!pmPenMode && !pmPlaceMode) return; pmPenMode=false; pmPlaceMode=''; pmModeSyncUi(); }
+function pmModeOff(){
+  if(!pmPenMode && !pmPlaceMode) return;
+  pmPenMode=false; pmPlaceMode='';
+  if(pmToolOpen==='pen') pmToolTab('shape');   // 手書きタブから抜ける
+  pmModeSyncUi();
+}
+/* 手書きの線だけをまとめて消す */
+function pmClearPen(){
+  if(!pmShapes.some(x=>x.type==='pen')){ toast('消す手書きがありません'); return; }
+  pmPushUndo();
+  pmShapes=pmShapes.filter(x=>x.type!=='pen'); pmSelShape=-1;
+  pmShapeSyncUi(); pmRedraw(); pmDraftSave();
+  toast('手書きを消しました（↩︎戻すで元に戻せます）');
+}
 function pmDelShape(){
   if(pmSelShape<0) return;
   pmPushUndo();
@@ -955,13 +1008,20 @@ function pmShapeSyncUi(){
 let pmToolOpen='';   // 開いているタブ '' | 'text' | 'shape' | 'date' | 'photo'
 function pmToolTab(name){
   pmToolOpen = (pmToolOpen===name) ? '' : name;   // 同じタブをもう一度＝閉じる
-  ['text','shape','date','photo'].forEach(t=>{
+  ['text','shape','pen','date'].forEach(t=>{
     const p=document.getElementById('pmPanel_'+t); if(p) p.style.display = (pmToolOpen===t)?'':'none';
     const b=document.getElementById('pmTab_'+t);  if(b) b.classList.toggle('on', pmToolOpen===t);
   });
-  if(pmToolOpen!=='shape' && (pmPenMode||pmPlaceMode)){ pmPenMode=false; pmPlaceMode=''; pmModeSyncUi(); }   // タブを離れたら描画モード解除
-  if(pmToolOpen==='shape') pmThickSyncUi();
-  if(pmToolOpen==='photo') pmQualitySyncUi();
+  // 手書きタブを開いている間だけ「なぞって描く」状態にする
+  if(pmToolOpen==='pen'){
+    pmPlaceMode='';
+    if(!pmImg){ toast('先に写真を入れてください'); pmPenMode=false; }
+    else pmPenMode=true;
+  } else if(pmPenMode || pmPlaceMode){
+    pmPenMode=false; if(pmToolOpen!=='shape') pmPlaceMode='';
+  }
+  pmModeSyncUi();
+  if(pmToolOpen==='shape' || pmToolOpen==='pen') pmThickSyncUi();
   pmMemoVisSync();
 }
 /* 文字を書く時以外（図形・日付・写真）はメモ欄を隠して、写真を大きく使えるようにする */
@@ -1141,6 +1201,8 @@ function pmOutWidth(){
   if(pmPrefs.q==='high') return Math.min(w, 2000);
   return Math.min(w, PM_QMAX);   // 元のサイズ（引き伸ばしはしない）
 }
+function pmOpenSaveSet(){ pmQualitySyncUi(); document.getElementById('pmSaveSetOverlay').classList.add('open'); }
+function pmCloseSaveSet(){ document.getElementById('pmSaveSetOverlay').classList.remove('open'); }
 function pmQualitySyncUi(){
   [['pmQ_orig','orig'],['pmQ_high','high'],['pmQ_std','std']].forEach(([id,v])=>{
     const b=document.getElementById(id); if(b) b.classList.toggle('on', pmPrefs.q===v);
