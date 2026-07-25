@@ -66,7 +66,16 @@ body {
   color: #fff; font-size: 13.5px; font-weight: bold; cursor: pointer; touch-action: manipulation; transition: transform .08s; }
 .pm-shoot:active { transform: scale(.95); }
 .pm-zoomreset { position: absolute; right: 8px; top: 8px; padding: 5px 10px; border: none; border-radius: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; cursor: pointer; touch-action: manipulation; }
-.pm-memo { flex: 0 1 36%; min-height: 70px; overflow-y: auto; padding: 9px 10px; font-size: 28.8px; line-height: 1.35;   /* 既定48px×表示0.6倍 */
+/* メモ欄：枠の中に操作ボタンを浮かせるため、外側の枠で包む */
+.pm-memowrap { position: relative; flex: 0 1 36%; min-height: 70px; display: flex; }
+.pm-caret { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
+.pm-cbtn { min-width: 34px; padding: 7px 9px; border: 1px solid rgba(255,255,255,.28); border-radius: 8px;
+  background: rgba(0,0,0,.58); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  color: #fff; font-size: 12.5px; font-weight: bold; cursor: pointer; touch-action: manipulation;
+  transition: background .14s, transform .08s; }
+.pm-cbtn:active { transform: scale(.93); }
+.pm-cbtn.on { background: var(--pm-acc); border-color: var(--pm-acc); }
+.pm-memo { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 9px 10px 40px; font-size: 28.8px; line-height: 1.35;   /* 既定48px×表示0.6倍 */
   border: 1px solid var(--pm-line); border-radius: 10px; background: var(--cell-bg, #fff); color: var(--text);
   -webkit-user-modify: read-write; word-break: break-word; }
 .pm-memo:empty::before { content: attr(data-ph); color: var(--text-light); pointer-events: none; font-size: 15px; }
@@ -277,7 +286,16 @@ body {
     <button class="pm-sizebtn pm-posbtn" id="pmPos_rb" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('rb')">右下</button>
     <button class="pm-sizebtn" id="pmStampDel" onclick="pmStampClear()" style="display:none">日付を消す</button>
   </div>
-  <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで上のボタンで色・大きさ・太字等を変えられます）" onfocus="pmDeselShape()" onkeydown="event.stopPropagation()"></div>
+  <div class="pm-memowrap" id="pmMemoWrap">
+    <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで上のボタンで色・大きさ・太字等を変えられます）" onfocus="pmDeselShape()" onkeydown="event.stopPropagation()"></div>
+    <!-- 枠の右下：カーソル移動と範囲選択（長押しメニューを使わずに編集できる） -->
+    <div class="pm-caret">
+      <button class="pm-cbtn" id="pmCaretL" title="左へ">◀</button>
+      <button class="pm-cbtn" id="pmCaretR" title="右へ">▶</button>
+      <button class="pm-cbtn" id="pmSelBtn" onpointerdown="event.preventDefault()" onclick="pmSelModeToggle()">選択</button>
+      <button class="pm-cbtn" onpointerdown="event.preventDefault()" onclick="pmSelectAllMemo()">全て</button>
+    </div>
+  </div>
   <input type="date" id="pmDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmDatePicked(this.value)">
 </div>
 
@@ -318,7 +336,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v13';
+const APP_VERSION='v14';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -587,6 +605,75 @@ function pmColor(c){
   const col = c || getComputedStyle(ed).color;   // 標準＝メモ欄の既定色
   try{ document.execCommand('styleWithCSS', false, true); document.execCommand('foreColor', false, col); }catch(_){}
 }
+/* ── メモ欄の右下ボタン：カーソル移動と範囲選択 ──
+   長押しの選択メニューを出さずに、◀▶で位置を動かし「選択」を押してから
+   ◀▶でなぞる範囲を決められる（そのまま色・大きさ・装飾を変えられる）。 */
+let pmSelExtend=false;   // 「選択」がON＝◀▶で範囲を広げる
+/* メモにカーソルが無ければ末尾に置く（隠れている時は文字タブを開く） */
+function pmEnsureMemoCaret(){
+  const ed=document.getElementById('pmMemo'); if(!ed) return null;
+  if(!pmMemoVisible() && pmToolOpen!=='text') pmToolTab('text');
+  const s=getSelection(); if(!s) return null;
+  let inside=false;
+  if(s.rangeCount){ let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement; inside=!!(n && ed.contains(n)); }
+  if(!inside){
+    ed.focus();
+    const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false);
+    s.removeAllRanges(); s.addRange(r);
+  } else if(document.activeElement!==ed) ed.focus();
+  return s;
+}
+/* カーソルを1文字ぶん動かす（選択ONなら範囲を広げる） */
+function pmCaretMove(dir){
+  const s=pmEnsureMemoCaret(); if(!s) return;
+  if(typeof s.modify==='function') s.modify(pmSelExtend?'extend':'move', dir<0?'backward':'forward', 'character');
+  else pmCaretStepFallback(dir, pmSelExtend);
+  pmUpdateSizeNow();
+}
+/* selection.modify が使えない環境向けの手動移動 */
+function pmCaretStepFallback(dir, extend){
+  const ed=document.getElementById('pmMemo'); const s=getSelection();
+  if(!ed || !s || !s.rangeCount) return;
+  const w=document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+  const ns=[]; while(w.nextNode()) ns.push(w.currentNode);
+  if(!ns.length) return;
+  let node=s.focusNode, off=s.focusOffset;
+  if(!node || node.nodeType!==3){ node=ns[dir<0?ns.length-1:0]; off=dir<0?node.length:0; }
+  let i=ns.indexOf(node); if(i<0){ i=0; node=ns[0]; off=0; }
+  if(dir<0){ if(off>0) off--; else if(i>0){ node=ns[--i]; off=Math.max(0,node.length-1); } }
+  else     { if(off<node.length) off++; else if(i<ns.length-1){ node=ns[++i]; off=Math.min(1,node.length); } }
+  if(extend && typeof s.extend==='function') s.extend(node, off);
+  else { const r=document.createRange(); r.setStart(node,off); r.collapse(true); s.removeAllRanges(); s.addRange(r); }
+}
+/* 「選択」ボタン：◀▶ の役割を カーソル移動 ⇄ 範囲選択 で切り替える */
+function pmSelModeToggle(){
+  pmSelExtend=!pmSelExtend;
+  pmEnsureMemoCaret(); pmCaretSyncUi();
+  toast(pmSelExtend ? '◀▶ で選ぶ範囲を決めます（もう一度押すと解除）' : '◀▶ でカーソルを動かします');
+}
+/* 「全て」ボタン：メモ全体を選ぶ */
+function pmSelectAllMemo(){
+  const ed=document.getElementById('pmMemo'); if(!ed) return;
+  if(!pmMemoVisible() && pmToolOpen!=='text') pmToolTab('text');
+  ed.focus();
+  const r=document.createRange(); r.selectNodeContents(ed);
+  const s=getSelection(); s.removeAllRanges(); s.addRange(r);
+  pmSelExtend=false; pmCaretSyncUi(); pmUpdateSizeNow();
+}
+function pmCaretSyncUi(){ const b=document.getElementById('pmSelBtn'); if(b) b.classList.toggle('on', pmSelExtend); }
+/* ◀▶ は押しっぱなしで連続移動する */
+(function pmBindCaretHold(){
+  [['pmCaretL',-1],['pmCaretR',1]].forEach(([id,dir])=>{
+    const b=document.getElementById(id); if(!b) return;
+    let t=null, iv=null;
+    const stop=()=>{ clearTimeout(t); clearInterval(iv); t=null; iv=null; };
+    b.addEventListener('pointerdown', e=>{
+      e.preventDefault(); pmCaretMove(dir);
+      t=setTimeout(()=>{ iv=setInterval(()=>pmCaretMove(dir), 70); }, 420);
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev, stop));
+  });
+})();
 /* 文字サイズの段階（既定は48。そこから上下できる） */
 const PM_SIZES=[13,17,22,28,36,48,64,80,96];
 /* メモ欄の縮小表示率：サイズの数値（既定48）はそのままに、入力欄では0.6倍で小さめに表示する。
@@ -816,14 +903,14 @@ function pmToolTab(name){
 }
 /* 文字を書く時以外（図形・日付・写真）はメモ欄を隠して、写真を大きく使えるようにする */
 function pmMemoVisSync(){
-  const ed=document.getElementById('pmMemo'); if(!ed) return;
+  const wrap=document.getElementById('pmMemoWrap'); if(!wrap) return;
   const show = (pmToolOpen==='' || pmToolOpen==='text');
-  const cur = ed.style.display!=='none';
+  const cur = wrap.style.display!=='none';
   if(show===cur) return;
-  ed.style.display = show ? '' : 'none';
+  wrap.style.display = show ? '' : 'none';
   requestAnimationFrame(pmRelayout);   // 枠が変わるのでキャンバスを合わせ直す
 }
-function pmMemoVisible(){ const ed=document.getElementById('pmMemo'); return !!ed && ed.style.display!=='none'; }
+function pmMemoVisible(){ const w=document.getElementById('pmMemoWrap'); return !!w && w.style.display!=='none'; }
 /* 表示枠が変わった時に、拡大の度合いを保ったままキャンバスを作り直す */
 function pmRelayout(){
   const c=pmCanvasEl(); if(!c) return;
