@@ -70,6 +70,11 @@ body {
   background: rgba(255,255,255,.18); color: #fff; font-size: 13px; font-weight: bold;
   cursor: pointer; touch-action: manipulation; transition: background .14s, transform .08s; }
 .hdr-btn:active { transform: scale(.95); background: rgba(255,255,255,.32); }
+/* 写真を回すボタンは上の帯（保存設定の左）へ。写真の上に重ねると編集の邪魔になるため */
+.hdr-rotrow { display: flex; align-items: center; gap: 4px; }
+.hdr-rot { padding: 5px 9px; font-size: 16px; line-height: 1; }
+body[data-pm="xs"] .hdr-right { gap: 5px; }
+body[data-pm="xs"] .hdr-rot { padding: 4px 7px; font-size: 14px; }
 .pm-toprow { position: absolute; right: 8px; top: 8px; display: flex; gap: 6px; }
 .pm-zoomreset { padding: 6px 11px; border: none; border-radius: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; cursor: pointer; touch-action: manipulation; }
 /* メモ欄：枠の中に操作ボタンを浮かせるため、外側の枠で包む */
@@ -267,6 +272,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
 <div class="app-header">
   <span>📝 写真メモ</span>
   <span class="hdr-right">
+    <span class="hdr-rotrow" id="pmRotRow" style="display:none"><button class="hdr-btn hdr-rot" onclick="pmRotatePhoto(-1)" title="左に90°回す">↺</button><button class="hdr-btn hdr-rot" onclick="pmRotatePhoto(1)" title="右に90°回す">↻</button></span>
     <button class="hdr-btn" onclick="pmOpenSaveSet()">⚙ 保存設定</button>
     <span class="app-ver" id="appVer"></span>
   </span>
@@ -286,8 +292,6 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
     </div>
     <div class="pm-penbadge" id="pmPenBadge" style="display:none" onclick="pmModeOff()"></div>
     <div class="pm-toprow" id="pmTopRow" style="display:none">
-      <button class="pm-zoomreset" onclick="pmRotatePhoto(-1)" title="左に90°回す">↺</button>
-      <button class="pm-zoomreset" onclick="pmRotatePhoto(1)" title="右に90°回す">↻</button>
       <button class="pm-zoomreset" id="pmZoomReset" onclick="pmResetZoom()" style="display:none">⤢ 全体</button>
     </div>
   </div>
@@ -556,7 +560,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
 </div>
 
 <script>
-const APP_VERSION='v27';
+const APP_VERSION='v28';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -753,6 +757,7 @@ function pmRedraw(){
   const em=document.getElementById('pmEmpty'); if(em) em.style.display=pmImg?'none':'flex';
   const zr=document.getElementById('pmZoomReset'); if(zr) zr.style.display=pmImg?'block':'none';
   const tr=document.getElementById('pmTopRow'); if(tr) tr.style.display=pmImg?'flex':'none';
+  const rr=document.getElementById('pmRotRow'); if(rr) rr.style.display=pmImg?'flex':'none';
 }
 function pmClientToCanvas(x,y){ const c=pmCanvasEl(); const r=c.getBoundingClientRect(); return {x:(x-r.left)*c.width/r.width, y:(y-r.top)*c.height/r.height}; }
 function pmTwo(){ const it=pmPointers.values(); return [it.next().value, it.next().value]; }
