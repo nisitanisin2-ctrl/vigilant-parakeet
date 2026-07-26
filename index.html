@@ -99,6 +99,10 @@ body[data-pm="xs"] .hdr-rot { padding: 4px 7px; font-size: 14px; }
   box-shadow: inset 0 0 0 1.5px rgba(128,138,158,.45); transition: transform .1s; }
 .pm-color:active { transform: scale(1.18); }
 .pm-color.on { box-shadow: inset 0 0 0 1.5px rgba(128,138,158,.45), 0 0 0 3px var(--pm-acc); }
+/* 虹色のボタン：押すと自分で色を作って登録できる。作った色はその手前に並ぶ */
+.pm-rainbow { display: flex; align-items: center; justify-content: center; line-height: 1;
+  color: #fff; font-size: 15px; font-weight: bold; text-shadow: 0 0 3px rgba(0,0,0,.8);
+  background: conic-gradient(#e53935,#fb8c00,#ffd400,#2e7d32,#00acc1,#1e88e5,#8e24aa,#e91e63,#e53935); }
 /* ツールのボタン：枠線をなくし、薄い面だけにする（線が減って画面が静かになる） */
 .pm-sizebtn { padding: 8px 13px; border: none; border-radius: 8px; font-size: 15px;
   background: var(--pm-chip); color: var(--text); font-weight: bold; cursor: pointer; touch-action: manipulation;
@@ -328,6 +332,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
         <button class="pm-color" style="background:#9e9e9e" onpointerdown="event.preventDefault()" onclick="pmColor('#9e9e9e')"></button>
         <button class="pm-color" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmColor('#000000')"></button>
         <button class="pm-color" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmColor('#ffffff')"></button>
+        <button class="pm-color pm-rainbow" data-cc="text" onpointerdown="event.preventDefault()" onclick="pmPickCustom('text')" title="自分で色を作って登録する">＋</button>
       </div></div>
     </div>
     <div class="pm-row">
@@ -379,6 +384,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
         <button class="pm-color pm-shcol" data-c="#00acc1" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#00acc1')"></button>
         <button class="pm-color pm-shcol" data-c="#ffffff" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#ffffff')"></button>
         <button class="pm-color pm-shcol" data-c="#000000" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#000000')"></button>
+        <button class="pm-color pm-rainbow" data-cc="shape" onpointerdown="event.preventDefault()" onclick="pmPickCustom('shape')" title="自分で色を作って登録する">＋</button>
       </div></div>
     </div>
     <div class="pm-row">
@@ -389,6 +395,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
         <button class="pm-color pm-ocbtn" data-oc="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#000000')"></button>
         <button class="pm-color pm-ocbtn" data-oc="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffd400')"></button>
         <button class="pm-color pm-ocbtn" data-oc="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#e53935')"></button>
+        <button class="pm-color pm-rainbow" data-cc="oc" onpointerdown="event.preventDefault()" onclick="pmPickCustom('oc')" title="自分で色を作って登録する">＋</button>
       </div></div>
     </div>
     <div class="pm-row">
@@ -428,6 +435,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
         <button class="pm-color pm-shcol" data-c="#00acc1" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#00acc1')"></button>
         <button class="pm-color pm-shcol" data-c="#ffffff" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#ffffff')"></button>
         <button class="pm-color pm-shcol" data-c="#000000" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#000000')"></button>
+        <button class="pm-color pm-rainbow" data-cc="shape" onpointerdown="event.preventDefault()" onclick="pmPickCustom('shape')" title="自分で色を作って登録する">＋</button>
       </div></div>
     </div>
     <div class="pm-row">
@@ -438,6 +446,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
         <button class="pm-color pm-ocbtn" data-oc="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#000000')"></button>
         <button class="pm-color pm-ocbtn" data-oc="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffd400')"></button>
         <button class="pm-color pm-ocbtn" data-oc="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#e53935')"></button>
+        <button class="pm-color pm-rainbow" data-cc="oc" onpointerdown="event.preventDefault()" onclick="pmPickCustom('oc')" title="自分で色を作って登録する">＋</button>
       </div></div>
     </div>
     <div class="pm-row">
@@ -500,6 +509,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
         <button class="pm-color pm-dcbtn" data-c="#2e7d32" style="background:#2e7d32" title="緑" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#2e7d32')"></button>
         <button class="pm-color pm-dcbtn" data-c="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#ffd400')"></button>
         <button class="pm-color pm-dcbtn" data-c="#e91e63" style="background:#e91e63" title="ピンク" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#e91e63')"></button>
+        <button class="pm-color pm-rainbow" data-cc="date" onpointerdown="event.preventDefault()" onclick="pmPickCustom('date')" title="自分で色を作って登録する">＋</button>
       </div></div>
     </div>
   </div>
@@ -513,6 +523,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
       <button class="pm-cbtn" onpointerdown="event.preventDefault()" onclick="pmSelectAllMemo()">全て</button>
     </div>
   </div>
+  <input type="color" id="pmColorInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmCustomPicked(this.value)">
   <input type="date" id="pmDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmDatePicked(this.value)">
   </div>
 </div>
@@ -573,7 +584,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
 </div>
 
 <script>
-const APP_VERSION='v29';
+const APP_VERSION='v30';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -1357,9 +1368,9 @@ function pmColorSyncUi(){
 function pmStripReveal(){
   document.querySelectorAll('.pm-strip').forEach(s=>{
     const on=s.querySelector('.on'); if(!on) return;
-    const l=on.offsetLeft, r=l+on.offsetWidth;
-    if(l < s.scrollLeft) s.scrollLeft=Math.max(0, l-8);
-    else if(r > s.scrollLeft+s.clientWidth) s.scrollLeft=r-s.clientWidth+8;
+    const l=on.offsetLeft, r=l+on.offsetWidth, m=32;   // 端のぼかし・矢印に隠れない分だけ余裕をとる
+    if(l-m < s.scrollLeft) s.scrollLeft=Math.max(0, l-m);
+    else if(r+m > s.scrollLeft+s.clientWidth) s.scrollLeft=r-s.clientWidth+m;
   });
 }
 /* 横スライドの帯：左右にまだ続きがあるかを見て、端のぼかしと矢印を出し入れする */
@@ -1721,6 +1732,81 @@ function pmSetDatePos(p){
   if(pmStamp){ pmPushUndo(); pmStamp.pos=p; pmRedraw(); pmDraftSave(); }
   pmDateUiSync();
 }
+/* ── 自分で作った色 ──
+   虹色のボタンから端末の色えらびを開いて登録する。登録した色は保存され、
+   文字・図形・手書き・フチ・日付、どの色の並びからも同じように使える。 */
+const PM_CUSTOM_KEY='photomemo_custom_colors';
+const PM_CUSTOM_MAX=8;   // これを超えたら古いものから消える
+let pmCustomColors=[];
+try{ const a=JSON.parse(localStorage.getItem(PM_CUSTOM_KEY)||'[]');
+  if(Array.isArray(a)) pmCustomColors=a.filter(c=>/^#[0-9a-f]{6}$/i.test(c)).slice(-PM_CUSTOM_MAX); }catch(_){}
+function pmSaveCustomColors(){ try{ localStorage.setItem(PM_CUSTOM_KEY, JSON.stringify(pmCustomColors)); }catch(_){} }
+/* 色の種類ごとに、その色を適用する */
+function pmApplyColorKind(kind,c){
+  if(kind==='text') pmColor(c);
+  else if(kind==='oc') pmSetShapeOutline(c);
+  else if(kind==='date') pmSetDateColor(c);
+  else pmShapeColorSet(c);
+}
+function pmCcCurrent(kind){
+  if(kind==='date') return pmPrefs.dc||'#ffb300';
+  if(kind==='oc') return pmShapeOutline||'#ffffff';
+  if(kind==='text') return '#e53935';
+  return pmShapeColor||'#e53935';
+}
+let pmCcTarget='shape', pmCcTimer=null, pmCcHeld=false;
+/* 虹色ボタン：端末の色えらびを開く */
+function pmPickCustom(kind){
+  pmCcTarget=kind;
+  const inp=document.getElementById('pmColorInput'); if(!inp) return;
+  inp.value=pmCcCurrent(kind);
+  try{ if(inp.showPicker) inp.showPicker(); else inp.click(); }catch(_){ try{ inp.click(); }catch(__){} }
+}
+/* 色えらびで決まった色を登録して、そのまま使う */
+function pmCustomPicked(v){
+  if(!/^#[0-9a-f]{6}$/i.test(v||'')) return;
+  const c=v.toLowerCase();
+  const i=pmCustomColors.indexOf(c); if(i>=0) pmCustomColors.splice(i,1);
+  pmCustomColors.push(c);
+  while(pmCustomColors.length>PM_CUSTOM_MAX) pmCustomColors.shift();
+  pmSaveCustomColors(); pmRenderCustomColors();
+  pmApplyColorKind(pmCcTarget, c);
+  toast('色を登録しました（長押しで消せます）');
+}
+/* 長押しで登録から消す */
+function pmCcHold(c){
+  pmCcRelease();
+  pmCcTimer=setTimeout(async ()=>{
+    pmCcTimer=null; pmCcHeld=true;
+    const ok = (typeof appConfirm==='function') ? await appConfirm('この色を登録から消しますか？','消す','やめる') : true;
+    if(!ok) return;
+    const i=pmCustomColors.indexOf(c);
+    if(i>=0){ pmCustomColors.splice(i,1); pmSaveCustomColors(); pmRenderCustomColors(); toast('色を消しました'); }
+  }, 600);
+}
+function pmCcRelease(){ if(pmCcTimer){ clearTimeout(pmCcTimer); pmCcTimer=null; } }
+/* 登録した色を、それぞれの並びの虹色ボタンの手前に並べ直す */
+function pmRenderCustomColors(){
+  document.querySelectorAll('.pm-rainbow').forEach(rb=>{
+    const kind=rb.dataset.cc, strip=rb.parentElement;
+    strip.querySelectorAll('.pm-cc').forEach(e=>e.remove());
+    pmCustomColors.forEach(c=>{
+      const b=document.createElement('button');
+      b.className='pm-color pm-cc'+(kind==='oc'?' pm-ocbtn':kind==='shape'?' pm-shcol':kind==='date'?' pm-dcbtn':'');
+      b.dataset.c=c; if(kind==='oc') b.dataset.oc=c;
+      b.style.background=c; b.title='自分で作った色（長押しで消せます）';
+      b.addEventListener('pointerdown', e=>{ e.preventDefault(); pmCcHold(c); });
+      ['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t, pmCcRelease));
+      b.addEventListener('click', ()=>{ if(pmCcHeld){ pmCcHeld=false; return; } pmApplyColorKind(kind,c); });
+      strip.insertBefore(b, rb);
+    });
+  });
+  if(typeof pmColorSyncUi==='function') pmColorSyncUi();
+  if(typeof pmOutlineSyncUi==='function') pmOutlineSyncUi();
+  if(typeof pmDateUiSync==='function') pmDateUiSync();
+  if(typeof pmStripSync==='function') pmStripSync();
+}
+setTimeout(pmRenderCustomColors, 0);
 /* 写真に入れる日付の色を決める（すでに入れた日付にもその場で反映する） */
 function pmSetDateColor(c){
   pmPrefs.dc=c; pmSavePrefs();
