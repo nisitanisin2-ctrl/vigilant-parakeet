@@ -152,11 +152,47 @@ body {
 .pm-actions { flex-shrink: 0; display: flex; gap: 8px; order: -1; }   /* 縦持ちでは写真の上に出す */
 /* 右側の列。縦持ちでは無いものとして扱い、今までどおり縦一列に並べる */
 .pm-sidecol { display: contents; }
+/* ── 画面の小さい端末に合わせて詰める（iPhone SE など） ──
+   機種名ではなく「実際に使える高さ・幅」を見て body に印を付け、2段階で余白とボタンを詰める。
+   sm＝小さめ（iPhone SE・小型Androidなど）／xs＝さらに狭い（ブラウザのバーが出ている時など）。
+   実寸で判断するので、これから出る機種でもそのまま合う。 */
+body[data-pm="sm"] .pm-body, body[data-pm="xs"] .pm-body {
+  gap: 6px; padding: 6px 8px calc(14px + env(safe-area-inset-bottom, 0px)); }
+body[data-pm="sm"] .pm-shot { padding: 9px 8px; font-size: 13.5px; }
+body[data-pm="sm"] .pm-tabbar .pm-tab { padding: 8px 7px; font-size: 15.5px; }
+body[data-pm="sm"] .pm-row { min-height: 34px; }
+body[data-pm="sm"] .pm-sizebtn { padding: 6px 10px; font-size: 14px; }
+body[data-pm="sm"] .pm-color { width: 26px; height: 26px; }
+body[data-pm="sm"] .pm-panel { gap: 2px; }
+body[data-pm="sm"] .pm-memowrap { min-height: 56px; }
+body[data-pm="xs"] .pm-shot { padding: 7px 6px; font-size: 12.5px; }
+body[data-pm="xs"] .pm-tabbar .pm-tab { padding: 6px 6px; font-size: 14.5px; }
+body[data-pm="xs"] .pm-row { min-height: 30px; }
+body[data-pm="xs"] .pm-sizebtn { padding: 5px 9px; font-size: 13.5px; }
+body[data-pm="xs"] .pm-color { width: 23px; height: 23px; }
+body[data-pm="xs"] .pm-tool-lb { font-size: 11.5px; }
+body[data-pm="xs"] .pm-panel { gap: 2px; }
+body[data-pm="xs"] .pm-shoot { padding: 7px 10px; font-size: 12.5px; }
+body[data-pm="xs"] .pm-editbtn { padding: 7px 10px; font-size: 15px; }
+body[data-pm="xs"] .pm-cbtn { min-width: 30px; padding: 5px 7px; font-size: 11.5px; }
+body[data-pm="xs"] .pm-memowrap { min-height: 48px; }
+body[data-pm="xs"] .hdr-btn { padding: 4px 9px; font-size: 12px; }
+body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
+/* 操作ボタンとタブは、狭い画面でも折り返して2段にならないようにする */
+.pm-shot { white-space: nowrap; }
+.pm-tabbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.pm-tabbar::-webkit-scrollbar { display: none; }
+.pm-tabbar .pm-tab { flex: 0 0 auto; white-space: nowrap; }
+/* 写真は画面の4割を必ず確保する。入りきらない分はツール側をスクロールさせて、
+   写真が潰れないようにする（小さい端末でも編集できる大きさを保つ） */
+.pm-photo { min-height: 38vh; }
+/* ツールは縮めずに全部見せる。足りない分は写真の方が縮む（下限は上の min-height） */
+.pm-panel { flex: 0 0 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 /* 横持ち：左に写真、右に編集ツール（幅に余裕があるときだけ2列にする） */
 @media (orientation: landscape) and (min-width: 600px) {
   .pm-body { flex-direction: row; align-items: stretch; gap: 10px;
     padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
-  .pm-photo { flex: 1 1 56%; min-width: 0; }
+  .pm-photo { flex: 1 1 56%; min-width: 0; min-height: 0; }
   .pm-sidecol { display: flex; flex-direction: column; flex: 0 0 44%; max-width: 520px;
     min-width: 0; gap: 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .pm-actions { order: 0; }
@@ -520,7 +556,7 @@ body {
 </div>
 
 <script>
-const APP_VERSION='v26';
+const APP_VERSION='v27';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -1321,7 +1357,21 @@ document.addEventListener('scroll', e=>{
   const t=e.target;
   if(t && t.classList && t.classList.contains('pm-strip')) pmStripSync();
 }, true);
-window.addEventListener('resize', ()=>requestAnimationFrame(pmStripSync));
+/* 端末の画面の大きさを見て、詰め具合（ふつう／sm／xs）を切り替える。
+   機種名ではなく実際の高さ・幅で判断するので、どのスマホでも写真が見える大きさを保てる。 */
+function pmSizeClass(){
+  if(!document.body) return;
+  const h=window.innerHeight, w=window.innerWidth, land=w>h;
+  let s='';
+  if(land){ if(h<380) s='xs'; else if(h<440) s='sm'; }
+  else if(h<620 || w<340) s='xs';
+  else if(h<760) s='sm';
+  if(document.body.dataset.pm!==s) document.body.dataset.pm=s;
+}
+pmSizeClass();
+window.addEventListener('orientationchange', ()=>setTimeout(pmSizeClass,120));
+window.addEventListener('resize', ()=>{ pmSizeClass();
+  requestAnimationFrame(()=>{ if(typeof pmRelayout==='function') pmRelayout(); pmStripSync(); }); });
 function pmToolTab(name){
   pmToolOpen = (pmToolOpen===name) ? '' : name;   // 同じタブをもう一度＝閉じる
   ['text','shape','pen','date'].forEach(t=>{
