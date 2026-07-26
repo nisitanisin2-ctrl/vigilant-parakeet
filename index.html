@@ -489,6 +489,19 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
         <button class="pm-sizebtn pm-dfbtn" id="pmDf_md_slash" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('md_slash')"></button>
       </div></div>
     </div>
+    <div class="pm-row" id="pmDateColorRow">
+      <span class="pm-tool-lb">色</span>
+      <div class="pm-slide"><div class="pm-strip">
+        <button class="pm-color pm-dcbtn" data-c="#ffb300" style="background:#ffb300" title="オレンジ" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#ffb300')"></button>
+        <button class="pm-color pm-dcbtn" data-c="#ffffff" style="background:#ffffff" title="白" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#ffffff')"></button>
+        <button class="pm-color pm-dcbtn" data-c="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#000000')"></button>
+        <button class="pm-color pm-dcbtn" data-c="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#e53935')"></button>
+        <button class="pm-color pm-dcbtn" data-c="#1e88e5" style="background:#1e88e5" title="青" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#1e88e5')"></button>
+        <button class="pm-color pm-dcbtn" data-c="#2e7d32" style="background:#2e7d32" title="緑" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#2e7d32')"></button>
+        <button class="pm-color pm-dcbtn" data-c="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#ffd400')"></button>
+        <button class="pm-color pm-dcbtn" data-c="#e91e63" style="background:#e91e63" title="ピンク" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#e91e63')"></button>
+      </div></div>
+    </div>
   </div>
   <div class="pm-memowrap" id="pmMemoWrap">
     <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで上のボタンで色・大きさ・太字等を変えられます）" onfocus="pmDeselShape()" onkeydown="pmMemoKeydown(event)"></div>
@@ -560,7 +573,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
 </div>
 
 <script>
-const APP_VERSION='v28';
+const APP_VERSION='v29';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -1609,12 +1622,13 @@ function pmDeco(cmd){
 /* ── 日付の挿入（今日／カレンダー） ──
    挿入先と写真スタンプの位置は設定として保存し、次回も同じ場所に入る */
 const PM_DFMTS=['ymd_slash','ymd_kanji','wareki','md_kanji','md_slash'];   // 日付の表示のしかた
-let pmPrefs={ target:'photo', pos:'rb', q:'orig', df:'ymd_slash' };   // target: 'memo'|'photo', pos: lt/rt/lb/rb, q: 画質
+let pmPrefs={ target:'photo', pos:'rb', q:'orig', df:'ymd_slash', dc:'#ffb300' };   // dc: 写真に入れる日付の色   // target: 'memo'|'photo', pos: lt/rt/lb/rb, q: 画質
 try{ const p=JSON.parse(localStorage.getItem('photomemo_prefs')||'{}');
   if(p.target==='memo'||p.target==='photo') pmPrefs.target=p.target;
   if(['lt','rt','lb','rb'].includes(p.pos)) pmPrefs.pos=p.pos;
   if(['orig','high','std'].includes(p.q)) pmPrefs.q=p.q;
-  if(PM_DFMTS.includes(p.df)) pmPrefs.df=p.df; }catch(_){}
+  if(PM_DFMTS.includes(p.df)) pmPrefs.df=p.df;
+  if(typeof p.dc==='string' && /^#[0-9a-f]{6}$/i.test(p.dc)) pmPrefs.dc=p.dc; }catch(_){}
 function pmSavePrefs(){ try{ localStorage.setItem('photomemo_prefs', JSON.stringify(pmPrefs)); }catch(_){} }
 /* ── 書き出しの画質（元のサイズ／高精細／標準） ── */
 const PM_QMAX=8000;   // これ以上はブラウザが扱えないことがあるので上限
@@ -1686,7 +1700,7 @@ function pmInsertDate(str, ymd){
   if(pmPrefs.target==='memo'){ pmMemoInsertText(str); return; }
   if(!pmImg){ toast('先に写真を入れてください（挿入先を「文書」にするとメモに入ります）'); return; }
   pmPushUndo();
-  pmStamp={ text:str, pos:pmPrefs.pos, ymd:ymd||null };
+  pmStamp={ text:str, pos:pmPrefs.pos, ymd:ymd||null, c:pmPrefs.dc };
   pmRedraw(); pmDateUiSync(); pmDraftSave();
   toast('写真に日付を入れました（位置ボタンで移動できます）');
 }
@@ -1707,6 +1721,18 @@ function pmSetDatePos(p){
   if(pmStamp){ pmPushUndo(); pmStamp.pos=p; pmRedraw(); pmDraftSave(); }
   pmDateUiSync();
 }
+/* 写真に入れる日付の色を決める（すでに入れた日付にもその場で反映する） */
+function pmSetDateColor(c){
+  pmPrefs.dc=c; pmSavePrefs();
+  if(pmStamp){ pmPushUndo(); pmStamp.c=c; pmRedraw(); pmDraftSave(); }
+  pmDateUiSync();
+}
+/* 明るい色なら黒フチ、暗い色なら白フチにして、どんな写真の上でも読めるようにする */
+function pmStampOutline(c){
+  const h=(c||'').replace('#',''); if(h.length!==6) return 'rgba(0,0,0,0.75)';
+  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+  return (0.299*r+0.587*g+0.114*b) > 140 ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.85)';
+}
 function pmStampClear(){ if(pmStamp) pmPushUndo(); pmStamp=null; pmRedraw(); pmDateUiSync(); pmDraftSave(); }
 function pmDateUiSync(){
   // 「表示」のボタンには、今日の日付をその書き方で表示する（見たまま選べる）
@@ -1723,6 +1749,8 @@ function pmDateUiSync(){
   const lb=document.getElementById('pmPosLb'); if(lb) lb.style.display=showPos?'':'none';
   ['lt','rt','lb','rb'].forEach(p=>{ const b=document.getElementById('pmPos_'+p);
     if(b){ b.style.display=showPos?'':'none'; b.classList.toggle('on', pmPrefs.pos===p); } });
+  document.querySelectorAll('.pm-dcbtn').forEach(b=>b.classList.toggle('on', b.dataset.c===pmPrefs.dc));
+  const cr=document.getElementById('pmDateColorRow'); if(cr) cr.style.display=showPos?'':'none';
   const del=document.getElementById('pmStampDel'); if(del) del.style.display=pmStamp?'':'none';
 }
 /* 日付スタンプを描く。rect＝写真が描かれている範囲（表示キャンバス／書き出しキャンバス共通） */
@@ -1737,9 +1765,10 @@ function pmDrawStamp(ctx, rect){
   const pos=pmStamp.pos||'rb';
   const x = (pos==='lt'||pos==='lb') ? rect.x+pad : rect.x+rect.w-pad-tw;
   const y = (pos==='lt'||pos==='rt') ? rect.y+pad+size : rect.y+rect.h-pad;
-  ctx.lineJoin='round'; ctx.lineWidth=Math.max(2, size/7); ctx.strokeStyle='rgba(0,0,0,0.75)';
+  const col=pmStamp.c||'#ffb300';   // 既定は日付カメラ風のオレンジ
+  ctx.lineJoin='round'; ctx.lineWidth=Math.max(2, size/7); ctx.strokeStyle=pmStampOutline(col);
   ctx.strokeText(pmStamp.text, x, y);
-  ctx.fillStyle='#ffb300';   // 日付カメラ風のオレンジ
+  ctx.fillStyle=col;
   ctx.fillText(pmStamp.text, x, y);
   ctx.restore();
 }
