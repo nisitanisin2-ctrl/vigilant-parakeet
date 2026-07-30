@@ -2,7 +2,7 @@
   "name": "写真メモ",
   "short_name": "写真メモ",
   "description": "写真にメモを書き添えて、画像として保存・共有できるアプリ",
-  "id": "./",
+  "id": "/photomemo",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
