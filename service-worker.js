@@ -1,4 +1,4 @@
-const CACHE = 'photomemo-v31';
+const CACHE = 'photomemo-v32';
 const CACHE_PREFIX = 'photomemo-';   // このアプリのキャッシュだけを見分けるための名前
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
