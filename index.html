@@ -61,7 +61,13 @@ body {
   box-shadow: 0 2px 10px rgba(0,0,0,.12); }
 .pm-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .pm-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #888; font-size: 14px; pointer-events: none; }
-.pm-shootrow { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 8px; }
+/* ボタンは左下にまとめる。文字を入れて幅が増えても、はみ出さずに上へ折り返す。
+   ボタン以外のすき間は指の操作を通して、写真に線を引くじゃまをしない。 */
+.pm-shootrow { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px;
+  pointer-events: none; }
+.pm-shootrow button { pointer-events: auto; }
+/* 「戻す・進む」は対で使うので、折り返すときも2つ一緒に動かす */
+.pm-editgrp { display: flex; gap: 8px; pointer-events: none; }
 .pm-shoot { padding: 9px 13px; border: 1px solid rgba(255,255,255,.28); border-radius: 9px; background: rgba(0,0,0,.55);
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   color: #fff; font-size: 13.5px; font-weight: bold; cursor: pointer; touch-action: manipulation; transition: transform .08s; }
@@ -71,6 +77,21 @@ body {
   background: rgba(255,255,255,.18); color: #fff; font-size: 13px; font-weight: bold;
   cursor: pointer; touch-action: manipulation; transition: background .14s, transform .08s; }
 .hdr-btn:active { transform: scale(.95); background: rgba(255,255,255,.32); }
+/* 小さい画面（保存設定・定型文・プレビュー）の左上に置く「戻る」。
+   ✕ だけでは「消える」のか「前に戻る」のか分かりにくいので、矢印と文字の両方を出す。 */
+.hdr-back { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px 6px 9px; border: 1px solid rgba(255,255,255,.55); border-radius: 999px;
+  background: rgba(255,255,255,.22); color: #fff; font-size: 13px; font-weight: bold;
+  cursor: pointer; touch-action: manipulation; white-space: nowrap;
+  transition: background .14s, transform .08s; }
+.hdr-back:hover { background: rgba(255,255,255,.35); }
+.hdr-back:active { transform: scale(.95); background: rgba(255,255,255,.4); }
+.hdr-back .hdr-back-ar { font-size: 16px; line-height: 1; }
+/* 見出しは残りの幅に収める */
+.hdr-title { flex: 1; min-width: 0; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-pm="xs"] .hdr-back { padding: 4px 9px 4px 7px; font-size: 12px; }
+body[data-pm="xs"] .hdr-back .hdr-back-ar { font-size: 14px; }
+body[data-pm="xs"] .hdr-title { margin-left: 6px; }
 /* 写真を回すボタンは上の帯（保存設定の左）へ。写真の上に重ねると編集の邪魔になるため */
 .hdr-rotrow { display: flex; align-items: center; gap: 4px; }
 .hdr-rot { padding: 5px 9px; font-size: 16px; line-height: 1; }
@@ -111,15 +132,27 @@ body[data-pm="xs"] .hdr-rot { padding: 4px 7px; font-size: 14px; }
 .pm-sizebtn:active { transform: scale(.94); }
 .pm-sizebtn[disabled] { opacity: .35; }
 .pm-sizebtn.on { background: var(--pm-acc); color: #fff; }
-/* タブ：下線でつながって見せる */
+/* タブ：下線でつながって見せる。先頭の「文字」がこのアプリの主役 */
 .pm-tabbar { gap: 2px; border-bottom: 1px solid var(--pm-line); }
-.pm-tabbar .pm-tab { background: transparent; color: var(--text-light); font-size: 16.5px; padding: 11px 8px;
+.pm-tabbar .pm-tab { background: transparent; color: var(--text-light); font-size: 16px; padding: 11px 6px;
   border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .pm-tabbar .pm-tab.on { background: var(--pm-soft); color: var(--pm-acc); border-bottom-color: var(--pm-acc); }
-.pm-editbtn { padding: 9px 13px; border: 1.5px solid var(--pm-acc); border-radius: 9px;
+/* 主役のタブは、閉じている時も文字色を濃くして目に入るようにする */
+.pm-tabbar .pm-tab-main { color: var(--pm-acc); font-weight: bold; }
+/* 使い方の一言（狭い画面では場所を優先して隠す） */
+.pm-tip { font-size: 11px; line-height: 1.4; color: var(--text-light); padding: 1px 2px 0; }
+.pm-tip b { color: var(--pm-acc); }
+body[data-pm="xs"] .pm-tip { display: none; }
+/* 主役のボタン（＋ 文字を入れる）：面を塗って、まずこれを押すと分かるようにする */
+.pm-mainbtn { background: var(--pm-acc); color: #fff; }
+.pm-mainbtn:active { background: var(--pm-acc); }
+.pm-editbtn { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  padding: 9px 12px; border: 1.5px solid var(--pm-acc); border-radius: 9px;
   background: rgba(0,0,0,.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   color: #fff; font-size: 17px; font-weight: bold; line-height: 1;
   cursor: pointer; touch-action: manipulation; transition: transform .08s, background .14s; }
+/* 矢印のとなりに小さく役割を出す（絵だけだと「画面が戻る」と間違えやすいため） */
+.pm-editbtn .pm-editlb { font-size: 12px; }
 .pm-editbtn:active { transform: scale(.94); background: var(--pm-acc); }
 .pm-editbtn[disabled] { border-color: rgba(255,255,255,.25); color: rgba(255,255,255,.4); }
 .pm-del { background: rgba(192,57,43,.12); border: 1.5px solid #c0392b; color: #c0392b; }
@@ -169,21 +202,22 @@ body[data-pm="xs"] .hdr-rot { padding: 4px 7px; font-size: 14px; }
 body[data-pm="sm"] .pm-body, body[data-pm="xs"] .pm-body {
   gap: 6px; padding: 6px 8px calc(14px + env(safe-area-inset-bottom, 0px)); }
 body[data-pm="sm"] .pm-shot { padding: 9px 8px; font-size: 13.5px; }
-body[data-pm="sm"] .pm-tabbar .pm-tab { padding: 8px 7px; font-size: 15.5px; }
+body[data-pm="sm"] .pm-tabbar .pm-tab { padding: 8px 5px; font-size: 15px; }
 body[data-pm="sm"] .pm-row { min-height: 34px; }
 body[data-pm="sm"] .pm-sizebtn { padding: 6px 10px; font-size: 14px; }
 body[data-pm="sm"] .pm-color { width: 26px; height: 26px; }
 body[data-pm="sm"] .pm-panel { gap: 2px; }
 body[data-pm="sm"] .pm-memowrap { min-height: 56px; }
 body[data-pm="xs"] .pm-shot { padding: 7px 6px; font-size: 12.5px; }
-body[data-pm="xs"] .pm-tabbar .pm-tab { padding: 6px 6px; font-size: 14.5px; }
+body[data-pm="xs"] .pm-tabbar .pm-tab { padding: 6px 4px; font-size: 14px; }
 body[data-pm="xs"] .pm-row { min-height: 30px; }
 body[data-pm="xs"] .pm-sizebtn { padding: 5px 9px; font-size: 13.5px; }
 body[data-pm="xs"] .pm-color { width: 23px; height: 23px; }
 body[data-pm="xs"] .pm-tool-lb { font-size: 11.5px; }
 body[data-pm="xs"] .pm-panel { gap: 2px; }
 body[data-pm="xs"] .pm-shoot { padding: 7px 10px; font-size: 12.5px; }
-body[data-pm="xs"] .pm-editbtn { padding: 7px 10px; font-size: 15px; }
+body[data-pm="xs"] .pm-editbtn { padding: 7px 9px; font-size: 15px; gap: 3px; }
+body[data-pm="xs"] .pm-editbtn .pm-editlb { font-size: 11px; }
 body[data-pm="xs"] .pm-cbtn { min-width: 30px; padding: 5px 7px; font-size: 11.5px; }
 body[data-pm="xs"] .pm-memowrap { min-height: 48px; }
 body[data-pm="xs"] .hdr-btn { padding: 4px 9px; font-size: 12px; }
@@ -292,8 +326,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
     <div class="pm-shootrow">
       <button class="pm-shoot" onclick="document.getElementById('pmPhotoInput').click()">📷 カメラ</button>
       <button class="pm-shoot" onclick="document.getElementById('pmFileInput').click()">🖼 ファイル</button>
-      <button class="pm-editbtn" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled title="元に戻す">↩︎</button>
-      <button class="pm-editbtn" id="pmRedoBtn" onpointerdown="event.preventDefault()" onclick="pmRedo()" disabled title="やり直す">↪︎</button>
+      <span class="pm-editgrp"><button class="pm-editbtn" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled title="直前の書き込みを取り消す">↩︎<span class="pm-editlb">戻す</span></button><button class="pm-editbtn" id="pmRedoBtn" onpointerdown="event.preventDefault()" onclick="pmRedo()" disabled title="取り消した書き込みをやり直す">↪︎<span class="pm-editlb">進む</span></button></span>
     </div>
     <div class="pm-penbadge" id="pmPenBadge" style="display:none" onclick="pmModeOff()"></div>
     <div class="pm-toprow" id="pmTopRow" style="display:none">
@@ -309,13 +342,67 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
   </div>
   <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる） -->
   <div class="pm-tools pm-tabbar">
-        <button class="pm-sizebtn pm-tab" id="pmTab_text" onpointerdown="event.preventDefault()" onclick="pmToolTab('text')">✏️ 文字</button>
-    <button class="pm-sizebtn pm-tab" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕ 図形</button>
+    <button class="pm-sizebtn pm-tab pm-tab-main" id="pmTab_text" onpointerdown="event.preventDefault()" onclick="pmToolTab('text')" title="写真の上に文字を入れる">あ文字</button>
+    <button class="pm-sizebtn pm-tab" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕図形</button>
     <button class="pm-sizebtn pm-tab" id="pmTab_pen" onpointerdown="event.preventDefault()" onclick="pmToolTab('pen')">✍️手書き</button>
-    <button class="pm-sizebtn pm-tab" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅 日付</button>
+    <button class="pm-sizebtn pm-tab" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅日付</button>
+    <button class="pm-sizebtn pm-tab" id="pmTab_memo" onpointerdown="event.preventDefault()" onclick="pmToolTab('memo')" title="写真の下に書くメモの書式">📄メモ</button>
   </div>
-  <!-- 文字タブ：色・書式・その他（入りきらない分は横スライドで出す） -->
+  <!-- 文字タブ（このアプリの主役）：写真の上に文字を置く。
+       置いた文字は図形と同じようにドラッグで移動・ハンドルで回転と大きさが変えられる。 -->
   <div class="pm-panel" id="pmPanel_text" style="display:none">
+    <div class="pm-tip">写真を<b>ダブルタップ</b>すると、その場所に文字を入れられます（文字をダブルタップ＝書き直し）</div>
+    <div class="pm-row">
+      <span class="pm-tool-lb">入れる</span>
+      <div class="pm-slide"><div class="pm-strip">
+        <button class="pm-sizebtn pm-mainbtn" onpointerdown="event.preventDefault()" onclick="pmAddText()">＋ 文字を入れる</button>
+        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmOpenPhrases('photo')">📋 定型文</button>
+        <button class="pm-sizebtn" id="pmTextEdit" onpointerdown="event.preventDefault()" onclick="pmEditText()" style="display:none">✎ 書き直す</button>
+        <button class="pm-sizebtn pm-del" id="pmTextDel" onclick="pmDelShape()" style="display:none">🗑 消す</button>
+      </div></div>
+    </div>
+    <div class="pm-row">
+      <span class="pm-tool-lb">色</span>
+      <div class="pm-slide"><div class="pm-strip">
+        <button class="pm-color pm-shcol" data-c="#e53935" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e53935')"></button>
+        <button class="pm-color pm-shcol" data-c="#1e88e5" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#1e88e5')"></button>
+        <button class="pm-color pm-shcol" data-c="#2e7d32" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#2e7d32')"></button>
+        <button class="pm-color pm-shcol" data-c="#fb8c00" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#fb8c00')"></button>
+        <button class="pm-color pm-shcol" data-c="#8e24aa" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#8e24aa')"></button>
+        <button class="pm-color pm-shcol" data-c="#e91e63" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e91e63')"></button>
+        <button class="pm-color pm-shcol" data-c="#f9a825" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#f9a825')"></button>
+        <button class="pm-color pm-shcol" data-c="#00acc1" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#00acc1')"></button>
+        <button class="pm-color pm-shcol" data-c="#ffffff" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#ffffff')"></button>
+        <button class="pm-color pm-shcol" data-c="#000000" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#000000')"></button>
+        <button class="pm-color pm-rainbow" data-cc="shape" onpointerdown="event.preventDefault()" onclick="pmPickCustom('shape')" title="自分で色を作って登録する">＋</button>
+      </div></div>
+    </div>
+    <div class="pm-row">
+      <span class="pm-tool-lb">大きさ</span>
+      <div class="pm-slide"><div class="pm-strip">
+        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmShapeSizeStep(-1)">あ 小</button>
+        <button class="pm-sizebtn" style="font-size:19px" onpointerdown="event.preventDefault()" onclick="pmShapeSizeStep(1)">あ 大</button>
+        <span class="pm-sub">向き</span>
+        <button class="pm-sizebtn pm-vtbtn" id="pmTxtH" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(false)">横書き</button>
+        <button class="pm-sizebtn pm-vtbtn" id="pmTxtV" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(true)">縦書き</button>
+      </div></div>
+    </div>
+    <div class="pm-row">
+      <span class="pm-tool-lb">フチ</span>
+      <div class="pm-slide"><div class="pm-strip">
+        <button class="pm-sizebtn pm-ocbtn" data-oc="" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('')" title="写真に合わせて白か黒で縁取ります">自動</button>
+        <button class="pm-color pm-ocbtn" data-oc="#ffffff" style="background:#ffffff" title="白" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffffff')"></button>
+        <button class="pm-color pm-ocbtn" data-oc="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#000000')"></button>
+        <button class="pm-color pm-ocbtn" data-oc="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffd400')"></button>
+        <button class="pm-color pm-ocbtn" data-oc="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#e53935')"></button>
+        <button class="pm-color pm-rainbow" data-cc="oc" onpointerdown="event.preventDefault()" onclick="pmPickCustom('oc')" title="自分で色を作って登録する">＋</button>
+        <span class="pm-sub">まとめて</span>
+        <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
+      </div></div>
+    </div>
+  </div>
+  <!-- メモタブ：写真の下に書くメモ欄の色・書式（入りきらない分は横スライドで出す） -->
+  <div class="pm-panel" id="pmPanel_memo" style="display:none">
     <div class="pm-row">
       <span class="pm-tool-lb">色</span>
       <div class="pm-slide"><div class="pm-strip">
@@ -353,8 +440,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
       <div class="pm-slide"><div class="pm-strip">
         <button class="pm-sizebtn" id="pmBgW" onpointerdown="event.preventDefault()" onclick="pmSetBg('white')">白背景</button>
         <button class="pm-sizebtn" id="pmBgB" onpointerdown="event.preventDefault()" onclick="pmSetBg('black')">黒背景</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmOpenPhrases()">📋 定型文</button>
-        <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
+        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmOpenPhrases('memo')">📋 定型文</button>
       </div></div>
     </div>
   </div>
@@ -367,8 +453,6 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
         <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('rect')">□</button>
         <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmArrowMode()">→</button>
         <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('tri')">△</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddText()">あ 文字</button>
-        <button class="pm-sizebtn" id="pmTextEdit" onpointerdown="event.preventDefault()" onclick="pmEditText()" style="display:none">✎ 文字を直す</button>
         <button class="pm-sizebtn pm-del" id="pmShapeDel" onclick="pmDelShape()" style="display:none">🗑 消す</button>
       </div></div>
     </div>
@@ -414,8 +498,6 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
     <div class="pm-row">
       <span class="pm-tool-lb">その他</span>
       <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-vtbtn" id="pmTxtH" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(false)">横書き</button>
-        <button class="pm-sizebtn pm-vtbtn" id="pmTxtV" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(true)">縦書き</button>
         <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
         <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearShapes()">全部消す</button>
       </div></div>
@@ -533,8 +615,8 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
 <div class="modal-overlay" id="pmSaveSetOverlay" onclick="if(event.target===this)pmCloseSaveSet()">
   <div class="modal">
     <div class="modal-header">
-      <span>⚙ 保存設定</span>
-      <button class="modal-close" onclick="pmCloseSaveSet()">✕</button>
+      <button class="hdr-back" onclick="pmCloseSaveSet()" title="前の画面にもどる"><span class="hdr-back-ar">←</span>戻る</button>
+      <span class="hdr-title">⚙ 保存設定</span>
     </div>
     <div class="shotprev-body">
       <div class="mode-hint">スクショ・共有で書き出す画像の大きさです。「元のサイズ」なら写真の画質そのままで保存できます（元より大きくは引き伸ばしません）。</div>
@@ -552,11 +634,11 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
 <div class="modal-overlay" id="pmPhraseOverlay" onclick="if(event.target===this)pmClosePhrases()">
   <div class="modal">
     <div class="modal-header">
-      <span>📋 定型文</span>
-      <button class="modal-close" onclick="pmClosePhrases()">✕</button>
+      <button class="hdr-back" onclick="pmClosePhrases()" title="前の画面にもどる"><span class="hdr-back-ar">←</span>戻る</button>
+      <span class="hdr-title">📋 定型文</span>
     </div>
     <div class="shotprev-body">
-      <div class="mode-hint">言葉をタップするとメモに入ります。「📷」を押すと写真の上に文字として置きます。</div>
+      <div class="mode-hint" id="pmPhraseHint">言葉をタップすると写真の上に文字として置きます。「📄」を押すと下のメモに入ります。</div>
       <div class="ph-list" id="pmPhraseList"></div>
       <div class="ph-add">
         <input type="text" id="pmPhraseNew" placeholder="新しい定型文を入力" onkeydown="if(event.key==='Enter'){event.preventDefault();pmAddPhrase();}">
@@ -570,8 +652,8 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
 <div class="modal-overlay" id="shotPrevOverlay" onclick="if(event.target===this)closeShotPreview()">
   <div class="modal">
     <div class="modal-header">
-      <span>👁 プレビュー</span>
-      <button class="modal-close" onclick="closeShotPreview()">✕</button>
+      <button class="hdr-back" onclick="closeShotPreview()" title="前の画面にもどる"><span class="hdr-back-ar">←</span>戻る</button>
+      <span class="hdr-title">👁 プレビュー</span>
     </div>
     <div class="shotprev-body">
       <div class="mode-hint">この内容の画像になります。よければ「スクショ」で画像として保存、「共有」でLINE・メール等へ送れます。</div>
@@ -585,7 +667,7 @@ body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
 </div>
 
 <script>
-const APP_VERSION='v31';
+const APP_VERSION='v32';
 document.getElementById('appVer').textContent=APP_VERSION;
 
 /* 簡易トースト通知 */
@@ -636,15 +718,23 @@ function appPrompt(message, defaultValue=''){
   });
 }
 
-/* 端末の「戻る」でアプリを閉じずに、開いている画面（プレビュー）だけを閉じる */
-let backGuardFn=null;
-window.addEventListener('popstate', ()=>{ if(backGuardFn){ const f=backGuardFn; backGuardFn=null; f(); } });
+/* 端末の「戻る」でアプリを閉じずに、開いている画面（保存設定・定型文・プレビュー）だけを閉じる。
+   開く時に履歴を1つ積み、戻る（popstate）でいちばん上の画面だけ閉じる。画面の「戻る」で閉じた時は
+   積んだ分を1つ消費するので、端末の戻ると画面の戻るがいつも同じ動きになる。 */
+let backGuardStack=[];     // 重ねて開いた画面の「閉じる処理」。後ろが上の画面
+let backGuardSkip=0;       // 自分で history.back() した分（popstate を1回読み飛ばす）
+window.addEventListener('popstate', ()=>{
+  if(backGuardSkip>0){ backGuardSkip--; return; }
+  const f=backGuardStack.pop(); if(f) f();
+});
 function armBackGuard(fn){
-  const had=!!backGuardFn; backGuardFn=fn;
-  if(!had){ try{ window.history.pushState({pmModal:1},''); }catch(_){} }
+  backGuardStack.push(fn);
+  try{ window.history.pushState({pmModal:1},''); }catch(_){}
 }
 function releaseBackGuard(){
-  if(backGuardFn){ backGuardFn=null; try{ window.history.back(); }catch(_){} }
+  if(!backGuardStack.length) return;
+  backGuardStack.pop(); backGuardSkip++;
+  try{ window.history.back(); }catch(_){ backGuardSkip--; }
 }
 
 /* ── 写真（上半分）：読み込み・ピンチズーム ── */
@@ -699,8 +789,10 @@ function pmPhotoChange(e){
   img.onload=()=>{
     pmPushUndo();
     pmImgOrig=img; pmImg=img; pmImgBlob=f; pmRot=0;
-    pmShapes=[]; pmSelShape=-1; pmSelGroup=[];   // 写真を変えたら図形はリセット
-    pmSetupCanvas(); pmFitView(); pmRedraw(); pmShapeSyncUi(); pmQualitySyncUi(); pmDraftSave(true);
+    pmShapes=[]; pmSelShape=-1; pmSelGroup=[];   // 写真を変えたら書き込みはリセット
+    pmSetupCanvas(); pmFitView(); pmRedraw();
+    if(!pmToolOpen) pmToolTab('text');   // 写真の次にすることは「文字を入れる」
+    pmShapeSyncUi(); pmQualitySyncUi(); pmDraftSave(true);
     try{ URL.revokeObjectURL(url); }catch(_){}
   };
   img.src=url; e.target.value='';
@@ -793,8 +885,10 @@ function pmDoPinch(){ const [a,b]=pmTwo(); if(!a||!b||!pmPinch) return; const mi
   pmView.tx=mid.x-pmPinch.anchor.x*pmView.scale; pmView.ty=mid.y-pmPinch.anchor.y*pmView.scale; pmClamp(); }
 function pmPointerDown(e){ if(!pmImg) return; const c=pmCanvasEl(); if(e.target!==c) return; e.preventDefault();
   pmPointers.set(e.pointerId, pmClientToCanvas(e.clientX,e.clientY));
-  if(pmPointers.size>=2){ pmStartPinch(); pmPanLast=null; pmShapeGesture=null; pmPenCur=null; pmDraft2=null; return; }
+  if(pmPointers.size>=2){ pmStartPinch(); pmPanLast=null; pmShapeGesture=null; pmPenCur=null; pmDraft2=null; pmTapDown=null; return; }
   const cp=pmPointers.get(e.pointerId);
+  // ダブルタップ（＝文字を置く／書き直す）の判定用。指を動かしたら取り消す
+  pmTapDown = (pmPenMode||pmPlaceMode||pmRectMode) ? null : {t:Date.now(), x:cp.x, y:cp.y};
   if(pmRectMode){   // 囲んで選ぶ
     const ic=pmClampToImg(pmToImg(cp)); pmRectDraft={x1:ic.x,y1:ic.y,x2:ic.x,y2:ic.y};
     pmPanLast=null; return;
@@ -878,8 +972,26 @@ function pmPointerUp(e){ if(!pmPointers.has(e.pointerId)) return; pmPointers.del
       pmDraft2=null; pmRedraw();
     }
     if(pmShapeGesture){ pmShapeGesture=null; pmDraftSave(); }
+    pmTapCheck(e);
   }
   pmPanLast = pmPointers.size===1 ? [...pmPointers.values()][0] : null; }
+/* ── 写真のダブルタップ ──
+   このアプリの主役は「写真に文字を入れる」なので、写真を2回続けてタップしたら
+   その場所に文字を置く（文字の上なら書き直す）。1本指の短いタップだけを見る。 */
+let pmTapDown=null, pmTapLast=0, pmTapLastPt=null;
+function pmTapCheck(e){
+  const d=pmTapDown; pmTapDown=null;
+  if(!d || pmPenMode || pmPlaceMode || pmRectMode || pmGroupActive()) return;
+  const cp=pmClientToCanvas(e.clientX, e.clientY);
+  if(Date.now()-d.t>400 || Math.hypot(cp.x-d.x, cp.y-d.y)>10) return;   // 長押し・ドラッグは対象外
+  const now=Date.now();
+  if(pmTapLastPt && now-pmTapLast<350 && Math.hypot(cp.x-pmTapLastPt.x, cp.y-pmTapLastPt.y)<30){
+    pmTapLast=0; pmTapLastPt=null;
+    pmTextAt(pmClampToImg(pmToImg(cp)));
+    return;
+  }
+  pmTapLast=now; pmTapLastPt=cp;
+}
 
 /* ── メモ（下半分）：色・大きさ・字体・装飾 ── */
 /* メモ欄（contenteditable）のプレーン文字を取り出す */
@@ -914,7 +1026,7 @@ let pmSelExtend=false;   // 「選択」がON＝◀▶で範囲を広げる
 /* メモにカーソルが無ければ末尾に置く（隠れている時は文字タブを開く） */
 function pmEnsureMemoCaret(){
   const ed=document.getElementById('pmMemo'); if(!ed) return null;
-  if(!pmMemoVisible() && pmToolOpen!=='text') pmToolTab('text');
+  if(!pmMemoVisible() && pmToolOpen!=='memo') pmToolTab('memo');
   const s=getSelection(); if(!s) return null;
   let inside=false;
   if(s.rangeCount){ let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement; inside=!!(n && ed.contains(n)); }
@@ -956,7 +1068,7 @@ function pmSelModeToggle(){
 /* 「全て」ボタン：メモ全体を選ぶ */
 function pmSelectAllMemo(){
   const ed=document.getElementById('pmMemo'); if(!ed) return;
-  if(!pmMemoVisible() && pmToolOpen!=='text') pmToolTab('text');
+  if(!pmMemoVisible() && pmToolOpen!=='memo') pmToolTab('memo');
   ed.focus();
   const r=document.createRange(); r.selectNodeContents(ed);
   const s=getSelection(); s.removeAllRanges(); s.addRange(r);
@@ -1149,8 +1261,10 @@ function pmAddShape(type){
   pmShapeSyncUi(); pmRedraw(); pmDraftSave();
   toast('図形を置きました（ドラッグで移動・丸いハンドルで回転と大きさ）');
 }
-/* 写真の上に文字を置く（図形と同じように移動・回転・大きさ・色が変えられる） */
-async function pmAddText(txt){
+/* ── このアプリの主役：写真の上に文字を置く ──
+   置いた文字は図形と同じようにドラッグで移動、ハンドルで回転と大きさが変えられる。
+   at を渡すと写真上のその位置に、渡さなければ今見えている中央に置く。 */
+async function pmAddText(txt, at){
   if(!pmImg){ toast('先に写真を入れてください'); return; }
   pmModeOff();   // 手書き・矢印モードを抜けてから置く（思わぬ線を描かないように）
   let t = (typeof txt==='string' && txt) ? txt : await appPrompt('写真に入れる文字', '');
@@ -1158,17 +1272,29 @@ async function pmAddText(txt){
   t=String(t).trim(); if(!t) return;
   pmPushUndo();
   const c=pmCanvasEl();
-  const ic=pmToImg({x:c.width/2, y:c.height/2});
+  const ic = at || pmToImg({x:c.width/2, y:c.height/2});
   const iw=pmIW(), ih=pmIH();
   pmShapes.push({ type:'text', text:t, x:Math.max(0,Math.min(iw,ic.x)), y:Math.max(0,Math.min(ih,ic.y)),
     size:Math.max(16, Math.min(iw,ih)*0.09), angle:0, color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline, vt:pmTextVert });
   pmSelShape=pmShapes.length-1;
+  if(pmToolOpen!=='text') pmToolTab('text');   // 色・大きさ・向きをすぐ直せるように
   pmShapeSyncUi(); pmRedraw(); pmDraftSave();
   toast('文字を置きました（ドラッグで移動・ハンドルで回転と大きさ）');
 }
-/* 置いた文字を書き直す */
+/* 写真をダブルタップ：文字の上なら書き直し、何も無い所ならその場所に文字を置く */
+function pmTextAt(ic){
+  if(!pmImg) return;
+  const hit=pmShapeHitAt(ic);
+  if(hit>=0 && pmShapes[hit] && pmShapes[hit].type==='text'){
+    pmSelShape=hit; pmShapeSyncUi(); pmRedraw(); pmEditText(); return;
+  }
+  if(hit>=0) return;   // 図形の上なら何もしない（うっかり文字が増えないように）
+  pmAddText(null, ic);
+}
+/* 置いた文字を書き直す（文字をダブルタップ、または「✎ 書き直す」） */
 async function pmEditText(){
   const s=pmShapes[pmSelShape]; if(!s || s.type!=='text') return;
+  if(pmToolOpen!=='text') pmToolTab('text');
   const t=await appPrompt('文字を直す', s.text||'');
   if(t===null) return;
   const v=String(t).trim(); if(!v) return;
@@ -1245,7 +1371,7 @@ function pmRectFinish(){
   if(!hit.length){ toast('囲んだ中に図形がありませんでした'); pmRedraw(); return; }
   pmSelGroup=hit; pmSelShape=-1; pmRectMode=false;
   pmModeSyncUi();
-  if(pmToolOpen!=='shape') pmToolTab('shape');   // 大きさ・色を変えられるタブへ
+  if(pmToolOpen!=='shape' && pmToolOpen!=='pen' && pmToolOpen!=='text') pmToolTab('shape');   // 大きさ・色を変えられるタブへ
   pmShapeSyncUi(); pmRedraw();
   toast(hit.length+'個をまとめて選びました（枠の中をドラッグで移動・丸で回転と大きさ）');
 }
@@ -1351,16 +1477,22 @@ function pmRedo(){
 }
 function pmShapeSyncUi(){
   const sel=(pmSelShape>=0)?pmShapes[pmSelShape]:null;
-  const del=document.getElementById('pmShapeDel');
-  if(del) del.style.display = (sel||pmGroupActive()) ? '' : 'none';
+  const on = !!(sel||pmGroupActive());
+  ['pmShapeDel','pmTextDel'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display = on ? '' : 'none'; });
   document.querySelectorAll('.pm-rectbtn').forEach(b=>b.classList.toggle('on', pmRectMode));
+  const isText = !!(sel && sel.type==='text');
   const te=document.getElementById('pmTextEdit');
-  if(te) te.style.display = (sel && sel.type==='text') ? '' : 'none';
-  if(sel && pmToolOpen!=='shape') pmToolTab('shape');   // 図形を選んだら図形タブを開く
-  pmThickSyncUi();   // 太さボタンの強調を選択中の図形に合わせる
+  if(te) te.style.display = isText ? '' : 'none';
+  // 選んだものを直せるタブを開く（文字＝文字タブ、図形・手書き＝図形タブ）
+  if(sel){
+    const want = isText ? 'text' : 'shape';
+    const ok = isText ? (pmToolOpen==='text') : (pmToolOpen==='shape' || pmToolOpen==='pen');
+    if(!ok) pmToolTab(want);
+  }
+  pmThickSyncUi();   // 太さ・フチ・縦横ボタンの強調を選択中のものに合わせる
 }
 /* ── ツールタブ（文字／図形／日付／写真）：使う時だけパネルを開いて画面をスッキリさせる ── */
-let pmToolOpen='';   // 開いているタブ '' | 'text' | 'shape' | 'date' | 'photo'
+let pmToolOpen='';   // 開いているタブ '' | 'text'（写真の文字＝主役） | 'shape' | 'pen' | 'date' | 'memo'
 /* 今えらんでいる色に印をつける（横スライドで隠れていても、開いた時に見える位置まで寄せる） */
 function pmColorSyncUi(){
   document.querySelectorAll('.pm-shcol').forEach(b=>b.classList.toggle('on', b.dataset.c===pmShapeColor));
@@ -1404,11 +1536,11 @@ window.addEventListener('resize', ()=>{ pmSizeClass();
   requestAnimationFrame(()=>{ if(typeof pmRelayout==='function') pmRelayout(); pmStripSync(); }); });
 function pmToolTab(name){
   pmToolOpen = (pmToolOpen===name) ? '' : name;   // 同じタブをもう一度＝閉じる
-  ['text','shape','pen','date'].forEach(t=>{
+  ['text','shape','pen','date','memo'].forEach(t=>{
     const p=document.getElementById('pmPanel_'+t); if(p) p.style.display = (pmToolOpen===t)?'':'none';
     const b=document.getElementById('pmTab_'+t);  if(b) b.classList.toggle('on', pmToolOpen===t);
   });
-  // 手書きタブを開いている間だけ「なぞって描く」状態にする
+  // 「囲んで選ぶ」は写真に置いたもの（文字・図形・手書き）を扱うタブでだけ続ける
   if(pmToolOpen!=='shape' && pmToolOpen!=='pen' && pmToolOpen!=='text') pmRectMode=false;
   if(pmToolOpen==='pen'){
     pmPlaceMode='';
@@ -1419,14 +1551,16 @@ function pmToolTab(name){
   }
   pmModeSyncUi();
   if(pmToolOpen==='shape' || pmToolOpen==='pen') pmThickSyncUi();
+  if(pmToolOpen==='text'){ pmOutlineSyncUi(); pmTextVertSyncUi(); }
   pmColorSyncUi();
   requestAnimationFrame(()=>{ pmRelayout(); pmStripReveal(); pmStripSync(); });   // パネルの高さが変わるので写真の枠を合わせ直す
   pmMemoVisSync();
 }
-/* 文字を書く時以外（図形・日付・写真）はメモ欄を隠して、写真を大きく使えるようにする */
+/* 写真に書き込む道具（文字・図形・手書き・日付）を開いている間はメモ欄を隠し、
+   写真を大きく使えるようにする。メモ欄を書くのは「📄メモ」タブとタブを閉じている時。 */
 function pmMemoVisSync(){
   const wrap=document.getElementById('pmMemoWrap'); if(!wrap) return;
-  const show = (pmToolOpen==='' || pmToolOpen==='text');
+  const show = (pmToolOpen==='' || pmToolOpen==='memo');
   const cur = wrap.style.display!=='none';
   if(show===cur) return;
   wrap.style.display = show ? '' : 'none';
@@ -1654,8 +1788,12 @@ function pmOutWidth(){
   if(pmPrefs.q==='high') return Math.min(w, 2000);
   return Math.min(w, PM_QMAX);   // 元のサイズ（引き伸ばしはしない）
 }
-function pmOpenSaveSet(){ pmQualitySyncUi(); document.getElementById('pmSaveSetOverlay').classList.add('open'); }
-function pmCloseSaveSet(){ document.getElementById('pmSaveSetOverlay').classList.remove('open'); }
+function pmOpenSaveSet(){ pmQualitySyncUi(); document.getElementById('pmSaveSetOverlay').classList.add('open');
+  armBackGuard(()=>document.getElementById('pmSaveSetOverlay').classList.remove('open')); }
+function pmCloseSaveSet(){
+  const ov=document.getElementById('pmSaveSetOverlay'); if(!ov.classList.contains('open')) return;
+  ov.classList.remove('open'); releaseBackGuard();
+}
 function pmQualitySyncUi(){
   [['pmQ_orig','orig'],['pmQ_high','high'],['pmQ_std','std']].forEach(([id,v])=>{
     const b=document.getElementById(id); if(b) b.classList.toggle('on', pmPrefs.q===v);
@@ -1719,7 +1857,7 @@ function pmInsertDate(str, ymd){
 /* メモ（contenteditable）のカーソル位置に文字を挿入。カーソルが無ければ末尾に */
 function pmMemoInsertText(t){
   const ed=document.getElementById('pmMemo'); if(!ed) return;
-  if(!pmMemoVisible() && pmToolOpen!=='text') pmToolTab('text');   // 隠れている時は文字タブを開いて見せる
+  if(!pmMemoVisible() && pmToolOpen!=='memo') pmToolTab('memo');   // 隠れている時は文字タブを開いて見せる
   ed.focus();
   const s=getSelection();
   let inEd=false;
@@ -1957,6 +2095,7 @@ function openShotPreview(build, prefix){
   armBackGuard(()=>{ document.getElementById('shotPrevOverlay').classList.remove('open'); shotPrevBuild=null; });
 }
 function closeShotPreview(){
+  if(!document.getElementById('shotPrevOverlay').classList.contains('open')) return;
   document.getElementById('shotPrevOverlay').classList.remove('open');
   shotPrevBuild=null;
   const img=document.getElementById('shotPrevImg'); if(img) img.removeAttribute('src');
@@ -2049,18 +2188,31 @@ const PM_PHRASE_DEF=['着工前','完了','配筋確認','型枠確認','打設�
 let pmPhrases=PM_PHRASE_DEF.slice();
 try{ const a=JSON.parse(localStorage.getItem('photomemo_phrases')||'null'); if(Array.isArray(a)) pmPhrases=a; }catch(_){}
 function pmSavePhrases(){ try{ localStorage.setItem('photomemo_phrases', JSON.stringify(pmPhrases)); }catch(_){} }
-function pmOpenPhrases(){
+/* 定型文：開いた場所で「押したときの入り先」が変わる。
+   文字タブから開けば写真の上、メモタブから開けばメモ欄に入る（もう一方は小さいボタンで選べる）。 */
+let pmPhraseTo='photo';
+function pmOpenPhrases(target){
+  pmPhraseTo = (target==='memo' || target==='photo') ? target : (pmToolOpen==='memo' ? 'memo' : 'photo');
+  const h=document.getElementById('pmPhraseHint');
+  if(h) h.textContent = (pmPhraseTo==='photo')
+    ? '言葉をタップすると写真の上に文字として置きます。「📄」を押すと下のメモに入ります。'
+    : '言葉をタップすると下のメモに入ります。「📷」を押すと写真の上に文字として置きます。';
   pmRenderPhrases();
   document.getElementById('pmPhraseOverlay').classList.add('open');
   armBackGuard(()=>document.getElementById('pmPhraseOverlay').classList.remove('open'));
 }
-function pmClosePhrases(){ document.getElementById('pmPhraseOverlay').classList.remove('open'); releaseBackGuard(); }
+function pmClosePhrases(){
+  const ov=document.getElementById('pmPhraseOverlay'); if(!ov.classList.contains('open')) return;
+  ov.classList.remove('open'); releaseBackGuard();
+}
 function pmRenderPhrases(){
   const el=document.getElementById('pmPhraseList'); if(!el) return;
   if(!pmPhrases.length){ el.innerHTML='<div class="mode-hint">定型文がありません。下の欄から追加できます。</div>'; return; }
+  const toPhoto = (pmPhraseTo==='photo');
+  const alt = toPhoto ? ['📄','下のメモに入れる'] : ['📷','写真の上に置く'];
   el.innerHTML=pmPhrases.map((p,i)=>`<div class="ph-row">
-    <button class="ph-txt" onclick="pmUsePhrase(${i},false)">${pmEsc(p)}</button>
-    <button class="ph-mini" onclick="pmUsePhrase(${i},true)" title="写真の上に置く">📷</button>
+    <button class="ph-txt" onclick="pmUsePhrase(${i},${toPhoto})">${pmEsc(p)}</button>
+    <button class="ph-mini" onclick="pmUsePhrase(${i},${!toPhoto})" title="${alt[1]}">${alt[0]}</button>
     <button class="ph-mini ph-del" onclick="pmDelPhrase(${i})" title="削除">✕</button>
   </div>`).join('');
 }
