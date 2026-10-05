@@ -2,2336 +2,655 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>写真メモ</title>
-<meta name="apple-mobile-web-app-title" content="写真メモ">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>菜園ノート</title>
+<meta name="apple-mobile-web-app-title" content="菜園ノート">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="theme-color" content="#1565c0">
+<meta name="theme-color" content="#2e7d32">
 <style>
 :root {
-  --text: #333;
-  --text-light: #666;
-  --save-item-bg: #fafafa;
-  --save-item-border: #ddd;
-  --cell-bg: #fff;
-  --modal-bg: #fff;
-  --panel: #fff;
-  --bg: #eef1f5;
+  --acc: #2e7d32; --acc-soft: rgba(46,125,50,.12); --acc-ink: #fff;
+  --bg: #f1f4ee; --panel: #fff; --text: #263022; --muted: #6b7768;
+  --line: rgba(80,100,70,.20); --chip: rgba(80,100,70,.10);
+  --warn: #e65100; --warn-soft: rgba(230,81,0,.12); --danger: #c62828;
+  --water: #1565c0; --water-soft: rgba(21,101,192,.12);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #e8ecf5;
-    --text-light: #9aa7c7;
-    --save-item-bg: #1e2a45;
-    --save-item-border: #3a4a70;
-    --cell-bg: #1e2a45;
-    --modal-bg: #182238;
-    --panel: #182238;
-    --bg: #0f1626;
+    --acc: #66bb6a; --acc-soft: rgba(102,187,106,.18); --acc-ink: #10210f;
+    --bg: #121811; --panel: #1b2419; --text: #e6eee2; --muted: #9aab95;
+    --line: rgba(160,190,150,.22); --chip: rgba(160,190,150,.12);
+    --warn: #ffb74d; --warn-soft: rgba(255,183,77,.15); --danger: #ef5350;
+    --water: #64b5f6; --water-soft: rgba(100,181,246,.16);
   }
 }
-/* 写真メモの色は「基準色1つ＋グレーの濃淡」に統一する */
-:root { --pm-acc: #1565c0; --pm-soft: rgba(21,101,192,.12); --pm-chip: rgba(120,132,156,.13); --pm-line: rgba(120,132,156,.30); --pm-bg: var(--bg); }
-@media (prefers-color-scheme: dark) {
-  :root { --pm-soft: rgba(21,101,192,.28); --pm-chip: rgba(150,170,210,.16); --pm-line: rgba(150,170,210,.26); }
-}
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; padding: 0; height: 100%; }
+html, body { margin: 0; padding: 0; }
 body {
-  font-family: 'Segoe UI', 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
-  background: var(--bg); color: var(--text);
-  display: flex; flex-direction: column;
-  height: 100dvh; overflow: hidden;
-  overscroll-behavior: none;
+  font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--text); font-size: 16px; line-height: 1.5;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
-/* ヘッダー */
-.app-header {
-  flex-shrink: 0; background: #1565c0; color: #fff;
-  padding: 10px 14px; font-size: 15px; font-weight: bold;
-  display: flex; align-items: center; justify-content: space-between;
+header {
+  position: sticky; top: 0; z-index: 10; background: var(--acc); color: var(--acc-ink);
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  display: flex; align-items: center; gap: 8px;
 }
-.app-ver { font-size: 10.5px; font-weight: normal; opacity: 0.8; }
-/* 本体レイアウト（上：写真／下：メモ・ツール・ボタン） */
-.pm-body { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px;
-  /* 下は少し広めに空ける（ボタンが画面の端にくっつかないように。iPhoneのホームバーも避ける） */
-  padding: 8px 10px calc(46px + env(safe-area-inset-bottom, 0px)); }
-.pm-photo { position: relative; flex: 1 1 64%; min-height: 0; background: #000; border-radius: 12px; overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,.12); }
-.pm-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.pm-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #888; font-size: 14px; pointer-events: none; }
-/* ボタンは左下にまとめる。文字を入れて幅が増えても、はみ出さずに上へ折り返す。
-   ボタン以外のすき間は指の操作を通して、写真に線を引くじゃまをしない。 */
-.pm-shootrow { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px;
-  pointer-events: none; }
-.pm-shootrow button { pointer-events: auto; }
-/* 「戻す・進む」は対で使うので、折り返すときも2つ一緒に動かす */
-.pm-editgrp { display: flex; gap: 8px; pointer-events: none; }
-.pm-shoot { padding: 9px 13px; border: 1px solid rgba(255,255,255,.28); border-radius: 9px; background: rgba(0,0,0,.55);
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-  color: #fff; font-size: 13.5px; font-weight: bold; cursor: pointer; touch-action: manipulation; transition: transform .08s; }
-.pm-shoot:active { transform: scale(.95); }
-.hdr-right { display: flex; align-items: center; gap: 8px; }
-.hdr-btn { padding: 6px 11px; border: 1px solid rgba(255,255,255,.45); border-radius: 8px;
-  background: rgba(255,255,255,.18); color: #fff; font-size: 13px; font-weight: bold;
-  cursor: pointer; touch-action: manipulation; transition: background .14s, transform .08s; }
-.hdr-btn:active { transform: scale(.95); background: rgba(255,255,255,.32); }
-/* 小さい画面（保存設定・定型文・プレビュー）の左上に置く「戻る」。
-   ✕ だけでは「消える」のか「前に戻る」のか分かりにくいので、矢印と文字の両方を出す。 */
-.hdr-back { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
-  padding: 6px 12px 6px 9px; border: 1px solid rgba(255,255,255,.55); border-radius: 999px;
-  background: rgba(255,255,255,.22); color: #fff; font-size: 13px; font-weight: bold;
-  cursor: pointer; touch-action: manipulation; white-space: nowrap;
-  transition: background .14s, transform .08s; }
-.hdr-back:hover { background: rgba(255,255,255,.35); }
-.hdr-back:active { transform: scale(.95); background: rgba(255,255,255,.4); }
-.hdr-back .hdr-back-ar { font-size: 16px; line-height: 1; }
-/* 見出しは残りの幅に収める */
-.hdr-title { flex: 1; min-width: 0; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-body[data-pm="xs"] .hdr-back { padding: 4px 9px 4px 7px; font-size: 12px; }
-body[data-pm="xs"] .hdr-back .hdr-back-ar { font-size: 14px; }
-body[data-pm="xs"] .hdr-title { margin-left: 6px; }
-/* 写真を回すボタンは上の帯（保存設定の左）へ。写真の上に重ねると編集の邪魔になるため */
-.hdr-rotrow { display: flex; align-items: center; gap: 4px; }
-.hdr-rot { padding: 5px 9px; font-size: 16px; line-height: 1; }
-body[data-pm="xs"] .hdr-right { gap: 5px; }
-body[data-pm="xs"] .hdr-rot { padding: 4px 7px; font-size: 14px; }
-.pm-toprow { position: absolute; right: 8px; top: 8px; display: flex; gap: 6px; }
-.pm-zoomreset { padding: 6px 11px; border: none; border-radius: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; cursor: pointer; touch-action: manipulation; }
-/* メモ欄：枠の中に操作ボタンを浮かせるため、外側の枠で包む */
-.pm-memowrap { position: relative; flex: 0 1 36%; min-height: 70px; display: flex; }
-.pm-caret { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
-.pm-cbtn { min-width: 34px; padding: 7px 9px; border: 1px solid rgba(255,255,255,.28); border-radius: 8px;
-  background: rgba(0,0,0,.58); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-  color: #fff; font-size: 12.5px; font-weight: bold; cursor: pointer; touch-action: manipulation;
-  transition: background .14s, transform .08s; }
-.pm-cbtn:active { transform: scale(.93); }
-.pm-cbtn.on { background: var(--pm-acc); border-color: var(--pm-acc); }
-.pm-memo { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 9px 10px 40px; font-size: 28.8px; line-height: 1.35;   /* 既定48px×表示0.6倍 */
-  border: 1px solid var(--pm-line); border-radius: 10px; background: var(--cell-bg, #fff); color: var(--text);
-  -webkit-user-modify: read-write; word-break: break-word; }
-.pm-memo:empty::before { content: attr(data-ph); color: var(--text-light); pointer-events: none; font-size: 15px; }
-/* 文字ツール（色・大きさ。選択した部分に適用） */
-.pm-tools { flex-shrink: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-/* ラベルの前だけ広めに空けて、まとまりが見えるようにする */
-.pm-tool-lb { font-size: 12.5px; font-weight: bold; color: var(--text-light); margin-left: 10px; letter-spacing: .02em; }
-.pm-tools > .pm-tool-lb:first-child { margin-left: 0; }
-.pm-color { width: 29px; height: 29px; border: none; border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation;
-  box-shadow: inset 0 0 0 1.5px rgba(128,138,158,.45); transition: transform .1s; }
-.pm-color:active { transform: scale(1.18); }
-.pm-color.on { box-shadow: inset 0 0 0 1.5px rgba(128,138,158,.45), 0 0 0 3px var(--pm-acc); }
-/* 虹色のボタン：押すと自分で色を作って登録できる。作った色はその手前に並ぶ */
-.pm-rainbow { display: flex; align-items: center; justify-content: center; line-height: 1;
-  color: #fff; font-size: 15px; font-weight: bold; text-shadow: 0 0 3px rgba(0,0,0,.8);
-  background: conic-gradient(#e53935,#fb8c00,#ffd400,#2e7d32,#00acc1,#1e88e5,#8e24aa,#e91e63,#e53935); }
-/* ツールのボタン：枠線をなくし、薄い面だけにする（線が減って画面が静かになる） */
-.pm-sizebtn { padding: 8px 13px; border: none; border-radius: 8px; font-size: 15px;
-  background: var(--pm-chip); color: var(--text); font-weight: bold; cursor: pointer; touch-action: manipulation;
-  transition: background .14s, color .14s, transform .08s; }
-.pm-sizebtn:active { transform: scale(.94); }
-.pm-sizebtn[disabled] { opacity: .35; }
-.pm-sizebtn.on { background: var(--pm-acc); color: #fff; }
-/* タブ：下線でつながって見せる。先頭の「文字」がこのアプリの主役 */
-.pm-tabbar { gap: 2px; border-bottom: 1px solid var(--pm-line); }
-.pm-tabbar .pm-tab { background: transparent; color: var(--text-light); font-size: 16px; padding: 11px 6px;
-  border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; margin-bottom: -1px; }
-.pm-tabbar .pm-tab.on { background: var(--pm-soft); color: var(--pm-acc); border-bottom-color: var(--pm-acc); }
-/* 主役のタブは、閉じている時も文字色を濃くして目に入るようにする */
-.pm-tabbar .pm-tab-main { color: var(--pm-acc); font-weight: bold; }
-/* 使い方の一言（狭い画面では場所を優先して隠す） */
-.pm-tip { font-size: 11px; line-height: 1.4; color: var(--text-light); padding: 1px 2px 0; }
-.pm-tip b { color: var(--pm-acc); }
-body[data-pm="xs"] .pm-tip { display: none; }
-/* 主役のボタン（＋ 文字を入れる）：面を塗って、まずこれを押すと分かるようにする */
-.pm-mainbtn { background: var(--pm-acc); color: #fff; }
-.pm-mainbtn:active { background: var(--pm-acc); }
-.pm-editbtn { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
-  padding: 9px 12px; border: 1.5px solid var(--pm-acc); border-radius: 9px;
-  background: rgba(0,0,0,.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-  color: #fff; font-size: 17px; font-weight: bold; line-height: 1;
-  cursor: pointer; touch-action: manipulation; transition: transform .08s, background .14s; }
-/* 矢印のとなりに小さく役割を出す（絵だけだと「画面が戻る」と間違えやすいため） */
-.pm-editbtn .pm-editlb { font-size: 12px; }
-.pm-editbtn:active { transform: scale(.94); background: var(--pm-acc); }
-.pm-editbtn[disabled] { border-color: rgba(255,255,255,.25); color: rgba(255,255,255,.4); }
-.pm-del { background: rgba(192,57,43,.12); border: 1.5px solid #c0392b; color: #c0392b; }
-.pm-del:active { background: #c0392b; color: #fff; }
-.pm-tabbar .pm-spacer { flex: 1; }
-/* ── ツールの並べ方 ──
-   「ラベル＋横スライドの帯」で1行にそろえる。画面に入りきらないボタン（色など）は
-   縦に折り返さず、指で横になぞって出す。行の頭がそろうので画面が散らからない。 */
-.pm-panel { display: flex; flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 4px; }
-.pm-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.pm-row { min-height: 41px; }
-.pm-row > .pm-tool-lb { flex: 0 0 auto; width: 3.5em; margin-left: 0; text-align: right; white-space: nowrap; }
-.pm-slide { position: relative; flex: 1 1 auto; min-width: 0; }
-.pm-strip { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap;
-  overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;
-  scrollbar-width: none; padding: 3px 1px; }
-.pm-strip::-webkit-scrollbar { display: none; }
-.pm-strip > * { flex: 0 0 auto; }
-.pm-strip > .pm-tool-lb { margin-left: 2px; }
-/* 帯の中の小見出し（「太さ」「位置」など）。細い区切り線でまとまりを分ける */
-.pm-sub { font-size: 12px; font-weight: bold; color: var(--text-light); line-height: 1.7;
-  margin-left: 4px; padding-left: 8px; border-left: 1px solid var(--pm-line); }
-/* 端のぼかし＋矢印：まだ続きがあることを知らせる（押さなくても指でなぞれば出る） */
-.pm-slide::before, .pm-slide::after {
-  position: absolute; top: 0; bottom: 0; width: 30px; pointer-events: none;
-  display: flex; align-items: center; font-size: 17px; font-weight: bold;
-  color: var(--pm-acc); opacity: 0; transition: opacity .18s;
+header h1 { font-size: 19px; margin: 0; flex: 1; font-weight: 700; }
+header .back { background: none; border: 0; color: inherit; font-size: 16px; padding: 4px 8px 4px 0; cursor: pointer; }
+main { max-width: 720px; margin: 0 auto; padding: 12px 16px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.btn { border: 0; border-radius: 10px; padding: 10px 16px; background: var(--chip); font-weight: 600; }
+.btn.primary { background: var(--acc); color: var(--acc-ink); }
+.btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn.block { width: 100%; }
+.row { display: flex; gap: 8px; align-items: center; }
+.muted { color: var(--muted); font-size: 13px; }
+.empty { text-align: center; color: var(--muted); padding: 40px 16px; }
+.empty .big { font-size: 48px; }
+
+/* 絞り込み */
+.filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; }
+.chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 14px; white-space: nowrap; }
+.chip.on { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+
+/* 野菜カード */
+.card { background: var(--panel); border-radius: 14px; padding: 12px; margin-bottom: 10px; border: 1px solid var(--line); }
+.crop { display: flex; gap: 12px; align-items: center; }
+.crop .emo { font-size: 36px; width: 52px; height: 52px; display: grid; place-items: center; background: var(--acc-soft); border-radius: 12px; flex-shrink: 0; }
+.crop .info { flex: 1; min-width: 0; cursor: pointer; }
+.crop .name { font-weight: 700; font-size: 17px; }
+.crop .name small { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 4px; }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--chip); }
+.badge.water { background: var(--water-soft); color: var(--water); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.badge.acc { background: var(--acc-soft); color: var(--acc); font-weight: 600; }
+.quick { display: flex; flex-direction: column; gap: 6px; }
+.quick button { border: 0; border-radius: 10px; width: 48px; height: 40px; font-size: 20px; background: var(--chip); }
+.quick .w { background: var(--water-soft); }
+
+/* 記録 */
+.log { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.log:last-child { border-bottom: 0; }
+.log .ic { font-size: 22px; width: 32px; text-align: center; flex-shrink: 0; }
+.log .body { flex: 1; min-width: 0; }
+.log .meta { font-size: 13px; color: var(--muted); }
+.log .memo { white-space: pre-wrap; word-break: break-word; }
+.log img { display: block; max-width: 100%; max-height: 240px; border-radius: 10px; margin-top: 6px; cursor: pointer; }
+.log .edit { background: none; border: 0; color: var(--muted); font-size: 18px; padding: 0 4px; align-self: flex-start; }
+.dayhead { font-weight: 700; color: var(--muted); font-size: 13px; margin: 14px 0 4px; }
+
+/* 詳細 */
+.detail-top { display: flex; gap: 14px; align-items: center; }
+.detail-top .emo { font-size: 52px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.stat { background: var(--acc-soft); border-radius: 12px; padding: 8px; text-align: center; }
+.stat b { display: block; font-size: 20px; color: var(--acc); }
+.stat span { font-size: 12px; color: var(--muted); }
+h2 { font-size: 16px; margin: 18px 0 8px; }
+
+/* 集計 */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+
+/* 下のタブ */
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex;
+  background: var(--panel); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
 }
-.pm-slide::before { content: '\2039'; left: 0; justify-content: flex-start; padding-left: 2px;
-  background: linear-gradient(to right, var(--pm-bg) 45%, rgba(0,0,0,0)); }
-.pm-slide::after  { content: '\203A'; right: 0; justify-content: flex-end; padding-right: 2px;
-  background: linear-gradient(to left,  var(--pm-bg) 45%, rgba(0,0,0,0)); }
-.pm-slide.more-l::before, .pm-slide.more-r::after { opacity: 1; }
-/* パネルはすっと開く */
-.pm-panel { animation: pmPanelIn .16s ease-out; }
-@keyframes pmPanelIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
-/* メモ欄の背景色（白/黒を選べる） */
-.pm-memo.bg-white { background: #ffffff; color: #222222; }
-.pm-memo.bg-black { background: #000000; color: #ffffff; }
-.pm-actions { flex-shrink: 0; display: flex; gap: 8px; order: -1; }   /* 縦持ちでは写真の上に出す */
-/* 右側の列。縦持ちでは無いものとして扱い、今までどおり縦一列に並べる */
-.pm-sidecol { display: contents; }
-/* ── 画面の小さい端末に合わせて詰める（iPhone SE など） ──
-   機種名ではなく「実際に使える高さ・幅」を見て body に印を付け、2段階で余白とボタンを詰める。
-   sm＝小さめ（iPhone SE・小型Androidなど）／xs＝さらに狭い（ブラウザのバーが出ている時など）。
-   実寸で判断するので、これから出る機種でもそのまま合う。 */
-body[data-pm="sm"] .pm-body, body[data-pm="xs"] .pm-body {
-  gap: 6px; padding: 6px 8px calc(14px + env(safe-area-inset-bottom, 0px)); }
-body[data-pm="sm"] .pm-shot { padding: 9px 8px; font-size: 13.5px; }
-body[data-pm="sm"] .pm-tabbar .pm-tab { padding: 8px 5px; font-size: 15px; }
-body[data-pm="sm"] .pm-row { min-height: 34px; }
-body[data-pm="sm"] .pm-sizebtn { padding: 6px 10px; font-size: 14px; }
-body[data-pm="sm"] .pm-color { width: 26px; height: 26px; }
-body[data-pm="sm"] .pm-panel { gap: 2px; }
-body[data-pm="sm"] .pm-memowrap { min-height: 56px; }
-body[data-pm="xs"] .pm-shot { padding: 7px 6px; font-size: 12.5px; }
-body[data-pm="xs"] .pm-tabbar .pm-tab { padding: 6px 4px; font-size: 14px; }
-body[data-pm="xs"] .pm-row { min-height: 30px; }
-body[data-pm="xs"] .pm-sizebtn { padding: 5px 9px; font-size: 13.5px; }
-body[data-pm="xs"] .pm-color { width: 23px; height: 23px; }
-body[data-pm="xs"] .pm-tool-lb { font-size: 11.5px; }
-body[data-pm="xs"] .pm-panel { gap: 2px; }
-body[data-pm="xs"] .pm-shoot { padding: 7px 10px; font-size: 12.5px; }
-body[data-pm="xs"] .pm-editbtn { padding: 7px 9px; font-size: 15px; gap: 3px; }
-body[data-pm="xs"] .pm-editbtn .pm-editlb { font-size: 11px; }
-body[data-pm="xs"] .pm-cbtn { min-width: 30px; padding: 5px 7px; font-size: 11.5px; }
-body[data-pm="xs"] .pm-memowrap { min-height: 48px; }
-body[data-pm="xs"] .hdr-btn { padding: 4px 9px; font-size: 12px; }
-body[data-pm="xs"] .app-header { padding: 6px 12px; font-size: 14px; }
-/* 操作ボタンとタブは、狭い画面でも折り返して2段にならないようにする */
-.pm-shot { white-space: nowrap; }
-.pm-tabbar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
-.pm-tabbar::-webkit-scrollbar { display: none; }
-.pm-tabbar .pm-tab { flex: 0 0 auto; white-space: nowrap; }
-/* 写真は画面の4割を必ず確保する。入りきらない分はツール側をスクロールさせて、
-   写真が潰れないようにする（小さい端末でも編集できる大きさを保つ） */
-.pm-photo { min-height: 38vh; }
-/* ツールは縮めずに全部見せる。足りない分は写真の方が縮む（下限は上の min-height） */
-.pm-panel { flex: 0 0 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-/* 横持ち：左に写真、右に編集ツール（幅に余裕があるときだけ2列にする） */
-@media (orientation: landscape) and (min-width: 600px) {
-  .pm-body { flex-direction: row; align-items: stretch; gap: 10px;
-    padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
-  .pm-photo { flex: 1 1 56%; min-width: 0; min-height: 0; }
-  .pm-sidecol { display: flex; flex-direction: column; flex: 0 0 44%; max-width: 520px;
-    min-width: 0; gap: 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .pm-actions { order: 0; }
-  .pm-memowrap { flex: 1 1 auto; min-height: 90px; }
-  .pm-memo { font-size: 24px; }
+nav.tabs button { flex: 1; border: 0; background: none; padding: 8px 0 10px; font-size: 12px; color: var(--muted); }
+nav.tabs button .i { display: block; font-size: 22px; line-height: 1.2; }
+nav.tabs button.on { color: var(--acc); font-weight: 700; }
+.fab {
+  position: fixed; right: 18px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 15;
+  width: 58px; height: 58px; border-radius: 50%; border: 0; background: var(--acc); color: var(--acc-ink);
+  font-size: 30px; box-shadow: 0 4px 14px rgba(0,0,0,.25);
 }
-.pm-shot { flex: 1; padding: 13px 10px; border: none; border-radius: 10px; font-size: 14.5px; font-weight: bold;
-  cursor: pointer; touch-action: manipulation; background: var(--pm-chip); color: var(--text);
-  transition: background .14s, transform .08s, box-shadow .14s; }
-.pm-shot:active { transform: scale(.97); }
-/* 主役のボタン（共有）だけ塗りつぶして目立たせる */
-.pm-shot.primary { background: var(--pm-acc); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
-/* モーダル（プレビュー用） */
-.modal-overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,0.55); z-index: 1000;
-  align-items: center; justify-content: center;
+
+/* モーダル */
+.modal { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  background: var(--panel); width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto;
+  border-radius: 18px 18px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
 }
-.modal-overlay.open { display: flex; }
-.modal {
-  background: var(--modal-bg); border-radius: 8px;
-  width: 92%; max-width: 560px; max-height: 85vh;
-  display: flex; flex-direction: column;
-  overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+@media (min-width: 600px) { .modal { align-items: center; } .sheet { border-radius: 18px; } }
+.sheet h3 { margin: 0 0 12px; font-size: 18px; }
+label.f { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+input[type=text], input[type=date], input[type=number], textarea, select {
+  width: 100%; font: inherit; font-size: 16px; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
 }
-.modal-header {
-  background: #1565c0; color: white;
-  padding: 12px 16px; font-size: 14px; font-weight: bold;
-  display: flex; align-items: center; justify-content: space-between;
-  flex-shrink: 0;
+textarea { min-height: 72px; resize: vertical; }
+.pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick button { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 6px 10px; font-size: 15px; }
+.pick button.on { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+.pick.emoji button { font-size: 24px; padding: 4px 8px; }
+.photo-prev { max-width: 100%; max-height: 200px; border-radius: 10px; margin-top: 8px; display: block; }
+.sheet .actions { display: flex; gap: 8px; margin-top: 18px; }
+.sheet .actions .btn { flex: 1; }
+.viewer { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.92); display: grid; place-items: center; }
+.viewer img { max-width: 100vw; max-height: 100vh; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: #333; color: #fff; padding: 10px 18px; border-radius: 999px; z-index: 70; font-size: 14px;
+  opacity: 0; transition: opacity .2s; pointer-events: none; width: max-content; max-width: 90vw; text-align: center;
 }
-.modal-close {
-  background: rgba(255,255,255,0.2); color: white; border: none;
-  border-radius: 4px; width: 28px; height: 28px; font-size: 16px;
-  cursor: pointer; touch-action: manipulation;
-}
-.modal-close:hover { background: rgba(255,255,255,0.35); }
-.mode-hint { font-size: 11.5px; color: var(--text-light); }
-.shotprev-body { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 10px; gap: 8px; }
-.shotprev-imgwrap { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid var(--save-item-border); border-radius: 8px; background: var(--save-item-bg); }
-.shotprev-imgwrap img { display: block; width: 100%; height: auto; }
-.shotprev-actions { flex-shrink: 0; display: flex; gap: 8px; }
-/* 定型文リスト */
-.ph-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-.ph-row { display: flex; align-items: center; gap: 6px; }
-.ph-txt { flex: 1; text-align: left; padding: 11px 13px; font-size: 14.5px; border: none;
-  border-radius: 9px; background: var(--pm-chip); color: var(--text); cursor: pointer; touch-action: manipulation; }
-.ph-mini { flex-shrink: 0; padding: 11px 11px; border: none; border-radius: 9px;
-  background: var(--pm-chip); color: var(--text); font-size: 13px; cursor: pointer; touch-action: manipulation; }
-.ph-del { color: #c0392b; }
-.ph-add { flex-shrink: 0; display: flex; gap: 6px; }
-.ph-add input { flex: 1; min-width: 0; padding: 9px 10px; font-size: 15px; border: 1px solid var(--save-item-border);
-  border-radius: 7px; background: var(--cell-bg, #fff); color: var(--text); }
-/* 手書きモード中はキャンバスの縁を光らせて分かるようにする */
-.pm-canvas.penmode { outline: 3px solid var(--pm-acc); outline-offset: -3px; }
-/* 手書き・矢印を引いている最中だと分かるようにする表示 */
-.pm-penbadge { position: absolute; left: 8px; top: 8px; padding: 6px 11px; border-radius: 8px;
-  background: var(--pm-acc); color: #fff; font-size: 12.5px; font-weight: bold;
-  cursor: pointer; touch-action: manipulation; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
-/* 簡易トースト通知 */
-.app-toast {
-  position:fixed; left:50%; bottom:18px; transform:translateX(-50%) translateY(8px);
-  background:rgba(0,0,0,0.85); color:#fff; padding:8px 16px; border-radius:8px;
-  font-size:13px; font-weight:bold; z-index:9999; opacity:0; pointer-events:none;
-  transition:opacity .15s, transform .15s; max-width:80%; text-align:center;
-}
-.app-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.show { opacity: 1; }
+[hidden] { display: none !important; }
 </style>
 </head>
 <body>
-
-<div class="app-header">
-  <span>📝 写真メモ</span>
-  <span class="hdr-right">
-    <span class="hdr-rotrow" id="pmRotRow" style="display:none"><button class="hdr-btn hdr-rot" onclick="pmRotatePhoto(-1)" title="左に90°回す">↺</button><button class="hdr-btn hdr-rot" onclick="pmRotatePhoto(1)" title="右に90°回す">↻</button></span>
-    <button class="hdr-btn" onclick="pmOpenSaveSet()">⚙ 保存設定</button>
-    <span class="app-ver" id="appVer"></span>
-  </span>
-</div>
-
-<div class="pm-body">
-  <input type="file" id="pmPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="pmPhotoChange(event)">
-  <input type="file" id="pmFileInput" accept="image/*" style="display:none" onchange="pmPhotoChange(event)">
-  <div class="pm-photo" id="pmPhotoArea">
-    <canvas id="pmCanvas" class="pm-canvas"></canvas>
-    <div class="pm-empty" id="pmEmpty">写真がありません</div>
-    <div class="pm-shootrow">
-      <button class="pm-shoot" onclick="document.getElementById('pmPhotoInput').click()">📷 カメラ</button>
-      <button class="pm-shoot" onclick="document.getElementById('pmFileInput').click()">🖼 ファイル</button>
-      <span class="pm-editgrp"><button class="pm-editbtn" id="pmUndoBtn" onpointerdown="event.preventDefault()" onclick="pmUndo()" disabled title="直前の書き込みを取り消す">↩︎<span class="pm-editlb">戻す</span></button><button class="pm-editbtn" id="pmRedoBtn" onpointerdown="event.preventDefault()" onclick="pmRedo()" disabled title="取り消した書き込みをやり直す">↪︎<span class="pm-editlb">進む</span></button></span>
-    </div>
-    <div class="pm-penbadge" id="pmPenBadge" style="display:none" onclick="pmModeOff()"></div>
-    <div class="pm-toprow" id="pmTopRow" style="display:none">
-      <button class="pm-zoomreset" id="pmZoomReset" onclick="pmResetZoom()" style="display:none">⤢ 全体</button>
-    </div>
-  </div>
-  <!-- 右側（横持ち時）にまとめる：操作ボタン・タブ・設定・メモ -->
-  <div class="pm-sidecol" id="pmSideCol">
-  <div class="pm-actions">
-    <button class="pm-shot" onclick="pmPreview()">👁 プレビュー</button>
-    <button class="pm-shot" onclick="pmScreenshot()">📸 スクショ</button>
-    <button class="pm-shot primary" onclick="pmScreenshot(true)">📤 共有</button>
-  </div>
-  <!-- ツールはタブにまとめ、使う時だけ開く（画面をスッキリさせる） -->
-  <div class="pm-tools pm-tabbar">
-    <button class="pm-sizebtn pm-tab pm-tab-main" id="pmTab_text" onpointerdown="event.preventDefault()" onclick="pmToolTab('text')" title="写真の上に文字を入れる">あ文字</button>
-    <button class="pm-sizebtn pm-tab" id="pmTab_shape" onpointerdown="event.preventDefault()" onclick="pmToolTab('shape')">⭕図形</button>
-    <button class="pm-sizebtn pm-tab" id="pmTab_pen" onpointerdown="event.preventDefault()" onclick="pmToolTab('pen')">✍️手書き</button>
-    <button class="pm-sizebtn pm-tab" id="pmTab_date" onpointerdown="event.preventDefault()" onclick="pmToolTab('date')">📅日付</button>
-    <button class="pm-sizebtn pm-tab" id="pmTab_memo" onpointerdown="event.preventDefault()" onclick="pmToolTab('memo')" title="写真の下に書くメモの書式">📄メモ</button>
-  </div>
-  <!-- 文字タブ（このアプリの主役）：写真の上に文字を置く。
-       置いた文字は図形と同じようにドラッグで移動・ハンドルで回転と大きさが変えられる。 -->
-  <div class="pm-panel" id="pmPanel_text" style="display:none">
-    <div class="pm-tip">写真を<b>ダブルタップ</b>すると、その場所に文字を入れられます（文字をダブルタップ＝書き直し）</div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">入れる</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-mainbtn" onpointerdown="event.preventDefault()" onclick="pmAddText()">＋ 文字を入れる</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmOpenPhrases('photo')">📋 定型文</button>
-        <button class="pm-sizebtn" id="pmTextEdit" onpointerdown="event.preventDefault()" onclick="pmEditText()" style="display:none">✎ 書き直す</button>
-        <button class="pm-sizebtn pm-del" id="pmTextDel" onclick="pmDelShape()" style="display:none">🗑 消す</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">色</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-color pm-shcol" data-c="#e53935" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e53935')"></button>
-        <button class="pm-color pm-shcol" data-c="#1e88e5" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#1e88e5')"></button>
-        <button class="pm-color pm-shcol" data-c="#2e7d32" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#2e7d32')"></button>
-        <button class="pm-color pm-shcol" data-c="#fb8c00" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#fb8c00')"></button>
-        <button class="pm-color pm-shcol" data-c="#8e24aa" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#8e24aa')"></button>
-        <button class="pm-color pm-shcol" data-c="#e91e63" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e91e63')"></button>
-        <button class="pm-color pm-shcol" data-c="#f9a825" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#f9a825')"></button>
-        <button class="pm-color pm-shcol" data-c="#00acc1" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#00acc1')"></button>
-        <button class="pm-color pm-shcol" data-c="#ffffff" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#ffffff')"></button>
-        <button class="pm-color pm-shcol" data-c="#000000" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#000000')"></button>
-        <button class="pm-color pm-rainbow" data-cc="shape" onpointerdown="event.preventDefault()" onclick="pmPickCustom('shape')" title="自分で色を作って登録する">＋</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">大きさ</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmShapeSizeStep(-1)">あ 小</button>
-        <button class="pm-sizebtn" style="font-size:19px" onpointerdown="event.preventDefault()" onclick="pmShapeSizeStep(1)">あ 大</button>
-        <span class="pm-sub">向き</span>
-        <button class="pm-sizebtn pm-vtbtn" id="pmTxtH" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(false)">横書き</button>
-        <button class="pm-sizebtn pm-vtbtn" id="pmTxtV" onpointerdown="event.preventDefault()" onclick="pmSetTextVert(true)">縦書き</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">フチ</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-ocbtn" data-oc="" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('')" title="写真に合わせて白か黒で縁取ります">自動</button>
-        <button class="pm-color pm-ocbtn" data-oc="#ffffff" style="background:#ffffff" title="白" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffffff')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#000000')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffd400')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#e53935')"></button>
-        <button class="pm-color pm-rainbow" data-cc="oc" onpointerdown="event.preventDefault()" onclick="pmPickCustom('oc')" title="自分で色を作って登録する">＋</button>
-        <span class="pm-sub">まとめて</span>
-        <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
-      </div></div>
-    </div>
-  </div>
-  <!-- メモタブ：写真の下に書くメモ欄の色・書式（入りきらない分は横スライドで出す） -->
-  <div class="pm-panel" id="pmPanel_memo" style="display:none">
-    <div class="pm-row">
-      <span class="pm-tool-lb">色</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-color" style="background:var(--text,#333)" title="標準" onpointerdown="event.preventDefault()" onclick="pmColor('')"></button>
-        <button class="pm-color" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmColor('#e53935')"></button>
-        <button class="pm-color" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmColor('#1e88e5')"></button>
-        <button class="pm-color" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmColor('#2e7d32')"></button>
-        <button class="pm-color" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmColor('#fb8c00')"></button>
-        <button class="pm-color" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmColor('#8e24aa')"></button>
-        <button class="pm-color" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmColor('#e91e63')"></button>
-        <button class="pm-color" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmColor('#f9a825')"></button>
-        <button class="pm-color" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmColor('#00acc1')"></button>
-        <button class="pm-color" style="background:#7cb342" onpointerdown="event.preventDefault()" onclick="pmColor('#7cb342')"></button>
-        <button class="pm-color" style="background:#6d4c41" onpointerdown="event.preventDefault()" onclick="pmColor('#6d4c41')"></button>
-        <button class="pm-color" style="background:#9e9e9e" onpointerdown="event.preventDefault()" onclick="pmColor('#9e9e9e')"></button>
-        <button class="pm-color" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmColor('#000000')"></button>
-        <button class="pm-color" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmColor('#ffffff')"></button>
-        <button class="pm-color pm-rainbow" data-cc="text" onpointerdown="event.preventDefault()" onclick="pmPickCustom('text')" title="自分で色を作って登録する">＋</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">書式</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmSizeStep(-1)">Ａ−</button>
-        <span class="pm-tool-lb" id="pmSizeNow" title="今の文字サイズ">48</span>
-        <button class="pm-sizebtn" style="font-size:16px" onpointerdown="event.preventDefault()" onclick="pmSizeStep(1)">Ａ＋</button>
-        <span class="pm-sub">装飾</span>
-        <button class="pm-sizebtn" style="font-weight:bold" onpointerdown="event.preventDefault()" onclick="pmDeco('bold')">B</button>
-        <button class="pm-sizebtn" style="font-style:italic" onpointerdown="event.preventDefault()" onclick="pmDeco('italic')">I</button>
-        <button class="pm-sizebtn" style="text-decoration:underline" onpointerdown="event.preventDefault()" onclick="pmDeco('underline')">U</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">その他</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn" id="pmBgW" onpointerdown="event.preventDefault()" onclick="pmSetBg('white')">白背景</button>
-        <button class="pm-sizebtn" id="pmBgB" onpointerdown="event.preventDefault()" onclick="pmSetBg('black')">黒背景</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmOpenPhrases('memo')">📋 定型文</button>
-      </div></div>
-    </div>
-  </div>
-  <!-- 図形タブ：置く図形・色・フチ・太さ -->
-  <div class="pm-panel" id="pmPanel_shape" style="display:none">
-    <div class="pm-row">
-      <span class="pm-tool-lb">置く</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('circle')">〇</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('rect')">□</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmArrowMode()">→</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmAddShape('tri')">△</button>
-        <button class="pm-sizebtn pm-del" id="pmShapeDel" onclick="pmDelShape()" style="display:none">🗑 消す</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">色</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-color pm-shcol" data-c="#e53935" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e53935')"></button>
-        <button class="pm-color pm-shcol" data-c="#1e88e5" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#1e88e5')"></button>
-        <button class="pm-color pm-shcol" data-c="#2e7d32" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#2e7d32')"></button>
-        <button class="pm-color pm-shcol" data-c="#fb8c00" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#fb8c00')"></button>
-        <button class="pm-color pm-shcol" data-c="#8e24aa" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#8e24aa')"></button>
-        <button class="pm-color pm-shcol" data-c="#e91e63" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e91e63')"></button>
-        <button class="pm-color pm-shcol" data-c="#f9a825" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#f9a825')"></button>
-        <button class="pm-color pm-shcol" data-c="#00acc1" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#00acc1')"></button>
-        <button class="pm-color pm-shcol" data-c="#ffffff" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#ffffff')"></button>
-        <button class="pm-color pm-shcol" data-c="#000000" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#000000')"></button>
-        <button class="pm-color pm-rainbow" data-cc="shape" onpointerdown="event.preventDefault()" onclick="pmPickCustom('shape')" title="自分で色を作って登録する">＋</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">フチ</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-ocbtn" data-oc="" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('')">なし</button>
-        <button class="pm-color pm-ocbtn" data-oc="#ffffff" style="background:#ffffff" title="白" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffffff')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#000000')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffd400')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#e53935')"></button>
-        <button class="pm-color pm-rainbow" data-cc="oc" onpointerdown="event.preventDefault()" onclick="pmPickCustom('oc')" title="自分で色を作って登録する">＋</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">太さ</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-thbtn" id="pmTh_thin" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(0.5)">細</button>
-        <button class="pm-sizebtn pm-thbtn" id="pmTh_mid" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(1)">中</button>
-        <button class="pm-sizebtn pm-thbtn" id="pmTh_bold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(2)">太</button>
-        <button class="pm-sizebtn pm-thbtn" id="pmTh_xbold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(3)">極太</button>
-        <span class="pm-sub">大きさ</span>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmShapeSizeStep(-1)">小</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmShapeSizeStep(1)">大</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">その他</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearShapes()">全部消す</button>
-      </div></div>
-    </div>
-  </div>
-  <!-- 手書きタブ：このタブを開いている間は、写真をなぞって線が描ける -->
-  <div class="pm-panel" id="pmPanel_pen" style="display:none">
-    <div class="pm-row">
-      <span class="pm-tool-lb">色</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-color pm-shcol" data-c="#e53935" style="background:#e53935" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e53935')"></button>
-        <button class="pm-color pm-shcol" data-c="#1e88e5" style="background:#1e88e5" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#1e88e5')"></button>
-        <button class="pm-color pm-shcol" data-c="#2e7d32" style="background:#2e7d32" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#2e7d32')"></button>
-        <button class="pm-color pm-shcol" data-c="#fb8c00" style="background:#fb8c00" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#fb8c00')"></button>
-        <button class="pm-color pm-shcol" data-c="#8e24aa" style="background:#8e24aa" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#8e24aa')"></button>
-        <button class="pm-color pm-shcol" data-c="#e91e63" style="background:#e91e63" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#e91e63')"></button>
-        <button class="pm-color pm-shcol" data-c="#f9a825" style="background:#f9a825" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#f9a825')"></button>
-        <button class="pm-color pm-shcol" data-c="#00acc1" style="background:#00acc1" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#00acc1')"></button>
-        <button class="pm-color pm-shcol" data-c="#ffffff" style="background:#ffffff" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#ffffff')"></button>
-        <button class="pm-color pm-shcol" data-c="#000000" style="background:#000000" onpointerdown="event.preventDefault()" onclick="pmShapeColorSet('#000000')"></button>
-        <button class="pm-color pm-rainbow" data-cc="shape" onpointerdown="event.preventDefault()" onclick="pmPickCustom('shape')" title="自分で色を作って登録する">＋</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">フチ</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-ocbtn" data-oc="" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('')">なし</button>
-        <button class="pm-color pm-ocbtn" data-oc="#ffffff" style="background:#ffffff" title="白" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffffff')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#000000')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#ffd400')"></button>
-        <button class="pm-color pm-ocbtn" data-oc="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetShapeOutline('#e53935')"></button>
-        <button class="pm-color pm-rainbow" data-cc="oc" onpointerdown="event.preventDefault()" onclick="pmPickCustom('oc')" title="自分で色を作って登録する">＋</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">太さ</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-thbtn" id="pmTh2_thin" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(0.5)">細</button>
-        <button class="pm-sizebtn pm-thbtn" id="pmTh2_mid" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(1)">中</button>
-        <button class="pm-sizebtn pm-thbtn" id="pmTh2_bold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(2)">太</button>
-        <button class="pm-sizebtn pm-thbtn" id="pmTh2_xbold" onpointerdown="event.preventDefault()" onclick="pmSetShapeThick(3)">極太</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">その他</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-rectbtn" onpointerdown="event.preventDefault()" onclick="pmRectToggle()">□ 範囲で選ぶ</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmClearPen()">手書きを消す</button>
-      </div></div>
-    </div>
-  </div>
-  <!-- 日付タブ：今日／カレンダー・入れ先／位置・表示のしかた -->
-  <div class="pm-panel" id="pmPanel_date" style="display:none">
-    <div class="pm-row">
-      <span class="pm-tool-lb">日付</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmDateToday()">📅 今日</button>
-        <button class="pm-sizebtn" onpointerdown="event.preventDefault()" onclick="pmDatePick()">🗓 カレンダー</button>
-        <button class="pm-sizebtn" id="pmStampDel" onclick="pmStampClear()" style="display:none">日付を消す</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">入れ先</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn" id="pmTgMemo" onpointerdown="event.preventDefault()" onclick="pmSetDateTarget('memo')">文書</button>
-        <button class="pm-sizebtn" id="pmTgPhoto" onpointerdown="event.preventDefault()" onclick="pmSetDateTarget('photo')">写真</button>
-        <span class="pm-sub" id="pmPosLb">位置</span>
-        <button class="pm-sizebtn pm-posbtn" id="pmPos_lt" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('lt')">左上</button>
-        <button class="pm-sizebtn pm-posbtn" id="pmPos_rt" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('rt')">右上</button>
-        <button class="pm-sizebtn pm-posbtn" id="pmPos_lb" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('lb')">左下</button>
-        <button class="pm-sizebtn pm-posbtn" id="pmPos_rb" onpointerdown="event.preventDefault()" onclick="pmSetDatePos('rb')">右下</button>
-      </div></div>
-    </div>
-    <div class="pm-row">
-      <span class="pm-tool-lb">表示</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-sizebtn pm-dfbtn" id="pmDf_ymd_slash" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('ymd_slash')"></button>
-        <button class="pm-sizebtn pm-dfbtn" id="pmDf_ymd_kanji" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('ymd_kanji')"></button>
-        <button class="pm-sizebtn pm-dfbtn" id="pmDf_wareki" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('wareki')"></button>
-        <button class="pm-sizebtn pm-dfbtn" id="pmDf_md_kanji" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('md_kanji')"></button>
-        <button class="pm-sizebtn pm-dfbtn" id="pmDf_md_slash" onpointerdown="event.preventDefault()" onclick="pmSetDateFmt('md_slash')"></button>
-      </div></div>
-    </div>
-    <div class="pm-row" id="pmDateColorRow">
-      <span class="pm-tool-lb">色</span>
-      <div class="pm-slide"><div class="pm-strip">
-        <button class="pm-color pm-dcbtn" data-c="#ffb300" style="background:#ffb300" title="オレンジ" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#ffb300')"></button>
-        <button class="pm-color pm-dcbtn" data-c="#ffffff" style="background:#ffffff" title="白" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#ffffff')"></button>
-        <button class="pm-color pm-dcbtn" data-c="#000000" style="background:#000000" title="黒" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#000000')"></button>
-        <button class="pm-color pm-dcbtn" data-c="#e53935" style="background:#e53935" title="赤" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#e53935')"></button>
-        <button class="pm-color pm-dcbtn" data-c="#1e88e5" style="background:#1e88e5" title="青" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#1e88e5')"></button>
-        <button class="pm-color pm-dcbtn" data-c="#2e7d32" style="background:#2e7d32" title="緑" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#2e7d32')"></button>
-        <button class="pm-color pm-dcbtn" data-c="#ffd400" style="background:#ffd400" title="黄" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#ffd400')"></button>
-        <button class="pm-color pm-dcbtn" data-c="#e91e63" style="background:#e91e63" title="ピンク" onpointerdown="event.preventDefault()" onclick="pmSetDateColor('#e91e63')"></button>
-        <button class="pm-color pm-rainbow" data-cc="date" onpointerdown="event.preventDefault()" onclick="pmPickCustom('date')" title="自分で色を作って登録する">＋</button>
-      </div></div>
-    </div>
-  </div>
-  <div class="pm-memowrap" id="pmMemoWrap">
-    <div class="pm-memo" id="pmMemo" contenteditable="true" data-ph="メモを入力…（文字を選んで上のボタンで色・大きさ・太字等を変えられます）" onfocus="pmDeselShape()" onkeydown="pmMemoKeydown(event)"></div>
-    <!-- 枠の右下：カーソル移動と範囲選択（長押しメニューを使わずに編集できる） -->
-    <div class="pm-caret">
-      <button class="pm-cbtn" id="pmCaretL" title="左へ">◀</button>
-      <button class="pm-cbtn" id="pmCaretR" title="右へ">▶</button>
-      <button class="pm-cbtn" id="pmSelBtn" onpointerdown="event.preventDefault()" onclick="pmSelModeToggle()">選択</button>
-      <button class="pm-cbtn" onpointerdown="event.preventDefault()" onclick="pmSelectAllMemo()">全て</button>
-    </div>
-  </div>
-  <input type="color" id="pmColorInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmCustomPicked(this.value)">
-  <input type="date" id="pmDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="pmDatePicked(this.value)">
-  </div>
-</div>
-
-<!-- 保存設定（書き出す画像の大きさ） -->
-<div class="modal-overlay" id="pmSaveSetOverlay" onclick="if(event.target===this)pmCloseSaveSet()">
-  <div class="modal">
-    <div class="modal-header">
-      <button class="hdr-back" onclick="pmCloseSaveSet()" title="前の画面にもどる"><span class="hdr-back-ar">←</span>戻る</button>
-      <span class="hdr-title">⚙ 保存設定</span>
-    </div>
-    <div class="shotprev-body">
-      <div class="mode-hint">スクショ・共有で書き出す画像の大きさです。「元のサイズ」なら写真の画質そのままで保存できます（元より大きくは引き伸ばしません）。</div>
-      <div class="pm-tools">
-        <button class="pm-sizebtn pm-qbtn" id="pmQ_orig" onclick="pmSetQuality('orig')">元のサイズ</button>
-        <button class="pm-sizebtn pm-qbtn" id="pmQ_high" onclick="pmSetQuality('high')">高精細</button>
-        <button class="pm-sizebtn pm-qbtn" id="pmQ_std" onclick="pmSetQuality('std')">標準</button>
-      </div>
-      <div class="mode-hint" id="pmQNote"></div>
-    </div>
-  </div>
-</div>
-
-<!-- 定型文（よく使う言葉をワンタップで入力。追加・削除できる） -->
-<div class="modal-overlay" id="pmPhraseOverlay" onclick="if(event.target===this)pmClosePhrases()">
-  <div class="modal">
-    <div class="modal-header">
-      <button class="hdr-back" onclick="pmClosePhrases()" title="前の画面にもどる"><span class="hdr-back-ar">←</span>戻る</button>
-      <span class="hdr-title">📋 定型文</span>
-    </div>
-    <div class="shotprev-body">
-      <div class="mode-hint" id="pmPhraseHint">言葉をタップすると写真の上に文字として置きます。「📄」を押すと下のメモに入ります。</div>
-      <div class="ph-list" id="pmPhraseList"></div>
-      <div class="ph-add">
-        <input type="text" id="pmPhraseNew" placeholder="新しい定型文を入力" onkeydown="if(event.key==='Enter'){event.preventDefault();pmAddPhrase();}">
-        <button class="pm-sizebtn" onclick="pmAddPhrase()">＋ 追加</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 出力プレビュー（仕上がりを確認してからスクショ・共有） -->
-<div class="modal-overlay" id="shotPrevOverlay" onclick="if(event.target===this)closeShotPreview()">
-  <div class="modal">
-    <div class="modal-header">
-      <button class="hdr-back" onclick="closeShotPreview()" title="前の画面にもどる"><span class="hdr-back-ar">←</span>戻る</button>
-      <span class="hdr-title">👁 プレビュー</span>
-    </div>
-    <div class="shotprev-body">
-      <div class="mode-hint">この内容の画像になります。よければ「スクショ」で画像として保存、「共有」でLINE・メール等へ送れます。</div>
-      <div class="shotprev-imgwrap"><img id="shotPrevImg" alt="プレビュー"></div>
-      <div class="shotprev-actions">
-        <button class="pm-shot" onclick="shotPrevDeliver(false)">📸 スクショ</button>
-        <button class="pm-shot primary" onclick="shotPrevDeliver(true)">📤 共有</button>
-      </div>
-    </div>
-  </div>
-</div>
+<header>
+  <button class="back" id="backBtn" hidden>‹ 戻る</button>
+  <h1 id="title">菜園ノート</h1>
+</header>
+<main id="main"></main>
+<button class="fab" id="fab" aria-label="追加">＋</button>
+<nav class="tabs">
+  <button data-tab="crops" class="on"><span class="i">🌱</span>畑</button>
+  <button data-tab="logs"><span class="i">📝</span>記録</button>
+  <button data-tab="summary"><span class="i">📊</span>集計</button>
+  <button data-tab="settings"><span class="i">⚙️</span>設定</button>
+</nav>
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
 
 <script>
-const APP_VERSION='v32';
-document.getElementById('appVer').textContent=APP_VERSION;
+'use strict';
+/* ===== 定数 ===== */
+const PRESETS = [
+  ['🍅','トマト'],['🍒','ミニトマト'],['🥒','キュウリ'],['🍆','ナス'],['🫑','ピーマン'],['🌶️','トウガラシ'],
+  ['🥕','ニンジン'],['🥬','葉物'],['🥦','ブロッコリー'],['🧅','タマネギ'],['🧄','ニンニク'],['🥔','ジャガイモ'],
+  ['🍠','サツマイモ'],['🌽','トウモロコシ'],['🫛','エダマメ・豆'],['🍓','イチゴ'],['🍉','スイカ'],['🎃','カボチャ'],
+  ['🌿','ハーブ'],['🌱','その他']
+];
+const TYPES = {
+  water:     { icon: '💧', label: '水やり' },
+  fertilize: { icon: '🧪', label: '追肥' },
+  harvest:   { icon: '🧺', label: '収穫' },
+  weed:      { icon: '✂️', label: '除草・手入れ' },
+  spray:     { icon: '🐛', label: '病害虫・消毒' },
+  observe:   { icon: '👀', label: '観察' },
+  other:     { icon: '📌', label: 'その他' }
+};
+const STATUS = { growing: '育成中', harvesting: '収穫中', done: '終了' };
+const UNITS = ['個', 'g', 'kg', '本', '株', '束'];
+const WATER_WARN_DAYS = 3;   // この日数以上水やりしていなければ目立たせる
 
-/* 簡易トースト通知 */
-let _toastTimer=null;
-function toast(msg){
-  let el=document.getElementById('appToast');
-  if(!el){ el=document.createElement('div'); el.id='appToast'; el.className='app-toast'; document.body.appendChild(el); }
-  el.textContent=msg; el.classList.add('show');
-  clearTimeout(_toastTimer);
-  _toastTimer=setTimeout(()=>el.classList.remove('show'), 1800);
+/* ===== 保存（IndexedDB） ===== */
+const DB_NAME = 'saien-note', STORE = 'kv';
+let dbp = null;
+function db() {
+  if (!dbp) dbp = new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return dbp;
 }
-
-/* window.prompt が使えない環境でも動く自前の入力モーダル。OKで文字列、キャンセルでnull
-   ※画面の上寄りに表示する（ソフトキーボードが出てもOK/キャンセルが隠れないように） */
-function appPrompt(message, defaultValue=''){
-  return new Promise(resolve=>{
-    const ov=document.createElement('div');
-    ov.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:flex-start;justify-content:center;padding-top:7vh;background:rgba(0,0,0,.45)';
-    const box=document.createElement('div');
-    box.style.cssText='background:var(--panel,#fff);color:var(--text,#222);min-width:280px;max-width:90vw;padding:18px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.35);font-size:15px';
-    const msg=document.createElement('div');
-    msg.textContent=message; msg.style.cssText='margin-bottom:10px;font-weight:600';
-    const input=document.createElement('input');
-    input.type='text'; input.value=defaultValue;
-    input.style.cssText='width:100%;box-sizing:border-box;padding:8px 10px;font-size:15px;border:1px solid #999;border-radius:6px;background:var(--cell-bg,#fff);color:var(--text,#222)';
-    const row=document.createElement('div');
-    row.style.cssText='display:flex;justify-content:flex-end;gap:8px;margin-top:14px';
-    const cancel=document.createElement('button');
-    cancel.textContent='キャンセル';
-    cancel.style.cssText='padding:7px 14px;font-size:14px;border:1px solid #999;border-radius:6px;background:#eee;color:#222;cursor:pointer';
-    const ok=document.createElement('button');
-    ok.textContent='OK';
-    ok.style.cssText='padding:7px 16px;font-size:14px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer';
-    const close=(val)=>{ document.body.removeChild(ov); resolve(val); };
-    cancel.onclick=()=>close(null);
-    ok.onclick=()=>close(input.value);
-    input.addEventListener('keydown',e=>{
-      e.stopPropagation();
-      if(e.key==='Enter'){ e.preventDefault(); close(input.value); }
-      else if(e.key==='Escape'){ e.preventDefault(); close(null); }
-    });
-    ov.addEventListener('mousedown',e=>{ if(e.target===ov) close(null); });
-    row.appendChild(cancel); row.appendChild(ok);
-    box.appendChild(msg); box.appendChild(input); box.appendChild(row);
-    ov.appendChild(box); document.body.appendChild(ov);
-    input.focus(); input.select();
-    requestAnimationFrame(()=>{ input.focus(); input.select(); });
+async function kvGet(key) {
+  const d = await db();
+  return new Promise((res, rej) => {
+    const r = d.transaction(STORE).objectStore(STORE).get(key);
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function kvSet(key, val) {
+  const d = await db();
+  return new Promise((res, rej) => {
+    const t = d.transaction(STORE, 'readwrite');
+    if (val === undefined) t.objectStore(STORE).delete(key); else t.objectStore(STORE).put(val, key);
+    t.oncomplete = () => res(); t.onerror = () => rej(t.error);
   });
 }
 
-/* 端末の「戻る」でアプリを閉じずに、開いている画面（保存設定・定型文・プレビュー）だけを閉じる。
-   開く時に履歴を1つ積み、戻る（popstate）でいちばん上の画面だけ閉じる。画面の「戻る」で閉じた時は
-   積んだ分を1つ消費するので、端末の戻ると画面の戻るがいつも同じ動きになる。 */
-let backGuardStack=[];     // 重ねて開いた画面の「閉じる処理」。後ろが上の画面
-let backGuardSkip=0;       // 自分で history.back() した分（popstate を1回読み飛ばす）
-window.addEventListener('popstate', ()=>{
-  if(backGuardSkip>0){ backGuardSkip--; return; }
-  const f=backGuardStack.pop(); if(f) f();
-});
-function armBackGuard(fn){
-  backGuardStack.push(fn);
-  try{ window.history.pushState({pmModal:1},''); }catch(_){}
+let data = { crops: [], logs: [] };
+async function load() {
+  try { data = (await kvGet('data')) || { crops: [], logs: [] }; }
+  catch (e) { toast('データを読み込めませんでした'); }
+  data.crops = data.crops || []; data.logs = data.logs || [];
 }
-function releaseBackGuard(){
-  if(!backGuardStack.length) return;
-  backGuardStack.pop(); backGuardSkip++;
-  try{ window.history.back(); }catch(_){ backGuardSkip--; }
+async function save() {
+  try { await kvSet('data', data); }
+  catch (e) { alert('保存に失敗しました：' + e.message); }
+}
+const photoCache = new Map();
+async function getPhoto(id) {
+  if (photoCache.has(id)) return photoCache.get(id);
+  const v = await kvGet('photo:' + id); photoCache.set(id, v); return v;
+}
+async function setPhoto(id, url) { photoCache.set(id, url); await kvSet('photo:' + id, url); }
+
+/* ===== 便利関数 ===== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+function today() { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); }
+function daysBetween(a, b) { return Math.round((new Date(b + 'T00:00') - new Date(a + 'T00:00')) / 86400000); }
+function fmtDate(s) {
+  if (!s) return '';
+  const d = new Date(s + 'T00:00');
+  return `${d.getMonth() + 1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})`;
+}
+function fmtDateLong(s) { const d = new Date(s + 'T00:00'); return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${'日月火水木金土'[d.getDay()]})`; }
+function ago(s) {
+  const n = daysBetween(s, today());
+  return n === 0 ? '今日' : n === 1 ? '昨日' : n > 0 ? `${n}日前` : `${-n}日後`;
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+const cropById = id => data.crops.find(c => c.id === id);
+const logsOf = id => data.logs.filter(l => l.cropId === id).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+function lastOf(id, type) { return logsOf(id).find(l => l.type === type); }
+function harvestTotals(logs) {
+  const t = {};
+  logs.filter(l => l.type === 'harvest' && l.amount > 0).forEach(l => { t[l.unit] = (t[l.unit] || 0) + Number(l.amount); });
+  return Object.entries(t).map(([u, v]) => `${Math.round(v * 100) / 100}${u}`).join('・');
 }
 
-/* ── 写真（上半分）：読み込み・ピンチズーム ── */
-let pmImg=null;         // いま表示・書き出しに使う画像（回転後。Image または Canvas）
-let pmImgOrig=null;     // 読み込んだ元の画像（回転のやり直しに使う）
-let pmImgBlob=null;     // 元の画像ファイル（下書きの保存用。画質を落とさず持っておく）
-let pmRot=0;            // 写真の回転（0〜3＝0°/90°/180°/270°）
-function pmIW(){ return pmImg ? (pmImg.naturalWidth || pmImg.width || 1) : 1; }   // 画像の幅（Image/Canvas 共用）
-function pmIH(){ return pmImg ? (pmImg.naturalHeight || pmImg.height || 1) : 1; }
-let pmView={scale:1,tx:0,ty:0,fit:1};
-let pmPointers=new Map(), pmPinch=null, pmPanLast=null;
-function pmCanvasEl(){ return document.getElementById('pmCanvas'); }
-let pmBg=null;   // メモ欄の背景色 'white'|'black'（未設定は端末のテーマから決める）
-/* メモ欄の背景色（白/黒）を反映し、選択中ボタンを強調する */
-function pmApplyBg(){
-  const ed=document.getElementById('pmMemo'); if(!ed) return;
-  if(!pmBg) pmBg=(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)?'black':'white';
-  ed.classList.toggle('bg-white', pmBg==='white');
-  ed.classList.toggle('bg-black', pmBg==='black');
-  const w=document.getElementById('pmBgW'), b=document.getElementById('pmBgB');
-  if(w) w.classList.toggle('on', pmBg==='white');
-  if(b) b.classList.toggle('on', pmBg==='black');
+/* 写真を縮小してJPEGに（容量を抑える） */
+function shrinkImage(file, max = 1280, q = 0.75) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', q));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('画像を読み込めませんでした')); };
+    img.src = url;
+  });
 }
-function pmSetBg(v){ pmBg=v; pmApplyBg(); }
-function pmSetupCanvas(){
-  const c=pmCanvasEl(); if(!c) return;
-  const rect=c.getBoundingClientRect();
-  c.width=Math.max(1,Math.round(rect.width)); c.height=Math.max(1,Math.round(rect.height));
-  if(!c.dataset.bound){
-    c.addEventListener('pointerdown', pmPointerDown);
-    window.addEventListener('pointermove', pmPointerMove);
-    window.addEventListener('pointerup', pmPointerUp);
-    window.addEventListener('pointercancel', pmPointerUp);
-    // キーボード開閉や回転で表示枠が変わったらキャンバスを合わせ直す（写真が細長く歪むのを防ぐ）
-    window.addEventListener('resize', pmOnResize);
-    if(window.visualViewport) window.visualViewport.addEventListener('resize', pmOnResize);
-    c.dataset.bound='1';
+
+/* ===== 画面状態 ===== */
+let view = { tab: 'crops', cropId: null };
+let cropFilter = 'active';
+
+function go(tab, cropId = null) { view = { tab, cropId }; render(); window.scrollTo(0, 0); }
+$('#backBtn').onclick = () => go('crops');
+document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
+$('#fab').onclick = () => {
+  if (view.cropId) openLogForm({ cropId: view.cropId });
+  else if (view.tab === 'logs') openLogForm({});
+  else openCropForm();
+};
+
+function render() {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === view.tab));
+  $('#backBtn').hidden = !view.cropId;
+  $('#fab').hidden = view.tab === 'summary' || view.tab === 'settings';
+  const m = $('#main');
+  if (view.cropId && cropById(view.cropId)) return renderDetail(m);
+  view.cropId = null;
+  ({ crops: renderCrops, logs: renderLogs, summary: renderSummary, settings: renderSettings })[view.tab](m);
+}
+
+/* ----- 畑（野菜一覧） ----- */
+function renderCrops(m) {
+  $('#title').textContent = '菜園ノート';
+  const list = data.crops.filter(c => cropFilter === 'all' ? true : cropFilter === 'done' ? c.status === 'done' : c.status !== 'done')
+    .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (b.plantedAt || '').localeCompare(a.plantedAt || ''));
+  const f = [['active', '育てている'], ['done', '終了'], ['all', 'すべて']];
+  let h = `<div class="filters">${f.map(([k, l]) => `<button class="chip ${cropFilter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>`;
+  if (!data.crops.length) {
+    h += `<div class="empty"><div class="big">🌱</div><p>まだ野菜が登録されていません。<br>右下の「＋」から植えた野菜を登録しましょう。</p></div>`;
+  } else if (!list.length) {
+    h += `<div class="empty">該当する野菜はありません</div>`;
   }
+  list.forEach(c => {
+    const lw = lastOf(c.id, 'water');
+    const tot = harvestTotals(logsOf(c.id));
+    const badges = [];
+    badges.push(`<span class="badge ${c.status === 'harvesting' ? 'acc' : ''}">${STATUS[c.status]}</span>`);
+    if (c.plantedAt) badges.push(`<span class="badge">植付から${Math.max(0, daysBetween(c.plantedAt, today()))}日</span>`);
+    if (c.status !== 'done') {
+      if (lw) {
+        const n = daysBetween(lw.date, today());
+        badges.push(`<span class="badge ${n >= WATER_WARN_DAYS ? 'warn' : 'water'}">💧${ago(lw.date)}</span>`);
+      } else badges.push(`<span class="badge warn">💧記録なし</span>`);
+    }
+    if (tot) badges.push(`<span class="badge acc">🧺${tot}</span>`);
+    h += `<div class="card crop">
+      <div class="emo">${c.emoji}</div>
+      <div class="info" data-open="${c.id}">
+        <div class="name">${esc(c.name)}${c.variety ? `<small>${esc(c.variety)}</small>` : ''}</div>
+        ${c.place ? `<div class="muted">📍${esc(c.place)}</div>` : ''}
+        <div class="badges">${badges.join('')}</div>
+      </div>
+      ${c.status !== 'done' ? `<div class="quick">
+        <button class="w" data-water="${c.id}" aria-label="今日水やりした">💧</button>
+        <button data-log="${c.id}" aria-label="記録を追加">✏️</button>
+      </div>` : ''}
+    </div>`;
+  });
+  m.innerHTML = h;
+  m.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { cropFilter = b.dataset.f; render(); });
+  m.querySelectorAll('[data-open]').forEach(b => b.onclick = () => go('crops', b.dataset.open));
+  m.querySelectorAll('[data-log]').forEach(b => b.onclick = () => openLogForm({ cropId: b.dataset.log }));
+  m.querySelectorAll('[data-water]').forEach(b => b.onclick = () => quickWater(b.dataset.water));
 }
-/* 表示枠が変わった時：キャンバスの内部サイズを枠に合わせ、写真を全体表示で描き直す */
-function pmOnResize(){
-  const c=pmCanvasEl(); if(!c) return;
-  const r=c.getBoundingClientRect();
-  if(r.width<1 || r.height<1) return;
-  if(Math.abs(r.width-c.width)<2 && Math.abs(r.height-c.height)<2) return;
-  c.width=Math.max(1,Math.round(r.width)); c.height=Math.max(1,Math.round(r.height));
-  pmFitView(); pmRedraw();
+
+async function quickWater(cropId) {
+  const exists = data.logs.some(l => l.cropId === cropId && l.type === 'water' && l.date === today());
+  if (exists && !confirm('今日はすでに水やりを記録しています。もう1件記録しますか？')) return;
+  data.logs.push({ id: uid(), cropId, type: 'water', date: today(), memo: '', ts: Date.now() });
+  await save(); render(); toast(`💧 ${cropById(cropId).name} に水やりを記録しました`);
 }
-function pmPhotoChange(e){
-  const f=e.target.files && e.target.files[0]; if(!f) return;
-  const url=URL.createObjectURL(f); const img=new Image();
-  img.onload=()=>{
-    pmPushUndo();
-    pmImgOrig=img; pmImg=img; pmImgBlob=f; pmRot=0;
-    pmShapes=[]; pmSelShape=-1; pmSelGroup=[];   // 写真を変えたら書き込みはリセット
-    pmSetupCanvas(); pmFitView(); pmRedraw();
-    if(!pmToolOpen) pmToolTab('text');   // 写真の次にすることは「文字を入れる」
-    pmShapeSyncUi(); pmQualitySyncUi(); pmDraftSave(true);
-    try{ URL.revokeObjectURL(url); }catch(_){}
+
+/* ----- 野菜の詳細 ----- */
+async function renderDetail(m) {
+  const c = cropById(view.cropId);
+  $('#title').textContent = c.name;
+  const logs = logsOf(c.id);
+  const lw = logs.find(l => l.type === 'water');
+  const tot = harvestTotals(logs);
+  let h = `<div class="card">
+    <div class="detail-top">
+      <div class="emo">${c.emoji}</div>
+      <div style="flex:1;min-width:0">
+        <div class="name" style="font-size:20px;font-weight:700">${esc(c.name)}</div>
+        ${c.variety ? `<div class="muted">品種：${esc(c.variety)}</div>` : ''}
+        ${c.place ? `<div class="muted">📍${esc(c.place)}</div>` : ''}
+        ${c.plantedAt ? `<div class="muted">植付：${fmtDateLong(c.plantedAt)}</div>` : ''}
+      </div>
+      <button class="btn" id="editCrop">編集</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${c.plantedAt ? Math.max(0, daysBetween(c.plantedAt, today())) : '-'}</b><span>植付からの日数</span></div>
+      <div class="stat"><b>${lw ? ago(lw.date) : '-'}</b><span>最後の水やり</span></div>
+      <div class="stat"><b style="font-size:${tot.length > 6 ? 14 : 20}px">${tot || '-'}</b><span>収穫合計</span></div>
+    </div>
+    <div class="pick" id="statusPick">${Object.entries(STATUS).map(([k, l]) => `<button data-s="${k}" class="${c.status === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${c.memo ? `<p class="memo" style="white-space:pre-wrap;margin:12px 0 0">${esc(c.memo)}</p>` : ''}
+  </div>
+  <div class="row">
+    <button class="btn" style="flex:1;background:var(--water-soft);color:var(--water)" id="dWater">💧 今日水やり</button>
+    <button class="btn primary" style="flex:1" id="dLog">＋ 記録を追加</button>
+  </div>
+  <h2>記録（${logs.length}件）</h2>
+  <div class="card" id="logList">${logs.length ? logs.map(l => logHtml(l, false)).join('') : '<div class="empty" style="padding:16px">まだ記録はありません</div>'}</div>`;
+  m.innerHTML = h;
+  $('#editCrop').onclick = () => openCropForm(c);
+  $('#dWater').onclick = () => quickWater(c.id);
+  $('#dLog').onclick = () => openLogForm({ cropId: c.id });
+  m.querySelectorAll('#statusPick button').forEach(b => b.onclick = async () => {
+    c.status = b.dataset.s; await save(); render(); toast(`「${STATUS[c.status]}」にしました`);
+  });
+  bindLogList(m);
+}
+
+function logHtml(l, showCrop) {
+  const t = TYPES[l.type] || TYPES.other;
+  const c = cropById(l.cropId);
+  const amt = l.type === 'harvest' && l.amount ? ` <b>${l.amount}${esc(l.unit)}</b>` : '';
+  return `<div class="log">
+    <div class="ic">${t.icon}</div>
+    <div class="body">
+      <div><b>${t.label}</b>${amt}${showCrop && c ? ` <span class="muted">${c.emoji}${esc(c.name)}</span>` : ''}</div>
+      <div class="meta">${fmtDate(l.date)}${showCrop ? '' : '・' + ago(l.date)}</div>
+      ${l.memo ? `<div class="memo">${esc(l.memo)}</div>` : ''}
+      ${l.hasPhoto ? `<img data-photo="${l.id}" alt="写真" loading="lazy">` : ''}
+    </div>
+    <button class="edit" data-edit="${l.id}" aria-label="編集">⋯</button>
+  </div>`;
+}
+function bindLogList(m) {
+  m.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openLogForm(data.logs.find(l => l.id === b.dataset.edit)));
+  m.querySelectorAll('img[data-photo]').forEach(async img => {
+    const url = await getPhoto(img.dataset.photo);
+    if (url) { img.src = url; img.onclick = () => showViewer(url); } else img.remove();
+  });
+}
+function showViewer(url) {
+  const v = document.createElement('div'); v.className = 'viewer';
+  v.innerHTML = `<img src="${url}" alt="">`; v.onclick = () => v.remove();
+  document.body.appendChild(v);
+}
+
+/* ----- 記録（全体のタイムライン） ----- */
+let logTypeFilter = 'all';
+function renderLogs(m) {
+  $('#title').textContent = '作業記録';
+  const logs = data.logs.filter(l => cropById(l.cropId) && (logTypeFilter === 'all' || l.type === logTypeFilter))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+  let h = `<div class="filters"><button class="chip ${logTypeFilter === 'all' ? 'on' : ''}" data-t="all">すべて</button>${
+    Object.entries(TYPES).map(([k, t]) => `<button class="chip ${logTypeFilter === k ? 'on' : ''}" data-t="${k}">${t.icon}${t.label}</button>`).join('')}</div>`;
+  if (!logs.length) h += `<div class="empty"><div class="big">📝</div><p>記録はまだありません</p></div>`;
+  let day = null, open = false;
+  logs.slice(0, 300).forEach(l => {
+    if (l.date !== day) {
+      if (open) h += '</div>';
+      day = l.date; h += `<div class="dayhead">${fmtDateLong(l.date)}・${ago(l.date)}</div><div class="card">`; open = true;
+    }
+    h += logHtml(l, true);
+  });
+  if (open) h += '</div>';
+  if (logs.length > 300) h += `<p class="muted" style="text-align:center">最新300件を表示しています</p>`;
+  m.innerHTML = h;
+  m.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { logTypeFilter = b.dataset.t; render(); });
+  bindLogList(m);
+}
+
+/* ----- 集計 ----- */
+function renderSummary(m) {
+  $('#title').textContent = '集計';
+  const years = [...new Set(data.logs.map(l => l.date.slice(0, 4)))].sort().reverse();
+  if (!renderSummary.year || !years.includes(renderSummary.year)) renderSummary.year = years[0] || today().slice(0, 4);
+  const y = renderSummary.year;
+  const ylogs = data.logs.filter(l => l.date.startsWith(y) && cropById(l.cropId));
+  let h = years.length > 1 ? `<div class="filters">${years.map(v => `<button class="chip ${v === y ? 'on' : ''}" data-y="${v}">${v}年</button>`).join('')}</div>` : '';
+  h += `<h2>${y}年の収穫</h2><div class="card">`;
+  const rows = data.crops.map(c => {
+    const ls = ylogs.filter(l => l.cropId === c.id);
+    const hv = ls.filter(l => l.type === 'harvest');
+    return { c, tot: harvestTotals(ls), times: hv.length, first: hv.map(l => l.date).sort()[0], last: hv.map(l => l.date).sort().pop() };
+  }).filter(r => r.times);
+  if (rows.length) {
+    h += `<table><tr><th>野菜</th><th class="num">回数</th><th class="num">合計</th><th class="num">期間</th></tr>${
+      rows.map(r => `<tr><td>${r.c.emoji} ${esc(r.c.name)}</td><td class="num">${r.times}回</td><td class="num">${r.tot || '-'}</td><td class="num">${fmtDate(r.first).replace(/\(.\)/, '')}〜${fmtDate(r.last).replace(/\(.\)/, '')}</td></tr>`).join('')}</table>`;
+  } else h += `<div class="empty" style="padding:16px">収穫の記録はまだありません</div>`;
+  h += `</div><h2>${y}年の作業回数</h2><div class="card"><table><tr><th>作業</th><th class="num">回数</th></tr>${
+    Object.entries(TYPES).map(([k, t]) => `<tr><td>${t.icon} ${t.label}</td><td class="num">${ylogs.filter(l => l.type === k).length}回</td></tr>`).join('')}</table></div>`;
+  // 月別の収穫回数（簡易グラフ）
+  const months = Array.from({ length: 12 }, (_, i) => ylogs.filter(l => l.type === 'harvest' && Number(l.date.slice(5, 7)) === i + 1).length);
+  const mx = Math.max(1, ...months);
+  h += `<h2>月別の収穫回数</h2><div class="card"><div style="display:flex;align-items:flex-end;gap:4px;height:110px">${
+    months.map((n, i) => `<div style="flex:1;text-align:center;font-size:11px;color:var(--muted)">
+      <div style="font-size:11px">${n || ''}</div>
+      <div style="height:${Math.round(n / mx * 70)}px;background:var(--acc);border-radius:4px 4px 0 0;min-height:${n ? 4 : 0}px"></div>
+      <div>${i + 1}</div></div>`).join('')}</div></div>`;
+  m.innerHTML = h;
+  m.querySelectorAll('[data-y]').forEach(b => b.onclick = () => { renderSummary.year = b.dataset.y; render(); });
+}
+
+/* ----- 設定（バックアップ） ----- */
+async function renderSettings(m) {
+  $('#title').textContent = '設定';
+  let est = '';
+  try { if (navigator.storage?.estimate) { const e = await navigator.storage.estimate(); est = `使用容量：約${(e.usage / 1048576).toFixed(1)}MB`; } } catch (e) {}
+  m.innerHTML = `<h2>データ</h2><div class="card">
+    <p style="margin-top:0">野菜 ${data.crops.length}件・記録 ${data.logs.length}件・写真 ${data.logs.filter(l => l.hasPhoto).length}枚</p>
+    <p class="muted">${est}<br>データはこの端末のブラウザ内だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきバックアップしてください。</p>
+    <button class="btn primary block" id="exp">📤 バックアップを保存（写真込み）</button>
+    <div style="height:8px"></div>
+    <button class="btn block" id="imp">📥 バックアップから復元</button>
+  </div>
+  <h2>このアプリについて</h2><div class="card"><p class="muted" style="margin:0">菜園ノート：家庭菜園の植付・水やり・追肥・収穫などを記録するアプリです。ホーム画面に追加するとアプリとして使え、オフラインでも動きます。</p></div>`;
+  $('#exp').onclick = exportData;
+  $('#imp').onclick = () => $('#importFile').click();
+}
+async function exportData() {
+  const photos = {};
+  for (const l of data.logs) if (l.hasPhoto) { const p = await getPhoto(l.id); if (p) photos[l.id] = p; }
+  const blob = new Blob([JSON.stringify({ app: 'saien-note', version: 1, exportedAt: new Date().toISOString(), data, photos })], { type: 'application/json' });
+  const name = `菜園ノート_${today()}.json`;
+  const file = new File([blob], name, { type: 'application/json' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    if (j.app !== 'saien-note' || !j.data) throw new Error('菜園ノートのバックアップではありません');
+    if (!confirm(`野菜${j.data.crops.length}件・記録${j.data.logs.length}件で、今のデータを置き換えます。よろしいですか？`)) return;
+    for (const l of data.logs) if (l.hasPhoto) await kvSet('photo:' + l.id, undefined);
+    photoCache.clear();
+    data = j.data;
+    for (const [id, url] of Object.entries(j.photos || {})) await setPhoto(id, url);
+    await save(); go('crops'); toast('復元しました');
+  } catch (err) { alert('復元できませんでした：' + err.message); }
+};
+
+/* ===== モーダル ===== */
+function openModal(html) {
+  const root = $('#modalRoot');
+  root.innerHTML = `<div class="modal"><div class="sheet">${html}</div></div>`;
+  const md = root.firstElementChild;
+  md.addEventListener('click', e => { if (e.target === md) closeModal(); });
+  return md.firstElementChild;
+}
+function closeModal() { $('#modalRoot').innerHTML = ''; }
+
+/* ----- 野菜の登録・編集 ----- */
+function openCropForm(c) {
+  const isNew = !c;
+  c = c || { emoji: '🍅', name: '', variety: '', place: '', plantedAt: today(), status: 'growing', memo: '' };
+  const s = openModal(`<h3>${isNew ? '野菜を登録' : '野菜を編集'}</h3>
+    <label class="f">種類（タップで名前も入ります）</label>
+    <div class="pick emoji" id="emo">${PRESETS.map(([e, n]) => `<button type="button" data-e="${e}" data-n="${n}" title="${n}" class="${c.emoji === e ? 'on' : ''}">${e}</button>`).join('')}</div>
+    <label class="f">名前</label><input type="text" id="cName" value="${esc(c.name)}" placeholder="例：トマト">
+    <label class="f">品種（任意）</label><input type="text" id="cVar" value="${esc(c.variety)}" placeholder="例：桃太郎">
+    <label class="f">場所（任意）</label><input type="text" id="cPlace" value="${esc(c.place)}" placeholder="例：南の畝・プランター1">
+    <label class="f">植付日・種まき日</label><input type="date" id="cDate" value="${esc(c.plantedAt)}">
+    <label class="f">メモ（任意）</label><textarea id="cMemo" placeholder="苗の購入先、株間など">${esc(c.memo)}</textarea>
+    <div class="actions"><button class="btn" id="cCancel">やめる</button><button class="btn primary" id="cSave">${isNew ? '登録' : '保存'}</button></div>
+    ${isNew ? '' : '<div style="margin-top:16px"><button class="btn danger block" id="cDel">この野菜を削除</button></div>'}`);
+  let emoji = c.emoji;
+  s.querySelectorAll('#emo button').forEach(b => b.onclick = () => {
+    s.querySelectorAll('#emo button').forEach(x => x.classList.remove('on')); b.classList.add('on'); emoji = b.dataset.e;
+    const nm = $('#cName'); const names = PRESETS.map(p => p[1]);
+    if (!nm.value.trim() || names.includes(nm.value.trim())) nm.value = b.dataset.n === 'その他' ? '' : b.dataset.n;
+  });
+  $('#cCancel').onclick = closeModal;
+  $('#cSave').onclick = async () => {
+    const name = $('#cName').value.trim();
+    if (!name) { $('#cName').focus(); toast('名前を入れてください'); return; }
+    Object.assign(c, { emoji, name, variety: $('#cVar').value.trim(), place: $('#cPlace').value.trim(), plantedAt: $('#cDate').value, memo: $('#cMemo').value.trim() });
+    if (isNew) { c.id = uid(); c.createdAt = Date.now(); data.crops.push(c); }
+    await save(); closeModal();
+    if (isNew) { cropFilter = 'active'; go('crops'); toast(`${c.emoji} ${c.name} を登録しました`); } else render();
   };
-  img.src=url; e.target.value='';
-}
-/* 写真を90°ずつ回す（図形の位置・向きも一緒に回す） */
-function pmRotatePhoto(dir){
-  if(!pmImgOrig){ toast('先に写真を入れてください'); return; }
-  pmPushUndo();
-  const w=pmIW(), h=pmIH();
-  pmShapes.forEach(sh=>{
-    const rot1=(x,y)=> dir>0 ? {x:h-y, y:x} : {x:y, y:w-x};   // 右90°／左90°
-    if(sh.type==='pen' && sh.pts && !sh.nrm){ sh.pts=sh.pts.map(pt=>rot1(pt.x,pt.y)); }
-    const c2=rot1(sh.x,sh.y); sh.x=c2.x; sh.y=c2.y;
-    sh.angle=(sh.angle||0) + dir*Math.PI/2;
-  });
-  pmRot=(pmRot+(dir>0?1:3))%4;
-  pmApplyRot();
-  pmFitView(); pmRedraw(); pmDraftSave();
-}
-/* pmRot に合わせて表示用の画像を作り直す（元画像から毎回作るので劣化しない） */
-function pmApplyRot(){
-  if(!pmImgOrig){ pmImg=null; return; }
-  if(pmRot===0){ pmImg=pmImgOrig; return; }
-  const ow=pmImgOrig.naturalWidth||pmImgOrig.width, oh=pmImgOrig.naturalHeight||pmImgOrig.height;
-  const swap=(pmRot%2===1);
-  const cv=document.createElement('canvas');
-  cv.width = swap?oh:ow; cv.height = swap?ow:oh;
-  const x=cv.getContext('2d');
-  x.translate(cv.width/2, cv.height/2); x.rotate(pmRot*Math.PI/2);
-  x.drawImage(pmImgOrig, -ow/2, -oh/2);
-  pmImg=cv;
-}
-function pmFitView(){
-  const c=pmCanvasEl();
-  if(!c || !pmImg){ pmView={scale:1,tx:0,ty:0,fit:1}; return; }
-  const iw=pmIW(), ih=pmIH();
-  const fit=Math.min(c.width/iw, c.height/ih)||1;
-  pmView={ scale:fit, fit, tx:(c.width-iw*fit)/2, ty:(c.height-ih*fit)/2 };
-}
-function pmResetZoom(){ pmFitView(); pmRedraw(); }
-function pmClamp(){
-  const c=pmCanvasEl(); if(!c||!pmImg) return;
-  const fit=pmView.fit||1;
-  pmView.scale=Math.max(fit, Math.min(fit*8, pmView.scale));
-  const iw=pmIW(), ih=pmIH();
-  const sw=iw*pmView.scale, sh=ih*pmView.scale;
-  pmView.tx = (sw<=c.width) ? (c.width-sw)/2 : Math.min(0, Math.max(c.width-sw, pmView.tx));
-  pmView.ty = (sh<=c.height) ? (c.height-sh)/2 : Math.min(0, Math.max(c.height-sh, pmView.ty));
-}
-function pmRedraw(){
-  const c=pmCanvasEl(); if(!c) return; const ctx=c.getContext('2d');
-  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,c.width,c.height);
-  if(pmImg){
-    const iw=pmIW(), ih=pmIH();
-    ctx.drawImage(pmImg,0,0,iw,ih, pmView.tx,pmView.ty, iw*pmView.scale, ih*pmView.scale);
-    // 図形（〇・□・→・△・文字・手書き）を写真に合わせて描く
-    pmShapes.forEach(s=>pmDrawShape(ctx,s,pmView.scale,pmView.tx,pmView.ty));
-    if(pmPenCur) pmDrawShape(ctx,pmPenCur,pmView.scale,pmView.tx,pmView.ty);   // 描いている途中の手書き
-    if(pmDraft2){   // 引いている途中の矢印
-      const d=Math.hypot(pmDraft2.x2-pmDraft2.x1, pmDraft2.y2-pmDraft2.y1);
-      pmDrawShape(ctx,{ type:'arrow', x:(pmDraft2.x1+pmDraft2.x2)/2, y:(pmDraft2.y1+pmDraft2.y2)/2, size:Math.max(4,d/2),
-        angle:Math.atan2(pmDraft2.y2-pmDraft2.y1, pmDraft2.x2-pmDraft2.x1), color:pmShapeColor, t:pmShapeThick },
-        pmView.scale, pmView.tx, pmView.ty);
-    }
-    if(pmSelShape>=0 && pmShapes[pmSelShape]) pmDrawShapeSel(ctx,pmShapes[pmSelShape],pmView.scale,pmView.tx,pmView.ty);
-    if(pmGroupActive()) pmDrawGroupSel(ctx,pmView.scale,pmView.tx,pmView.ty);
-    if(pmRectDraft){   // 囲んでいる最中の枠
-      const d=pmRectDraft;
-      ctx.save(); ctx.setLineDash([7,5]); ctx.strokeStyle=PM_ACC; ctx.lineWidth=2;
-      ctx.strokeRect(pmView.tx+Math.min(d.x1,d.x2)*pmView.scale, pmView.ty+Math.min(d.y1,d.y2)*pmView.scale,
-        Math.abs(d.x2-d.x1)*pmView.scale, Math.abs(d.y2-d.y1)*pmView.scale);
-      ctx.restore();
-    }
-    // 日付スタンプ：見えている写真の範囲の隅に重ねて表示（書き出しでは写真そのものの隅に入る）
-    const x0=Math.max(0,pmView.tx), y0=Math.max(0,pmView.ty);
-    const x1=Math.min(c.width, pmView.tx+iw*pmView.scale), y1=Math.min(c.height, pmView.ty+ih*pmView.scale);
-    pmDrawStamp(ctx, {x:x0, y:y0, w:x1-x0, h:y1-y0});
-  }
-  const em=document.getElementById('pmEmpty'); if(em) em.style.display=pmImg?'none':'flex';
-  const zr=document.getElementById('pmZoomReset'); if(zr) zr.style.display=pmImg?'block':'none';
-  const tr=document.getElementById('pmTopRow'); if(tr) tr.style.display=pmImg?'flex':'none';
-  const rr=document.getElementById('pmRotRow'); if(rr) rr.style.display=pmImg?'flex':'none';
-}
-function pmClientToCanvas(x,y){ const c=pmCanvasEl(); const r=c.getBoundingClientRect(); return {x:(x-r.left)*c.width/r.width, y:(y-r.top)*c.height/r.height}; }
-function pmTwo(){ const it=pmPointers.values(); return [it.next().value, it.next().value]; }
-function pmStartPinch(){ const [a,b]=pmTwo(); if(!a||!b) return; const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
-  pmPinch={ dist:Math.hypot(a.x-b.x,a.y-b.y)||1, scale:pmView.scale, anchor:{x:(mid.x-pmView.tx)/pmView.scale, y:(mid.y-pmView.ty)/pmView.scale} }; }
-function pmDoPinch(){ const [a,b]=pmTwo(); if(!a||!b||!pmPinch) return; const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
-  const dist=Math.hypot(a.x-b.x,a.y-b.y)||1; pmView.scale=pmPinch.scale*dist/pmPinch.dist;
-  pmView.tx=mid.x-pmPinch.anchor.x*pmView.scale; pmView.ty=mid.y-pmPinch.anchor.y*pmView.scale; pmClamp(); }
-function pmPointerDown(e){ if(!pmImg) return; const c=pmCanvasEl(); if(e.target!==c) return; e.preventDefault();
-  pmPointers.set(e.pointerId, pmClientToCanvas(e.clientX,e.clientY));
-  if(pmPointers.size>=2){ pmStartPinch(); pmPanLast=null; pmShapeGesture=null; pmPenCur=null; pmDraft2=null; pmTapDown=null; return; }
-  const cp=pmPointers.get(e.pointerId);
-  // ダブルタップ（＝文字を置く／書き直す）の判定用。指を動かしたら取り消す
-  pmTapDown = (pmPenMode||pmPlaceMode||pmRectMode) ? null : {t:Date.now(), x:cp.x, y:cp.y};
-  if(pmRectMode){   // 囲んで選ぶ
-    const ic=pmClampToImg(pmToImg(cp)); pmRectDraft={x1:ic.x,y1:ic.y,x2:ic.x,y2:ic.y};
-    pmPanLast=null; return;
-  }
-  if(pmGroupActive()){   // まとめて選んだものを動かす／回す
-    const gh=pmGroupHit(cp);
-    if(gh){ pmPushUndo(); pmShapeGesture=gh; pmPanLast=null; return; }
-    pmSelGroup=[]; pmShapeSyncUi(); pmRedraw();   // 枠の外を押した＝選択解除
-  }
-  if(pmPenMode){   // 手書き：なぞった点をためていく（写真の外にはみ出さないよう収める）
-    const ic=pmClampToImg(pmToImg(cp));
-    pmPenCur={ type:'pen', x:ic.x, y:ic.y, size:Math.max(3, Math.min(pmIW(),pmIH())*0.006),
-      color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline, pts:[{x:ic.x,y:ic.y}] };
-    pmPanLast=null; return;
-  }
-  if(pmPlaceMode==='arrow'){   // 矢印：なぞった向き・長さで置く
-    const ic=pmToImg(cp); pmDraft2={ x1:ic.x, y1:ic.y, x2:ic.x, y2:ic.y };
-    pmPanLast=null; return;
-  }
-  const g=pmShapeHit(cp);   // 図形の上＝つかんで移動／ハンドル＝回転・大きさ
-  if(g){ pmPushUndo(); pmShapeGesture=g; if(pmSelShape!==g.idx){ pmSelShape=g.idx; pmShapeSyncUi(); } pmPanLast=null; pmRedraw(); return; }
-  if(pmSelShape>=0){ pmSelShape=-1; pmShapeSyncUi(); pmRedraw(); }   // 何もない所を押した＝選択解除
-  pmPanLast=cp; }
-function pmPointerMove(e){ if(!pmPointers.has(e.pointerId)) return; e.preventDefault();
-  const cp=pmClientToCanvas(e.clientX,e.clientY); pmPointers.set(e.pointerId,cp);
-  if(pmPointers.size>=2 && pmPinch){ pmShapeGesture=null; pmPenCur=null; pmDraft2=null; pmDoPinch(); pmRedraw(); return; }
-  if(pmRectDraft){ const ic=pmClampToImg(pmToImg(cp)); pmRectDraft.x2=ic.x; pmRectDraft.y2=ic.y; pmRedraw(); return; }
-  if(pmShapeGesture && pmShapeGesture.mode==='gmove'){
-    const ic=pmToImg(cp); pmGroupMove(ic.x-pmShapeGesture.px, ic.y-pmShapeGesture.py);
-    pmShapeGesture.px=ic.x; pmShapeGesture.py=ic.y; pmRedraw(); return;
-  }
-  if(pmShapeGesture && pmShapeGesture.mode==='ghandle'){
-    const ic=pmToImg(cp); const gs=pmShapeGesture;
-    const ang=Math.atan2(ic.y-gs.cy, ic.x-gs.cx), dist=Math.max(1,Math.hypot(ic.x-gs.cx, ic.y-gs.cy));
-    pmGroupTransform(gs.cx, gs.cy, ang-gs.lastAng, dist/gs.lastDist);
-    gs.lastAng=ang; gs.lastDist=dist; pmRedraw(); return;
-  }
-  if(pmPenCur){ const ic=pmClampToImg(pmToImg(cp)); pmPenCur.pts.push({x:ic.x,y:ic.y}); pmRedraw(); return; }
-  if(pmDraft2){ const ic=pmToImg(cp); pmDraft2.x2=ic.x; pmDraft2.y2=ic.y; pmRedraw(); return; }
-  if(pmShapeGesture){
-    const s=pmShapes[pmShapeGesture.idx]; if(!s){ pmShapeGesture=null; return; }
-    const ic=pmToImg(cp);
-    if(pmShapeGesture.mode==='move'){
-      const nx=ic.x-pmShapeGesture.dx, ny=ic.y-pmShapeGesture.dy;
-      if(s.type==='pen' && s.pts && !s.nrm){ const ddx=nx-s.x, ddy=ny-s.y; s.pts.forEach(pt=>{ pt.x+=ddx; pt.y+=ddy; }); }
-      s.x=nx; s.y=ny;
-    }
-    else {   // ハンドル：中心からの向き＝角度、距離＝大きさ
-      const dx=ic.x-s.x, dy=ic.y-s.y;
-      s.angle=Math.atan2(dy,dx);
-      const d=Math.hypot(dx,dy)*0.87;
-      s.size = (s.type==='text') ? Math.max(10, d*(s.size/Math.max(1,pmShapeRadius(s)))) : Math.max(12, d);
-    }
-    pmRedraw(); return;
-  }
-  if(pmPanLast){ pmView.tx+=cp.x-pmPanLast.x; pmView.ty+=cp.y-pmPanLast.y; pmPanLast=cp; pmClamp(); pmRedraw(); } }
-function pmPointerUp(e){ if(!pmPointers.has(e.pointerId)) return; pmPointers.delete(e.pointerId);
-  if(pmPointers.size<2) pmPinch=null;
-  if(pmPointers.size===0){
-    if(pmRectDraft){ pmRectFinish(); pmPanLast=null; return; }
-    if(pmPenCur && pmPenCur.pts.length<2){   // ほぼ動いていない＝タップ。図形があれば選んでモードを抜ける
-      const hit=pmShapeHitAt(pmPenCur.pts[0]);
-      pmPenCur=null;
-      if(hit>=0){ pmModeOff(); pmSelShape=hit; pmShapeSyncUi(); pmRedraw(); pmPanLast=null; return; }
-      pmRedraw();
-    }
-    if(pmPenCur){   // 手書きの線を確定（中心からの相対位置に直して、後から動かせるようにする）
-      if(pmPenCur.pts.length>=2){ pmPushUndo(); pmShapes.push(pmPenFinish(pmPenCur)); pmSelShape=-1; pmDraftSave(); }
-      pmPenCur=null; pmRedraw();
-    }
-    if(pmDraft2){   // なぞった向きで矢印を確定
-      const d=Math.hypot(pmDraft2.x2-pmDraft2.x1, pmDraft2.y2-pmDraft2.y1);
-      if(d*pmView.scale>=12){
-        pmPushUndo();
-        pmShapes.push({ type:'arrow', x:(pmDraft2.x1+pmDraft2.x2)/2, y:(pmDraft2.y1+pmDraft2.y2)/2,
-          size:d/2, angle:Math.atan2(pmDraft2.y2-pmDraft2.y1, pmDraft2.x2-pmDraft2.x1),
-          color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline });
-        pmSelShape=pmShapes.length-1;
-        pmPlaceMode=''; pmModeSyncUi(); pmShapeSyncUi(); pmDraftSave();
-      }
-      pmDraft2=null; pmRedraw();
-    }
-    if(pmShapeGesture){ pmShapeGesture=null; pmDraftSave(); }
-    pmTapCheck(e);
-  }
-  pmPanLast = pmPointers.size===1 ? [...pmPointers.values()][0] : null; }
-/* ── 写真のダブルタップ ──
-   このアプリの主役は「写真に文字を入れる」なので、写真を2回続けてタップしたら
-   その場所に文字を置く（文字の上なら書き直す）。1本指の短いタップだけを見る。 */
-let pmTapDown=null, pmTapLast=0, pmTapLastPt=null;
-function pmTapCheck(e){
-  const d=pmTapDown; pmTapDown=null;
-  if(!d || pmPenMode || pmPlaceMode || pmRectMode || pmGroupActive()) return;
-  const cp=pmClientToCanvas(e.clientX, e.clientY);
-  if(Date.now()-d.t>400 || Math.hypot(cp.x-d.x, cp.y-d.y)>10) return;   // 長押し・ドラッグは対象外
-  const now=Date.now();
-  if(pmTapLastPt && now-pmTapLast<350 && Math.hypot(cp.x-pmTapLastPt.x, cp.y-pmTapLastPt.y)<30){
-    pmTapLast=0; pmTapLastPt=null;
-    pmTextAt(pmClampToImg(pmToImg(cp)));
-    return;
-  }
-  pmTapLast=now; pmTapLastPt=cp;
+  if (!isNew) $('#cDel').onclick = async () => {
+    const n = data.logs.filter(l => l.cropId === c.id).length;
+    if (!confirm(`「${c.name}」と記録${n}件を削除します。元に戻せません。よろしいですか？`)) return;
+    for (const l of data.logs) if (l.cropId === c.id && l.hasPhoto) await kvSet('photo:' + l.id, undefined);
+    data.logs = data.logs.filter(l => l.cropId !== c.id);
+    data.crops = data.crops.filter(x => x.id !== c.id);
+    await save(); closeModal(); go('crops'); toast('削除しました');
+  };
 }
 
-/* ── メモ（下半分）：色・大きさ・字体・装飾 ── */
-/* メモ欄（contenteditable）のプレーン文字を取り出す */
-function pmMemoText(){ const ed=document.getElementById('pmMemo'); return ed ? (ed.innerText||'').replace(/\u200B/g,'') : ''; }
-/* 選択した部分（または以後の入力）の文字色を変える。空文字＝標準色
-   （文字タブ専用。図形の色は図形タブの pmShapeColorSet で変える） */
-function pmColor(c){
-  const ed=document.getElementById('pmMemo'); if(!ed) return; ed.focus();
-  pmPushUndo(true);
-  const col = c || getComputedStyle(ed).color;   // 標準＝メモ欄の既定色
-  try{ document.execCommand('styleWithCSS', false, true); document.execCommand('foreColor', false, col); }catch(_){}
-}
-/* メモ欄のキー処理。文字を選んだままEnterを押すと、その文字が消えて改行に
-   置き換わってしまうため、選択の終わりへカーソルを移してから改行する。 */
-function pmMemoKeydown(e){
-  e.stopPropagation();
-  if(e.key!=='Enter' || e.isComposing || e.keyCode===229) return;
-  const s=getSelection();
-  if(!s || !s.rangeCount || s.isCollapsed) return;   // 普通の改行はそのまま
-  e.preventDefault();
-  const r=s.getRangeAt(0).cloneRange(); r.collapse(false);   // 選んだ範囲の終わりへ
-  s.removeAllRanges(); s.addRange(r);
-  pmSelExtend=false; pmCaretSyncUi();
-  try{ document.execCommand('insertLineBreak'); }
-  catch(_){ try{ document.execCommand('insertHTML', false, '<br>'); }catch(__){} }
-  if(typeof pmMarkDirty==='function') pmMarkDirty(); else pmDraftSave();
-}
-/* ── メモ欄の右下ボタン：カーソル移動と範囲選択 ──
-   長押しの選択メニューを出さずに、◀▶で位置を動かし「選択」を押してから
-   ◀▶でなぞる範囲を決められる（そのまま色・大きさ・装飾を変えられる）。 */
-let pmSelExtend=false;   // 「選択」がON＝◀▶で範囲を広げる
-/* メモにカーソルが無ければ末尾に置く（隠れている時は文字タブを開く） */
-function pmEnsureMemoCaret(){
-  const ed=document.getElementById('pmMemo'); if(!ed) return null;
-  if(!pmMemoVisible() && pmToolOpen!=='memo') pmToolTab('memo');
-  const s=getSelection(); if(!s) return null;
-  let inside=false;
-  if(s.rangeCount){ let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement; inside=!!(n && ed.contains(n)); }
-  if(!inside){
-    ed.focus();
-    const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false);
-    s.removeAllRanges(); s.addRange(r);
-  } else if(document.activeElement!==ed) ed.focus();
-  return s;
-}
-/* カーソルを1文字ぶん動かす（選択ONなら範囲を広げる） */
-function pmCaretMove(dir){
-  const s=pmEnsureMemoCaret(); if(!s) return;
-  if(typeof s.modify==='function') s.modify(pmSelExtend?'extend':'move', dir<0?'backward':'forward', 'character');
-  else pmCaretStepFallback(dir, pmSelExtend);
-  pmUpdateSizeNow();
-}
-/* selection.modify が使えない環境向けの手動移動 */
-function pmCaretStepFallback(dir, extend){
-  const ed=document.getElementById('pmMemo'); const s=getSelection();
-  if(!ed || !s || !s.rangeCount) return;
-  const w=document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
-  const ns=[]; while(w.nextNode()) ns.push(w.currentNode);
-  if(!ns.length) return;
-  let node=s.focusNode, off=s.focusOffset;
-  if(!node || node.nodeType!==3){ node=ns[dir<0?ns.length-1:0]; off=dir<0?node.length:0; }
-  let i=ns.indexOf(node); if(i<0){ i=0; node=ns[0]; off=0; }
-  if(dir<0){ if(off>0) off--; else if(i>0){ node=ns[--i]; off=Math.max(0,node.length-1); } }
-  else     { if(off<node.length) off++; else if(i<ns.length-1){ node=ns[++i]; off=Math.min(1,node.length); } }
-  if(extend && typeof s.extend==='function') s.extend(node, off);
-  else { const r=document.createRange(); r.setStart(node,off); r.collapse(true); s.removeAllRanges(); s.addRange(r); }
-}
-/* 「選択」ボタン：◀▶ の役割を カーソル移動 ⇄ 範囲選択 で切り替える */
-function pmSelModeToggle(){
-  pmSelExtend=!pmSelExtend;
-  pmEnsureMemoCaret(); pmCaretSyncUi();
-  toast(pmSelExtend ? '◀▶ で選ぶ範囲を決めます（もう一度押すと解除）' : '◀▶ でカーソルを動かします');
-}
-/* 「全て」ボタン：メモ全体を選ぶ */
-function pmSelectAllMemo(){
-  const ed=document.getElementById('pmMemo'); if(!ed) return;
-  if(!pmMemoVisible() && pmToolOpen!=='memo') pmToolTab('memo');
-  ed.focus();
-  const r=document.createRange(); r.selectNodeContents(ed);
-  const s=getSelection(); s.removeAllRanges(); s.addRange(r);
-  pmSelExtend=false; pmCaretSyncUi(); pmUpdateSizeNow();
-}
-function pmCaretSyncUi(){ const b=document.getElementById('pmSelBtn'); if(b) b.classList.toggle('on', pmSelExtend); }
-/* ◀▶ は押しっぱなしで連続移動する */
-(function pmBindCaretHold(){
-  [['pmCaretL',-1],['pmCaretR',1]].forEach(([id,dir])=>{
-    const b=document.getElementById(id); if(!b) return;
-    let t=null, iv=null;
-    const stop=()=>{ clearTimeout(t); clearInterval(iv); t=null; iv=null; };
-    b.addEventListener('pointerdown', e=>{
-      e.preventDefault(); pmCaretMove(dir);
-      t=setTimeout(()=>{ iv=setInterval(()=>pmCaretMove(dir), 70); }, 420);
-    });
-    ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev, stop));
+/* ----- 作業記録の追加・編集 ----- */
+async function openLogForm(l) {
+  const active = data.crops.filter(c => c.status !== 'done' || c.id === l.cropId);
+  if (!active.length) { toast('先に野菜を登録してください'); go('crops'); openCropForm(); return; }
+  const isNew = !l.id;
+  l = Object.assign({ type: 'water', date: today(), memo: '', amount: '', unit: '個', cropId: active[0].id }, l);
+  let photo = l.hasPhoto ? await getPhoto(l.id) : null, photoChanged = false;
+  const s = openModal(`<h3>${isNew ? '記録を追加' : '記録を編集'}</h3>
+    <label class="f">野菜</label>
+    <select id="lCrop">${active.map(c => `<option value="${c.id}" ${c.id === l.cropId ? 'selected' : ''}>${c.emoji} ${esc(c.name)}${c.variety ? '（' + esc(c.variety) + '）' : ''}</option>`).join('')}</select>
+    <label class="f">作業</label>
+    <div class="pick" id="lType">${Object.entries(TYPES).map(([k, t]) => `<button type="button" data-t="${k}" class="${l.type === k ? 'on' : ''}">${t.icon}${t.label}</button>`).join('')}</div>
+    <div id="hvBox">
+      <label class="f">収穫量（任意）</label>
+      <div class="row"><input type="number" id="lAmt" inputmode="decimal" min="0" step="any" value="${esc(l.amount)}" placeholder="数量" style="flex:2">
+      <select id="lUnit" style="flex:1">${UNITS.map(u => `<option ${u === l.unit ? 'selected' : ''}>${u}</option>`).join('')}</select></div>
+    </div>
+    <label class="f">日付</label><input type="date" id="lDate" value="${esc(l.date)}">
+    <label class="f">メモ（任意）</label><textarea id="lMemo" placeholder="例：液肥を500倍で、実が5つ色づいた">${esc(l.memo)}</textarea>
+    <label class="f">写真（任意）</label>
+    <div class="row"><label class="btn" style="flex:1;text-align:center">📷 撮影・選択<input type="file" id="lPhoto" accept="image/*" hidden></label>
+    <button class="btn" id="lPhotoDel" ${photo ? '' : 'hidden'}>写真を外す</button></div>
+    <img id="lPrev" class="photo-prev" ${photo ? `src="${photo}"` : 'hidden'} alt="">
+    <div class="actions"><button class="btn" id="lCancel">やめる</button><button class="btn primary" id="lSave">${isNew ? '記録' : '保存'}</button></div>
+    ${isNew ? '' : '<div style="margin-top:16px"><button class="btn danger block" id="lDel">この記録を削除</button></div>'}`);
+  let type = l.type;
+  const syncHv = () => { $('#hvBox').hidden = type !== 'harvest'; };
+  syncHv();
+  s.querySelectorAll('#lType button').forEach(b => b.onclick = () => {
+    s.querySelectorAll('#lType button').forEach(x => x.classList.remove('on')); b.classList.add('on'); type = b.dataset.t; syncHv();
   });
+  $('#lPhoto').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { photo = await shrinkImage(f); photoChanged = true; $('#lPrev').src = photo; $('#lPrev').hidden = false; $('#lPhotoDel').hidden = false; }
+    catch (err) { alert(err.message); }
+  };
+  $('#lPhotoDel').onclick = () => { photo = null; photoChanged = true; $('#lPrev').hidden = true; $('#lPhotoDel').hidden = true; };
+  $('#lCancel').onclick = closeModal;
+  $('#lSave').onclick = async () => {
+    const date = $('#lDate').value;
+    if (!date) { toast('日付を入れてください'); return; }
+    const amt = $('#lAmt').value;
+    Object.assign(l, {
+      cropId: $('#lCrop').value, type, date, memo: $('#lMemo').value.trim(),
+      amount: type === 'harvest' && amt !== '' ? Number(amt) : '', unit: $('#lUnit').value
+    });
+    if (isNew) { l.id = uid(); l.ts = Date.now(); data.logs.push(l); }
+    if (photoChanged) {
+      if (photo) await setPhoto(l.id, photo); else { await kvSet('photo:' + l.id, undefined); photoCache.delete(l.id); }
+      l.hasPhoto = !!photo;
+    }
+    // 収穫を記録したら「収穫中」に切り替える
+    const c = cropById(l.cropId);
+    if (type === 'harvest' && c.status === 'growing') c.status = 'harvesting';
+    await save(); closeModal(); render();
+    toast(`${TYPES[type].icon} ${c.name}：${TYPES[type].label}を${isNew ? '記録' : '保存'}しました`);
+  };
+  if (!isNew) $('#lDel').onclick = async () => {
+    if (!confirm('この記録を削除しますか？')) return;
+    if (l.hasPhoto) { await kvSet('photo:' + l.id, undefined); photoCache.delete(l.id); }
+    data.logs = data.logs.filter(x => x.id !== l.id);
+    await save(); closeModal(); render(); toast('削除しました');
+  };
+}
+
+/* ===== 起動 ===== */
+(async () => {
+  await load();
+  if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
+  render();
 })();
-/* 文字サイズの段階（既定は48。そこから上下できる） */
-const PM_SIZES=[13,17,22,28,36,48,64,80,96];
-/* メモ欄の縮小表示率：サイズの数値（既定48）はそのままに、入力欄では0.6倍で小さめに表示する。
-   スクリーンショットには本来のサイズで書き出される。 */
-const PM_VIEW=0.6;
-/* 選択位置の文字サイズ（本来のpx＝表示pxを0.6で割った値）を取得 */
-function pmSelSize(){
-  const ed=document.getElementById('pmMemo');
-  const s=getSelection(); if(!s || !s.rangeCount) return 48;
-  let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement;
-  if(!n || !ed.contains(n)) n=ed;
-  const disp=parseFloat(getComputedStyle(n).fontSize);
-  return disp ? disp/PM_VIEW : 48;
-}
-/* ツールバーの「今の文字サイズ」表示を更新 */
-function pmUpdateSizeNow(px){
-  const el=document.getElementById('pmSizeNow');
-  if(el) el.textContent=Math.round(px!=null?px:pmSelSize());
-}
-/* 文字の大きさを1段階 上げる/下げる。
-   範囲選択中＝その文字を変更／カーソルだけ＝これから入力する文字の大きさを指定 */
-function pmSizeStep(dir){
-  const ed=document.getElementById('pmMemo'); if(!ed) return; ed.focus();
-  const s=getSelection(); if(!s || !s.rangeCount) return;
-  const cur=pmSelSize();
-  let i=PM_SIZES.findIndex(v=>v>=cur-0.5); if(i<0) i=PM_SIZES.length-1;
-  i=Math.max(0, Math.min(PM_SIZES.length-1, i+dir));
-  const px=PM_SIZES[i];
-  if(s.isCollapsed) pmSetTypingSize(px);   // 入力前にサイズ指定
-  else pmApplySizePx(px);
-  pmUpdateSizeNow(px);
-}
-/* カーソル位置に「これから入力する文字」のサイズを設定する
-   （サイズ付きの目印スパンを置き、その中で入力させる。目印文字は書き出し時に掃除） */
-function pmSetTypingSize(px){
-  const s=getSelection(); if(!s || !s.rangeCount) return;
-  let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement;
-  if(n && n.dataset && n.dataset.pmsize==='1'){ n.style.fontSize=(px*PM_VIEW)+'px'; return; }   // 直前の指定を更新
-  const r=s.getRangeAt(0);
-  const span=document.createElement('span');
-  span.style.fontSize=(px*PM_VIEW)+'px'; span.dataset.pmsize='1'; span.textContent='\u200B';
-  r.insertNode(span);
-  const nr=document.createRange(); nr.setStart(span.firstChild,1); nr.collapse(true);
-  s.removeAllRanges(); s.addRange(nr);
-}
-document.addEventListener('selectionchange', ()=>{   // カーソル位置の文字サイズをツールバーに表示
-  const ed=document.getElementById('pmMemo'); const s=getSelection();
-  if(!ed || !s || !s.rangeCount) return;
-  let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement;
-  if(n && ed.contains(n)) pmUpdateSizeNow();
-});
-/* 目印文字（ゼロ幅スペース）と空の目印スパンを掃除する（書き出し前に呼ぶ） */
-function pmCleanZwsp(){
-  const ed=document.getElementById('pmMemo'); if(!ed) return;
-  ed.querySelectorAll('span[data-pmsize]').forEach(sp=>{
-    if(sp.textContent.replace(/\u200B/g,'')===''){ sp.remove(); return; }
-    sp.removeAttribute('data-pmsize');
-  });
-  const walker=document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
-  const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
-  nodes.forEach(t=>{ if(t.textContent.includes('\u200B')) t.textContent=t.textContent.replace(/\u200B/g,''); });
-}
-/* 選択部分に指定pxの文字サイズを適用（execCommandの上限48pxを超えられるよう
-   一旦 <font size=7> にしてから span の px 指定に置き換える） */
-function pmApplySizePx(px){
-  const ed=document.getElementById('pmMemo'); if(!ed) return;
-  pmPushUndo(true);
-  try{
-    ed.querySelectorAll('font[size="7"]').forEach(f=>f.setAttribute('data-old','1'));   // 既存のものは触らない
-    document.execCommand('styleWithCSS', false, false);
-    document.execCommand('fontSize', false, '7');
-    ed.querySelectorAll('font[size="7"]:not([data-old])').forEach(f=>{ f.removeAttribute('size'); f.style.fontSize=(px*PM_VIEW)+'px'; });
-    ed.querySelectorAll('font[data-old]').forEach(f=>f.removeAttribute('data-old'));
-    document.execCommand('styleWithCSS', false, true);
-  }catch(_){}
-}
-/* ── 図形（〇・□・→・△を写真の上に置く） ──
-   置いた図形はドラッグで移動、丸いハンドルを回すように動かすと角度と大きさが変わる。
-   選択中に色パレット＝図形の色、Ａ−/Ａ＋＝図形の大きさ。座標は写真の実寸px基準
-   （書き出し画像にもそのまま入る）。 */
-let pmShapes=[];          // [{type,x,y,size,angle,color}]（x,y,size は写真の実寸px、angleはラジアン）
-let pmSelShape=-1;        // 選択中の図形のindex（-1=なし）
-let pmShapeGesture=null;  // ドラッグ中 {mode:'move'|'handle', idx, dx, dy}
-let pmDraft2=null;        // なぞって置いている途中の矢印 {x1,y1,x2,y2}
-let pmShapeColor='#e53935';   // 次に置く図形の色（最後に使った色を覚える）
-let pmShapeThick=1;           // 次に置く図形の線の太さ（0.5=細, 1=中, 2=太, 3=極太）
-let pmShapeOutline='';        // 次に置く図形のフチの色（空＝なし）
-let pmTextVert=false;         // 次に置く文字を縦書きにするか
-/* 縦書きで寝かせて描く文字（長音符・かっこ類） */
-const PM_VROT='ー－—―〜～ｰ(（)）[［]］{｛}｝<＜>＞【】「」『』…‥';
-/* 写真の上の文字を 横書き／縦書き に切り替える */
-function pmSetTextVert(v){
-  pmTextVert=v;
-  const apply=sh=>{ if(sh && sh.type==='text') sh.vt=v; };
-  if(pmGroupActive() && pmSelGroup.some(i=>pmShapes[i] && pmShapes[i].type==='text')){
-    pmPushUndo(); pmGroupApply(apply); pmRedraw(); pmDraftSave();
-  } else if(pmSelShape>=0 && pmShapes[pmSelShape] && pmShapes[pmSelShape].type==='text'){
-    pmPushUndo(); apply(pmShapes[pmSelShape]); pmRedraw(); pmDraftSave();
-  }
-  pmTextVertSyncUi();
-}
-function pmTextVertSyncUi(){
-  const sel=(pmSelShape>=0)?pmShapes[pmSelShape]:null;
-  const cur=(sel && sel.type==='text') ? !!sel.vt : pmTextVert;
-  const h=document.getElementById('pmTxtH'), v=document.getElementById('pmTxtV');
-  if(h) h.classList.toggle('on', !cur);
-  if(v) v.classList.toggle('on', cur);
-}
-/* フチ（縁取り）の色を設定：選んでいるものに適用し、次に置くものにも引き継ぐ */
-function pmSetShapeOutline(c){
-  pmShapeOutline=c;
-  if(pmGroupActive()){ pmPushUndo(); pmGroupApply(s=>s.oc=c); pmRedraw(); pmDraftSave(); }
-  else if(pmSelShape>=0 && pmShapes[pmSelShape]){ pmPushUndo(); pmShapes[pmSelShape].oc=c; pmRedraw(); pmDraftSave(); }
-  pmOutlineSyncUi(); pmTextVertSyncUi();
-}
-function pmOutlineSyncUi(){
-  const cur = (pmSelShape>=0 && pmShapes[pmSelShape]) ? (pmShapes[pmSelShape].oc||'') : pmShapeOutline;
-  document.querySelectorAll('.pm-ocbtn').forEach(b=>b.classList.toggle('on', (b.dataset.oc||'')===cur));
-}
-/* 図形の色を設定（図形タブ専用）：選択中の図形に適用し、次に置く図形にも引き継ぐ */
-function pmShapeColorSet(c){
-  pmShapeColor=c; pmColorSyncUi();
-  if(pmGroupActive()){ pmPushUndo(); pmGroupApply(s=>s.color=c); pmRedraw(); pmDraftSave(); return; }
-  if(pmSelShape>=0 && pmShapes[pmSelShape]){ pmPushUndo(); pmShapes[pmSelShape].color=c; pmRedraw(); pmDraftSave(); }
-  else toast('この色で次の図形を置きます（図形をタップして選ぶと色変更）');
-}
-/* 図形の大きさを一段階 変える（図形タブ専用） */
-function pmShapeSizeStep(dir){
-  if(pmGroupActive()){   // まとめて選んだものは中心を軸に拡大・縮小
-    const g=pmGroupBox(); if(!g) return;
-    pmPushUndo(); pmGroupTransform(g.cx, g.cy, 0, dir>0?1.25:0.8); pmRedraw(); pmDraftSave(); return;
-  }
-  if(!(pmSelShape>=0 && pmShapes[pmSelShape])){ toast('大きさを変える図形をタップして選んでください'); return; }
-  pmPushUndo();
-  const sh=pmShapes[pmSelShape];
-  sh.size=Math.max(8, sh.size*(dir>0?1.25:0.8));
-  pmRedraw(); pmDraftSave();
-}
-/* メモ欄に触れたら図形の選択を解除（文字の操作と図形の操作が混ざらないように） */
-function pmDeselShape(){
-  if(pmSelShape>=0){ pmSelShape=-1; pmShapeSyncUi(); pmRedraw(); }
-}
-/* 線の太さを設定：選択中の図形に適用し、次に置く図形にも引き継ぐ */
-function pmSetShapeThick(v){
-  pmShapeThick=v;
-  if(pmGroupActive()){ pmPushUndo(); pmGroupApply(s=>s.t=v); pmRedraw(); pmDraftSave(); pmThickSyncUi(); return; }
-  if(pmSelShape>=0 && pmShapes[pmSelShape]){ pmPushUndo(); pmShapes[pmSelShape].t=v; pmRedraw(); pmDraftSave(); }
-  pmThickSyncUi();
-}
-function pmThickSyncUi(){
-  const cur=(pmSelShape>=0 && pmShapes[pmSelShape]) ? (pmShapes[pmSelShape].t||1) : pmShapeThick;
-  [['pmTh_thin',0.5],['pmTh_mid',1],['pmTh_bold',2],['pmTh_xbold',3],
-   ['pmTh2_thin',0.5],['pmTh2_mid',1],['pmTh2_bold',2],['pmTh2_xbold',3]].forEach(([id,v])=>{
-    const b=document.getElementById(id); if(b) b.classList.toggle('on', cur===v);
-  });
-  pmOutlineSyncUi(); pmTextVertSyncUi();
-}
-function pmToImg(cp){ return {x:(cp.x-pmView.tx)/pmView.scale, y:(cp.y-pmView.ty)/pmView.scale}; }
-/* 写真の外（黒い余白）に出ないよう、座標を写真の中に収める */
-function pmClampToImg(p){ return { x:Math.max(0,Math.min(pmIW(),p.x)), y:Math.max(0,Math.min(pmIH(),p.y)) }; }
-function pmAddShape(type){
-  if(!pmImg){ toast('先に写真を入れてください'); return; }
-  pmModeOff();   // 手書き・矢印モードを抜けてから置く（思わぬ線を描かないように）
-  pmPushUndo();
-  const c=pmCanvasEl();
-  const ic=pmToImg({x:c.width/2, y:c.height/2});   // いま見えている中央に置く
-  const iw=pmIW(), ih=pmIH();
-  pmShapes.push({ type, x:Math.max(0,Math.min(iw,ic.x)), y:Math.max(0,Math.min(ih,ic.y)),
-    size:Math.max(24, Math.min(iw,ih)*0.14), angle:0, color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline });
-  pmSelShape=pmShapes.length-1;
-  pmShapeSyncUi(); pmRedraw(); pmDraftSave();
-  toast('図形を置きました（ドラッグで移動・丸いハンドルで回転と大きさ）');
-}
-/* ── このアプリの主役：写真の上に文字を置く ──
-   置いた文字は図形と同じようにドラッグで移動、ハンドルで回転と大きさが変えられる。
-   at を渡すと写真上のその位置に、渡さなければ今見えている中央に置く。 */
-async function pmAddText(txt, at){
-  if(!pmImg){ toast('先に写真を入れてください'); return; }
-  pmModeOff();   // 手書き・矢印モードを抜けてから置く（思わぬ線を描かないように）
-  let t = (typeof txt==='string' && txt) ? txt : await appPrompt('写真に入れる文字', '');
-  if(t===null) return;
-  t=String(t).trim(); if(!t) return;
-  pmPushUndo();
-  const c=pmCanvasEl();
-  const ic = at || pmToImg({x:c.width/2, y:c.height/2});
-  const iw=pmIW(), ih=pmIH();
-  pmShapes.push({ type:'text', text:t, x:Math.max(0,Math.min(iw,ic.x)), y:Math.max(0,Math.min(ih,ic.y)),
-    size:Math.max(16, Math.min(iw,ih)*0.09), angle:0, color:pmShapeColor, t:pmShapeThick, oc:pmShapeOutline, vt:pmTextVert });
-  pmSelShape=pmShapes.length-1;
-  if(pmToolOpen!=='text') pmToolTab('text');   // 色・大きさ・向きをすぐ直せるように
-  pmShapeSyncUi(); pmRedraw(); pmDraftSave();
-  toast('文字を置きました（ドラッグで移動・ハンドルで回転と大きさ）');
-}
-/* 写真をダブルタップ：文字の上なら書き直し、何も無い所ならその場所に文字を置く */
-function pmTextAt(ic){
-  if(!pmImg) return;
-  const hit=pmShapeHitAt(ic);
-  if(hit>=0 && pmShapes[hit] && pmShapes[hit].type==='text'){
-    pmSelShape=hit; pmShapeSyncUi(); pmRedraw(); pmEditText(); return;
-  }
-  if(hit>=0) return;   // 図形の上なら何もしない（うっかり文字が増えないように）
-  pmAddText(null, ic);
-}
-/* 置いた文字を書き直す（文字をダブルタップ、または「✎ 書き直す」） */
-async function pmEditText(){
-  const s=pmShapes[pmSelShape]; if(!s || s.type!=='text') return;
-  if(pmToolOpen!=='text') pmToolTab('text');
-  const t=await appPrompt('文字を直す', s.text||'');
-  if(t===null) return;
-  const v=String(t).trim(); if(!v) return;
-  pmPushUndo(); s.text=v; pmRedraw(); pmDraftSave();
-}
-/* 矢印：写真の上でなぞって「ここからここ」に引く */
-let pmPlaceMode='';   // '' | 'arrow'（なぞって置くモード）
-let pmPenMode=false;  // 手書きモード
-let pmPenCur=null;    // 描いている途中の手書き線
-function pmArrowMode(){
-  if(!pmImg){ toast('先に写真を入れてください'); return; }
-  pmPenMode=false; pmPlaceMode = (pmPlaceMode==='arrow') ? '' : 'arrow';
-  pmModeSyncUi();
-  if(pmPlaceMode) toast('写真の上をなぞると、その向きに矢印を引きます');
-}
-/* 手書き：指でなぞった線をそのまま描く */
-function pmPenToggle(){
-  if(!pmImg){ toast('先に写真を入れてください'); return; }
-  pmPlaceMode=''; pmPenMode=!pmPenMode;
-  pmModeSyncUi();
-  if(pmPenMode) toast('写真の上をなぞると線が描けます（もう一度押すと解除）');
-}
-/* ── □で囲んでまとめて選ぶ（手書きの「あ」のように複数の線でできた形を一括で扱う）── */
-let pmSelGroup=[];      // まとめて選んだ図形のindex一覧
-let pmRectMode=false;   // 囲んで選ぶモード
-let pmRectDraft=null;   // 囲んでいる最中の枠（写真座標）
-function pmGroupActive(){ return pmSelGroup.length>0; }
-/* 選んだ図形全体を囲む枠 */
-function pmGroupBox(){
-  let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
-  pmSelGroup.forEach(i=>{ const s=pmShapes[i]; if(!s) return; const r=pmShapeRadius(s);
-    x1=Math.min(x1,s.x-r); y1=Math.min(y1,s.y-r); x2=Math.max(x2,s.x+r); y2=Math.max(y2,s.y+r); });
-  if(!isFinite(x1)) return null;
-  return { x1,y1,x2,y2, cx:(x1+x2)/2, cy:(y1+y2)/2, r:Math.max(12, Math.hypot(x2-x1,y2-y1)/2) };
-}
-function pmGroupApply(fn){ pmSelGroup.forEach(i=>{ const s=pmShapes[i]; if(s) fn(s); }); }
-/* まとめて動かす */
-function pmGroupMove(dx,dy){
-  pmGroupApply(s=>{ s.x+=dx; s.y+=dy;
-    if(s.type==='pen' && s.pts && !s.nrm) s.pts.forEach(p=>{ p.x+=dx; p.y+=dy; }); });
-}
-/* まとめて回す・大きさを変える（中心cx,cyのまわりで dA ラジアン回し、k倍する） */
-function pmGroupTransform(cx,cy,dA,k){
-  const c=Math.cos(dA), sn=Math.sin(dA);
-  pmGroupApply(s=>{
-    const rx=(s.x-cx)*k, ry=(s.y-cy)*k;
-    s.x=cx+rx*c-ry*sn; s.y=cy+rx*sn+ry*c;
-    s.angle=(s.angle||0)+dA;
-    s.size=Math.max(4,(s.size||10)*k);
-    if(s.type==='pen' && s.pts && !s.nrm){
-      s.pts=s.pts.map(p=>{ const px=(p.x-cx)*k, py=(p.y-cy)*k;
-        return { x:cx+px*c-py*sn, y:cy+px*sn+py*c }; });
-    }
-  });
-}
-/* 「範囲で選ぶ」ボタン */
-function pmRectToggle(){
-  if(!pmImg){ toast('先に写真を入れてください'); return; }
-  pmPenMode=false; pmPlaceMode='';
-  pmRectMode=!pmRectMode;
-  if(pmRectMode){ pmSelShape=-1; pmSelGroup=[]; }
-  pmModeSyncUi(); pmShapeSyncUi(); pmRedraw();
-  if(pmRectMode) toast('写真の上で四角く囲むと、中の図形をまとめて選べます');
-}
-/* 囲み終わり：枠の中にある図形をまとめて選ぶ */
-function pmRectFinish(){
-  const d=pmRectDraft; pmRectDraft=null;
-  if(!d){ pmRedraw(); return; }
-  const x1=Math.min(d.x1,d.x2), x2=Math.max(d.x1,d.x2);
-  const y1=Math.min(d.y1,d.y2), y2=Math.max(d.y1,d.y2);
-  if(Math.abs(x2-x1)*pmView.scale<8 || Math.abs(y2-y1)*pmView.scale<8){ pmRedraw(); return; }
-  const hit=[];
-  pmShapes.forEach((s,i)=>{ if(s.x>=x1 && s.x<=x2 && s.y>=y1 && s.y<=y2) hit.push(i); });
-  if(!hit.length){ toast('囲んだ中に図形がありませんでした'); pmRedraw(); return; }
-  pmSelGroup=hit; pmSelShape=-1; pmRectMode=false;
-  pmModeSyncUi();
-  if(pmToolOpen!=='shape' && pmToolOpen!=='pen' && pmToolOpen!=='text') pmToolTab('shape');   // 大きさ・色を変えられるタブへ
-  pmShapeSyncUi(); pmRedraw();
-  toast(hit.length+'個をまとめて選びました（枠の中をドラッグで移動・丸で回転と大きさ）');
-}
-/* 描き終えた手書きを、他の図形と同じように動かせる形に変換する */
-function pmPenFinish(cur){
-  const pts=cur.pts;
-  let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
-  pts.forEach(p=>{ x1=Math.min(x1,p.x); y1=Math.min(y1,p.y); x2=Math.max(x2,p.x); y2=Math.max(y2,p.y); });
-  const cx=(x1+x2)/2, cy=(y1+y2)/2;
-  let r=0; pts.forEach(p=>{ r=Math.max(r, Math.hypot(p.x-cx, p.y-cy)); });
-  r=Math.max(6, r);
-  return { type:'pen', x:cx, y:cy, size:r, angle:0, color:cur.color, t:cur.t, oc:cur.oc||'', nrm:1,
-    wf:(cur.size||6)/r,                      // 線の太さ（大きさに対する割合）
-    pts: pts.map(p=>({ x:(p.x-cx)/r, y:(p.y-cy)/r })) };
-}
-function pmModeSyncUi(){
-  const pen=document.getElementById('pmPenBtn'); if(pen) pen.classList.toggle('on', pmPenMode);
-  const c=pmCanvasEl(); if(c) c.classList.toggle('penmode', pmPenMode || pmPlaceMode==='arrow' || pmRectMode);
-  document.querySelectorAll('.pm-rectbtn').forEach(b=>b.classList.toggle('on', pmRectMode));
-  const bd=document.getElementById('pmPenBadge');
-  if(bd){
-    if(pmPenMode) bd.textContent='✏️ 手書き中（押すと解除）';
-    else if(pmPlaceMode==='arrow') bd.textContent='→ 矢印を引きます（押すと解除）';
-    else if(pmRectMode) bd.textContent='□ 囲んで選びます（押すと解除）';
-    bd.style.display = (pmPenMode || pmPlaceMode==='arrow' || pmRectMode) ? '' : 'none';
-  }
-}
-/* 手書き・矢印のモードをやめる */
-function pmModeOff(){
-  if(!pmPenMode && !pmPlaceMode && !pmRectMode) return;
-  pmPenMode=false; pmPlaceMode=''; pmRectMode=false;
-  if(pmToolOpen==='pen') pmToolTab('shape');   // 手書きタブから抜ける
-  pmModeSyncUi();
-}
-/* 手書きの線だけをまとめて消す */
-function pmClearPen(){
-  if(!pmShapes.some(x=>x.type==='pen')){ toast('消す手書きがありません'); return; }
-  pmPushUndo();
-  pmShapes=pmShapes.filter(x=>x.type!=='pen'); pmSelShape=-1; pmSelGroup=[];
-  pmShapeSyncUi(); pmRedraw(); pmDraftSave();
-  toast('手書きを消しました（↩︎戻すで元に戻せます）');
-}
-function pmDelShape(){
-  if(pmGroupActive()){   // まとめて選んだものを全部消す
-    pmPushUndo();
-    pmSelGroup.slice().sort((a,b)=>b-a).forEach(i=>pmShapes.splice(i,1));
-    pmSelGroup=[]; pmShapeSyncUi(); pmRedraw(); pmDraftSave(); return;
-  }
-  if(pmSelShape<0) return;
-  pmPushUndo();
-  pmShapes.splice(pmSelShape,1); pmSelShape=-1;
-  pmShapeSyncUi(); pmRedraw(); pmDraftSave();
-}
-/* 置いた図形・文字・手書きをすべて消す */
-function pmClearShapes(){
-  if(!pmShapes.length){ toast('消す図形がありません'); return; }
-  pmPushUndo();
-  pmShapes=[]; pmSelShape=-1; pmSelGroup=[];
-  pmShapeSyncUi(); pmRedraw(); pmDraftSave();
-  toast('図形をすべて消しました（↩︎戻すで元に戻せます）');
-}
-/* ── 元に戻す（図形・文字・手書き・日付・写真の向きの操作を1手ずつ戻す） ── */
-let pmUndoStack=[], pmRedoStack=[];
-/* memoOp=true のときはメモの中身も一緒に覚える（文字の書式変更を戻せるように） */
-function pmSnapshot(memoOp){
-  const ed=document.getElementById('pmMemo');
-  return JSON.stringify({ sh:pmShapes, st:pmStamp, rot:pmRot, mh:(memoOp&&ed)?ed.innerHTML:null });
-}
-function pmPushUndo(memoOp){
-  pmUndoStack.push(pmSnapshot(memoOp));
-  if(pmUndoStack.length>40) pmUndoStack.shift();
-  pmRedoStack=[];   // 新しい操作をしたら「進む」はできなくなる
-  pmUndoSyncUi();
-}
-function pmUndoSyncUi(){
-  const b=document.getElementById('pmUndoBtn'); if(b) b.disabled = pmUndoStack.length===0;
-  const r=document.getElementById('pmRedoBtn'); if(r) r.disabled = pmRedoStack.length===0;
-}
-/* 覚えておいた状態に戻す（戻す・進むで共用） */
-function pmApplySnapshot(j){
-  let st; try{ st=JSON.parse(j); }catch(_){ return false; }
-  pmShapes=st.sh||[]; pmStamp=st.st||null; pmSelShape=-1; pmSelGroup=[];
-  if(st.mh!=null){ const ed=document.getElementById('pmMemo'); if(ed) ed.innerHTML=st.mh; }
-  if((st.rot||0)!==pmRot){ pmRot=st.rot||0; pmApplyRot(); pmFitView(); }
-  return true;
-}
-function pmUndo(){
-  const j=pmUndoStack.pop(); if(!j){ pmUndoSyncUi(); return; }
-  let hasMemo=false; try{ hasMemo = JSON.parse(j).mh!=null; }catch(_){}
-  pmRedoStack.push(pmSnapshot(hasMemo));   // 進む用に今の状態を控える
-  if(pmRedoStack.length>40) pmRedoStack.shift();
-  if(!pmApplySnapshot(j)){ pmUndoSyncUi(); return; }
-  pmUndoSyncUi(); pmShapeSyncUi(); pmDateUiSync(); pmRedraw(); pmDraftSave();
-}
-/* 進む（やり直す）：戻したものをもう一度やり直す */
-function pmRedo(){
-  const j=pmRedoStack.pop(); if(!j){ pmUndoSyncUi(); return; }
-  let hasMemo=false; try{ hasMemo = JSON.parse(j).mh!=null; }catch(_){}
-  pmUndoStack.push(pmSnapshot(hasMemo));   // 戻す用に今の状態を控える
-  if(pmUndoStack.length>40) pmUndoStack.shift();
-  if(!pmApplySnapshot(j)){ pmUndoSyncUi(); return; }
-  pmUndoSyncUi(); pmShapeSyncUi(); pmDateUiSync(); pmRedraw(); pmDraftSave();
-}
-function pmShapeSyncUi(){
-  const sel=(pmSelShape>=0)?pmShapes[pmSelShape]:null;
-  const on = !!(sel||pmGroupActive());
-  ['pmShapeDel','pmTextDel'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display = on ? '' : 'none'; });
-  document.querySelectorAll('.pm-rectbtn').forEach(b=>b.classList.toggle('on', pmRectMode));
-  const isText = !!(sel && sel.type==='text');
-  const te=document.getElementById('pmTextEdit');
-  if(te) te.style.display = isText ? '' : 'none';
-  // 選んだものを直せるタブを開く（文字＝文字タブ、図形・手書き＝図形タブ）
-  if(sel){
-    const want = isText ? 'text' : 'shape';
-    const ok = isText ? (pmToolOpen==='text') : (pmToolOpen==='shape' || pmToolOpen==='pen');
-    if(!ok) pmToolTab(want);
-  }
-  pmThickSyncUi();   // 太さ・フチ・縦横ボタンの強調を選択中のものに合わせる
-}
-/* ── ツールタブ（文字／図形／日付／写真）：使う時だけパネルを開いて画面をスッキリさせる ── */
-let pmToolOpen='';   // 開いているタブ '' | 'text'（写真の文字＝主役） | 'shape' | 'pen' | 'date' | 'memo'
-/* 今えらんでいる色に印をつける（横スライドで隠れていても、開いた時に見える位置まで寄せる） */
-function pmColorSyncUi(){
-  document.querySelectorAll('.pm-shcol').forEach(b=>b.classList.toggle('on', b.dataset.c===pmShapeColor));
-}
-/* 帯の中で「選択中」の印が隠れていたら、その位置まで横に寄せる */
-function pmStripReveal(){
-  document.querySelectorAll('.pm-strip').forEach(s=>{
-    const on=s.querySelector('.on'); if(!on) return;
-    const l=on.offsetLeft, r=l+on.offsetWidth, m=32;   // 端のぼかし・矢印に隠れない分だけ余裕をとる
-    if(l-m < s.scrollLeft) s.scrollLeft=Math.max(0, l-m);
-    else if(r+m > s.scrollLeft+s.clientWidth) s.scrollLeft=r-s.clientWidth+m;
-  });
-}
-/* 横スライドの帯：左右にまだ続きがあるかを見て、端のぼかしと矢印を出し入れする */
-function pmStripSync(){
-  document.querySelectorAll('.pm-slide').forEach(w=>{
-    const s=w.firstElementChild; if(!s) return;
-    const max=s.scrollWidth-s.clientWidth;
-    w.classList.toggle('more-l', s.scrollLeft>2);
-    w.classList.toggle('more-r', s.scrollLeft<max-2);
-  });
-}
-document.addEventListener('scroll', e=>{
-  const t=e.target;
-  if(t && t.classList && t.classList.contains('pm-strip')) pmStripSync();
-}, true);
-/* 端末の画面の大きさを見て、詰め具合（ふつう／sm／xs）を切り替える。
-   機種名ではなく実際の高さ・幅で判断するので、どのスマホでも写真が見える大きさを保てる。 */
-function pmSizeClass(){
-  if(!document.body) return;
-  const h=window.innerHeight, w=window.innerWidth, land=w>h;
-  let s='';
-  if(land){ if(h<380) s='xs'; else if(h<440) s='sm'; }
-  else if(h<620 || w<340) s='xs';
-  else if(h<760) s='sm';
-  if(document.body.dataset.pm!==s) document.body.dataset.pm=s;
-}
-pmSizeClass();
-window.addEventListener('orientationchange', ()=>setTimeout(pmSizeClass,120));
-window.addEventListener('resize', ()=>{ pmSizeClass();
-  requestAnimationFrame(()=>{ if(typeof pmRelayout==='function') pmRelayout(); pmStripSync(); }); });
-function pmToolTab(name){
-  pmToolOpen = (pmToolOpen===name) ? '' : name;   // 同じタブをもう一度＝閉じる
-  ['text','shape','pen','date','memo'].forEach(t=>{
-    const p=document.getElementById('pmPanel_'+t); if(p) p.style.display = (pmToolOpen===t)?'':'none';
-    const b=document.getElementById('pmTab_'+t);  if(b) b.classList.toggle('on', pmToolOpen===t);
-  });
-  // 「囲んで選ぶ」は写真に置いたもの（文字・図形・手書き）を扱うタブでだけ続ける
-  if(pmToolOpen!=='shape' && pmToolOpen!=='pen' && pmToolOpen!=='text') pmRectMode=false;
-  if(pmToolOpen==='pen'){
-    pmPlaceMode='';
-    if(!pmImg){ toast('先に写真を入れてください'); pmPenMode=false; }
-    else pmPenMode=true;
-  } else if(pmPenMode || pmPlaceMode){
-    pmPenMode=false; if(pmToolOpen!=='shape') pmPlaceMode='';
-  }
-  pmModeSyncUi();
-  if(pmToolOpen==='shape' || pmToolOpen==='pen') pmThickSyncUi();
-  if(pmToolOpen==='text'){ pmOutlineSyncUi(); pmTextVertSyncUi(); }
-  pmColorSyncUi();
-  requestAnimationFrame(()=>{ pmRelayout(); pmStripReveal(); pmStripSync(); });   // パネルの高さが変わるので写真の枠を合わせ直す
-  pmMemoVisSync();
-}
-/* 写真に書き込む道具（文字・図形・手書き・日付）を開いている間はメモ欄を隠し、
-   写真を大きく使えるようにする。メモ欄を書くのは「📄メモ」タブとタブを閉じている時。 */
-function pmMemoVisSync(){
-  const wrap=document.getElementById('pmMemoWrap'); if(!wrap) return;
-  const show = (pmToolOpen==='' || pmToolOpen==='memo');
-  const cur = wrap.style.display!=='none';
-  if(show===cur) return;
-  wrap.style.display = show ? '' : 'none';
-  requestAnimationFrame(pmRelayout);   // 枠が変わるのでキャンバスを合わせ直す
-}
-function pmMemoVisible(){ const w=document.getElementById('pmMemoWrap'); return !!w && w.style.display!=='none'; }
-/* 表示枠が変わった時に、拡大の度合いを保ったままキャンバスを作り直す */
-function pmRelayout(){
-  const c=pmCanvasEl(); if(!c) return;
-  const r=c.getBoundingClientRect(); if(r.width<1||r.height<1) return;
-  if(Math.abs(r.width-c.width)<2 && Math.abs(r.height-c.height)<2) return;   // 枠が変わっていなければ何もしない
-  const ratio=(pmView.fit>0) ? pmView.scale/pmView.fit : 1;   // いまの拡大率（全体表示＝1）
-  c.width=Math.max(1,Math.round(r.width)); c.height=Math.max(1,Math.round(r.height));
-  pmFitView();
-  if(pmImg && Math.abs(ratio-1)>0.01){ pmView.scale=pmView.fit*ratio; pmClamp(); }
-  pmRedraw();
-}
-/* 図形のおおよその半径（当たり判定・選択枠に使う。画像基準px） */
-const _pmMeas=document.createElement('canvas').getContext('2d');
-function pmShapeRadius(s){
-  if(s.type==='text'){
-    if(s.vt){   // 縦書きは文字数ぶんの高さで見る
-      const nch=[...(s.text||'')].length||1;
-      return Math.max(s.size*0.7, nch*s.size*1.05/2);
-    }
-    _pmMeas.font=`bold ${s.size}px sans-serif`;
-    const w=_pmMeas.measureText(s.text||'').width;
-    return Math.max(s.size*0.7, w/2);
-  }
-  if(s.type==='pen'){
-    if(s.nrm) return Math.max(8, s.size||8);
-    let m=0; (s.pts||[]).forEach(pt=>{ m=Math.max(m, Math.hypot(pt.x-s.x, pt.y-s.y)); });
-    return Math.max(8, m);
-  }
-  return s.size;
-}
-/* まとめ選択中：枠の中＝移動、右のハンドル＝回転と大きさ */
-function pmGroupHit(cp){
-  const g=pmGroupBox(); if(!g) return null;
-  const hx=pmView.tx+(g.cx+g.r)*pmView.scale, hy=pmView.ty+g.cy*pmView.scale;
-  if(Math.hypot(cp.x-hx,cp.y-hy)<=24){
-    const ic=pmToImg(cp);
-    return { mode:'ghandle', cx:g.cx, cy:g.cy,
-      lastAng:Math.atan2(ic.y-g.cy, ic.x-g.cx), lastDist:Math.max(1,Math.hypot(ic.x-g.cx, ic.y-g.cy)) };
-  }
-  const ic=pmToImg(cp);
-  if(ic.x>=g.x1 && ic.x<=g.x2 && ic.y>=g.y1 && ic.y<=g.y2) return { mode:'gmove', px:ic.x, py:ic.y };
-  return null;
-}
-/* 写真上の座標にある図形を探す（見つからなければ -1） */
-function pmShapeHitAt(ic){
-  if(!ic) return -1;
-  for(let i=pmShapes.length-1;i>=0;i--){
-    const s=pmShapes[i];
-    if(s.type==='pen'){
-      if(pmPenPoints(s).some(pt=>Math.hypot(ic.x-pt.x, ic.y-pt.y) <= 16/pmView.scale + pmPenWidth(s,1))) return i;
-      continue;
-    }
-    if(Math.hypot(ic.x-s.x, ic.y-s.y) <= pmShapeRadius(s)*1.15 + 10/pmView.scale) return i;
-  }
-  return -1;
-}
-/* 押した位置の図形/ハンドルを探す（キャンバス座標） */
-function pmShapeHit(cp){
-  if(pmSelShape>=0 && pmShapes[pmSelShape]){   // 選択中図形のハンドル優先（古い形式の手書きだけハンドルなし）
-    const s=pmShapes[pmSelShape];
-    if(s.type!=='pen' || s.nrm){
-      const x=pmView.tx+s.x*pmView.scale, y=pmView.ty+s.y*pmView.scale;
-      const r=pmShapeRadius(s)*pmView.scale*1.15+6;
-      const hx=x+Math.cos(s.angle||0)*r, hy=y+Math.sin(s.angle||0)*r;
-      if(Math.hypot(cp.x-hx,cp.y-hy)<=22) return {mode:'handle', idx:pmSelShape};
-    }
-  }
-  const ic=pmToImg(cp);
-  for(let i=pmShapes.length-1;i>=0;i--){
-    const s=pmShapes[i];
-    if(s.type==='pen'){   // 手書き：線のどこかに近ければつかむ
-      const near=pmPenPoints(s).some(pt=>Math.hypot(ic.x-pt.x, ic.y-pt.y) <= 14/pmView.scale + pmPenWidth(s,1));
-      if(near) return {mode:'move', idx:i, dx:ic.x-s.x, dy:ic.y-s.y};
-      continue;
-    }
-    const x=pmView.tx+s.x*pmView.scale, y=pmView.ty+s.y*pmView.scale;
-    if(Math.hypot(cp.x-x,cp.y-y)<=pmShapeRadius(s)*pmView.scale*1.15+10){
-      return {mode:'move', idx:i, dx:ic.x-s.x, dy:ic.y-s.y};
-    }
-  }
-  return null;
-}
-/* 図形を1つ描く（f=倍率、ox/oy=平行移動。画面表示と書き出しで共用） */
-/* 手書きの点を写真上の座標に直す（nrm付き＝中心からの相対位置。回転・拡大が効く） */
-function pmPenPoints(s){
-  const pts=s.pts||[];
-  if(!s.nrm) return pts;                       // 描いている最中・古い形式はそのままの座標
-  const a=s.angle||0, c=Math.cos(a), sn=Math.sin(a), k=s.size||1;
-  return pts.map(p=>({ x: s.x + (p.x*k*c - p.y*k*sn), y: s.y + (p.x*k*sn + p.y*k*c) }));
-}
-/* 手書きの線の太さ（拡大すると線も太くなる） */
-function pmPenWidth(s,f){
-  const base = s.nrm ? (s.wf||0.08)*(s.size||1) : (s.size||6);
-  return Math.max(1.5, base*f*(s.t||1));
-}
-function pmDrawShape(ctx,s,f,ox,oy){
-  const oc=s.oc||'';                       // フチ（縁取り）の色。空なら付けない
-  if(s.type==='pen'){   // 手書き：なぞった点をつないで描く
-    const pts=pmPenPoints(s); if(pts.length<1) return;
-    const w=pmPenWidth(s,f);
-    ctx.save(); ctx.lineJoin='round'; ctx.lineCap='round';
-    const path=()=>{ ctx.beginPath();
-      pts.forEach((pt,i)=>{ const px=ox+pt.x*f, py=oy+pt.y*f; i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
-      if(pts.length===1){ const pt=pts[0]; ctx.lineTo(ox+pt.x*f+0.1, oy+pt.y*f+0.1); } };
-    if(oc){ path(); ctx.strokeStyle=oc; ctx.lineWidth=w+Math.max(2, w*0.7); ctx.stroke(); }
-    path(); ctx.strokeStyle=s.color; ctx.lineWidth=w; ctx.stroke();
-    ctx.restore(); return;
-  }
-  const x=ox+s.x*f, y=oy+s.y*f, r=Math.max(4, s.size*f);
-  const lw=Math.max(1.5, r*0.12*(s.t||1));   // 線の太さ（細0.5／中1／太2／極太3）
-  const ow=Math.max(2, lw*0.7);              // フチのはみ出し幅
-  ctx.save(); ctx.translate(x,y); ctx.rotate(s.angle||0);
-  if(s.type==='text'){   // 写真の上の文字（どんな写真でも読めるよう縁取りを付ける）
-    const fs=Math.max(8, r);
-    ctx.font=`bold ${fs}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.lineJoin='round'; ctx.lineWidth=Math.max(2, fs*0.17);
-    ctx.strokeStyle= oc || (pmIsLight(s.color)?'rgba(0,0,0,0.8)':'rgba(255,255,255,0.92)');
-    ctx.fillStyle=s.color;
-    if(s.vt){   // 縦書き：1文字ずつ下へ並べる
-      const chars=[...(s.text||'')], lh=fs*1.05;
-      let ty=-(chars.length*lh)/2 + lh/2;
-      chars.forEach(ch=>{
-        ctx.save(); ctx.translate(0,ty);
-        if(PM_VROT.indexOf(ch)>=0) ctx.rotate(Math.PI/2);   // 長音符・かっこは寝かせる
-        ctx.strokeText(ch,0,0); ctx.fillText(ch,0,0);
-        ctx.restore(); ty+=lh;
-      });
-    } else {
-      ctx.strokeText(s.text||'',0,0);
-      ctx.fillText(s.text||'',0,0);
-    }
-    ctx.restore(); return;
-  }
-  ctx.lineJoin='round'; ctx.lineCap='round';
-  /* フチありなら、太い線で下地を描いてから本来の色を重ねる */
-  const stroke2=(pathFn)=>{
-    if(oc){ pathFn(); ctx.strokeStyle=oc; ctx.lineWidth=lw+ow; ctx.stroke(); }
-    pathFn(); ctx.strokeStyle=s.color; ctx.lineWidth=lw; ctx.stroke();
-  };
-  if(s.type==='circle'){ stroke2(()=>{ ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); }); }
-  else if(s.type==='rect'){ stroke2(()=>{ ctx.beginPath(); ctx.rect(-r,-r*0.7,r*2,r*1.4); }); }
-  else if(s.type==='tri'){
-    stroke2(()=>{ ctx.beginPath();
-      for(let i=0;i<3;i++){ const a=-Math.PI/2+i*2*Math.PI/3; const px=Math.cos(a)*r, py=Math.sin(a)*r; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
-      ctx.closePath(); });
-  }
-  else if(s.type==='arrow'){
-    const head=Math.max(lw*3, r*0.58);   // 矢の先（大きめで見やすく）
-    stroke2(()=>{ ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r-head*0.75,0); });
-    const headPath=()=>{ ctx.beginPath(); ctx.moveTo(r,0); ctx.lineTo(r-head,-head*0.7); ctx.lineTo(r-head,head*0.7); ctx.closePath(); };
-    if(oc){ headPath(); ctx.strokeStyle=oc; ctx.fillStyle=oc; ctx.lineWidth=ow*1.6; ctx.stroke(); ctx.fill(); }
-    headPath(); ctx.fillStyle=s.color; ctx.fill();
-  }
-  ctx.restore();
-}
-const PM_ACC='#1565c0';   // 画面の基準色（選択枠などに使う）
-/* 色が明るいか（文字の縁取りの色を決めるのに使う） */
-function pmIsLight(col){
-  const m=/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(col||'').replace('#',''))
-       || /rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(col||'');
-  if(!m) return false;
-  const hex=/^[0-9a-f]{2}$/i.test(m[1]);
-  const r=hex?parseInt(m[1],16):+m[1], g=hex?parseInt(m[2],16):+m[2], b=hex?parseInt(m[3],16):+m[3];
-  return (0.299*r+0.587*g+0.114*b)/255 > 0.6;
-}
-/* まとめて選んだ図形の枠とハンドル（画面表示のみ） */
-function pmDrawGroupSel(ctx,f,ox,oy){
-  const g=pmGroupBox(); if(!g) return;
-  ctx.save();
-  ctx.setLineDash([7,5]); ctx.strokeStyle=PM_ACC; ctx.lineWidth=2.5;
-  ctx.strokeRect(ox+g.x1*f, oy+g.y1*f, (g.x2-g.x1)*f, (g.y2-g.y1)*f);
-  ctx.setLineDash([]);
-  const hx=ox+(g.cx+g.r)*f, hy=oy+g.cy*f;
-  ctx.fillStyle=PM_ACC; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.arc(hx,hy,10,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.restore();
-}
-/* 選択中の図形の枠とハンドル（画面表示のみ。書き出しには入れない） */
-function pmDrawShapeSel(ctx,s,f,ox,oy){
-  const x=ox+s.x*f, y=oy+s.y*f, r=pmShapeRadius(s)*f*1.15+6;
-  ctx.save();
-  ctx.setLineDash([6,5]); ctx.strokeStyle=PM_ACC; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.stroke();
-  ctx.setLineDash([]);
-  if(s.type!=='pen' || s.nrm){   // 古い形式の手書きだけハンドルを出さない
-    const hx=x+Math.cos(s.angle||0)*r, hy=y+Math.sin(s.angle||0)*r;
-    ctx.fillStyle=PM_ACC; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(hx,hy,9,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  }
-  ctx.restore();
-}
-/* 選択した部分（または以後の入力）の装飾を切り替える（bold/italic/underline） */
-function pmDeco(cmd){
-  const ed=document.getElementById('pmMemo'); if(!ed) return; ed.focus();
-  pmPushUndo(true);
-  try{ document.execCommand(cmd, false, null); }catch(_){}
-}
 
-/* ── 日付の挿入（今日／カレンダー） ──
-   挿入先と写真スタンプの位置は設定として保存し、次回も同じ場所に入る */
-const PM_DFMTS=['ymd_slash','ymd_kanji','wareki','md_kanji','md_slash'];   // 日付の表示のしかた
-let pmPrefs={ target:'photo', pos:'rb', q:'orig', df:'ymd_slash', dc:'#ffb300' };   // dc: 写真に入れる日付の色   // target: 'memo'|'photo', pos: lt/rt/lb/rb, q: 画質
-try{ const p=JSON.parse(localStorage.getItem('photomemo_prefs')||'{}');
-  if(p.target==='memo'||p.target==='photo') pmPrefs.target=p.target;
-  if(['lt','rt','lb','rb'].includes(p.pos)) pmPrefs.pos=p.pos;
-  if(['orig','high','std'].includes(p.q)) pmPrefs.q=p.q;
-  if(PM_DFMTS.includes(p.df)) pmPrefs.df=p.df;
-  if(typeof p.dc==='string' && /^#[0-9a-f]{6}$/i.test(p.dc)) pmPrefs.dc=p.dc; }catch(_){}
-function pmSavePrefs(){ try{ localStorage.setItem('photomemo_prefs', JSON.stringify(pmPrefs)); }catch(_){} }
-/* ── 書き出しの画質（元のサイズ／高精細／標準） ── */
-const PM_QMAX=8000;   // これ以上はブラウザが扱えないことがあるので上限
-function pmSetQuality(q){ pmPrefs.q=q; pmSavePrefs(); pmQualitySyncUi(); }
-/* 実際に書き出す横幅を決める。元のサイズ＝写真の実寸そのまま。
-   どの設定でも元より大きくはしない（引き伸ばしでぼやけるのを防ぐ） */
-function pmOutWidth(){
-  if(!pmImg) return 1000;
-  const w=pmIW();
-  if(pmPrefs.q==='std')  return Math.min(w, 1000);
-  if(pmPrefs.q==='high') return Math.min(w, 2000);
-  return Math.min(w, PM_QMAX);   // 元のサイズ（引き伸ばしはしない）
-}
-function pmOpenSaveSet(){ pmQualitySyncUi(); document.getElementById('pmSaveSetOverlay').classList.add('open');
-  armBackGuard(()=>document.getElementById('pmSaveSetOverlay').classList.remove('open')); }
-function pmCloseSaveSet(){
-  const ov=document.getElementById('pmSaveSetOverlay'); if(!ov.classList.contains('open')) return;
-  ov.classList.remove('open'); releaseBackGuard();
-}
-function pmQualitySyncUi(){
-  [['pmQ_orig','orig'],['pmQ_high','high'],['pmQ_std','std']].forEach(([id,v])=>{
-    const b=document.getElementById(id); if(b) b.classList.toggle('on', pmPrefs.q===v);
-  });
-  const n=document.getElementById('pmQNote');
-  if(n) n.textContent = pmImg ? `書き出し 横${pmOutWidth()}px（写真は${pmIW()}×${pmIH()}px）` : '';
-}
-let pmStamp=null;   // 写真に載せる日付 {text, pos}（書き出し時に写真の隅に描く）
-/* 元号（開始日）。これより前は西暦のまま出す */
-const PM_ERAS=[{n:'令和',y:2019,m:5,d:1},{n:'平成',y:1989,m:1,d:8},{n:'昭和',y:1926,m:12,d:25}];
-function pmWareki(y,m,d){
-  const v=y*10000+m*100+d;
-  for(const e of PM_ERAS){
-    if(v >= e.y*10000+e.m*100+e.d){ const yy=y-e.y+1; return `${e.n}${yy===1?'元':yy}年${m}月${d}日`; }
-  }
-  return `${y}年${m}月${d}日`;
-}
-/* 指定の書き方で日付の文字を作る */
-function pmDateFmtOf(fmt,y,m,d){
-  switch(fmt){
-    case 'ymd_kanji': return `${y}年${m}月${d}日`;
-    case 'wareki':    return pmWareki(y,m,d);
-    case 'md_kanji':  return `${m}月${d}日`;
-    case 'md_slash':  return `${m}/${d}`;
-    default:          return `${y}/${m}/${d}`;
-  }
-}
-function pmDateStr(y,m,d){ return pmDateFmtOf(pmPrefs.df,y,m,d); }
-/* 表示のしかたを変える（すでに写真に入れた日付も書き換える） */
-function pmSetDateFmt(f){
-  pmPrefs.df=f; pmSavePrefs();
-  if(pmStamp && pmStamp.ymd){
-    pmPushUndo();
-    pmStamp.text=pmDateFmtOf(f, pmStamp.ymd[0], pmStamp.ymd[1], pmStamp.ymd[2]);
-    pmRedraw(); pmDraftSave();
-  }
-  pmDateUiSync();
-}
-function pmDateToday(){ const t=new Date(); const y=t.getFullYear(), m=t.getMonth()+1, d=t.getDate();
-  pmInsertDate(pmDateStr(y,m,d), [y,m,d]); }
-function pmDatePick(){   // 端末標準のカレンダーで日付を選ぶ
-  const inp=document.getElementById('pmDateInput');
-  const t=new Date(); const p=n=>String(n).padStart(2,'0');
-  if(!inp.value) inp.value=`${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())}`;
-  try{ if(inp.showPicker) inp.showPicker(); else inp.click(); }catch(_){ try{ inp.click(); }catch(__){} }
-}
-function pmDatePicked(v){
-  if(!v) return;
-  const [y,m,d]=v.split('-').map(Number);
-  if(!y||!m||!d) return;
-  pmInsertDate(pmDateStr(y,m,d), [y,m,d]);
-}
-function pmInsertDate(str, ymd){
-  if(pmPrefs.target==='memo'){ pmMemoInsertText(str); return; }
-  if(!pmImg){ toast('先に写真を入れてください（挿入先を「文書」にするとメモに入ります）'); return; }
-  pmPushUndo();
-  pmStamp={ text:str, pos:pmPrefs.pos, ymd:ymd||null, c:pmPrefs.dc };
-  pmRedraw(); pmDateUiSync(); pmDraftSave();
-  toast('写真に日付を入れました（位置ボタンで移動できます）');
-}
-/* メモ（contenteditable）のカーソル位置に文字を挿入。カーソルが無ければ末尾に */
-function pmMemoInsertText(t){
-  const ed=document.getElementById('pmMemo'); if(!ed) return;
-  if(!pmMemoVisible() && pmToolOpen!=='memo') pmToolTab('memo');   // 隠れている時は文字タブを開いて見せる
-  ed.focus();
-  const s=getSelection();
-  let inEd=false;
-  if(s && s.rangeCount){ let n=s.anchorNode; if(n && n.nodeType===3) n=n.parentElement; inEd=!!(n && ed.contains(n)); }
-  if(!inEd && s){ const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false); s.removeAllRanges(); s.addRange(r); }
-  try{ document.execCommand('insertText', false, t); }catch(_){ ed.textContent+=t; }
-}
-function pmSetDateTarget(t){ pmPrefs.target=t; pmSavePrefs(); pmDateUiSync(); }
-function pmSetDatePos(p){
-  pmPrefs.pos=p; pmSavePrefs();
-  if(pmStamp){ pmPushUndo(); pmStamp.pos=p; pmRedraw(); pmDraftSave(); }
-  pmDateUiSync();
-}
-/* ── 自分で作った色 ──
-   虹色のボタンから端末の色えらびを開いて登録する。登録した色は保存され、
-   文字・図形・手書き・フチ・日付、どの色の並びからも同じように使える。 */
-const PM_CUSTOM_KEY='photomemo_custom_colors';
-const PM_CUSTOM_MAX=8;   // これを超えたら古いものから消える
-let pmCustomColors=[];
-try{ const a=JSON.parse(localStorage.getItem(PM_CUSTOM_KEY)||'[]');
-  if(Array.isArray(a)) pmCustomColors=a.filter(c=>/^#[0-9a-f]{6}$/i.test(c)).slice(-PM_CUSTOM_MAX); }catch(_){}
-function pmSaveCustomColors(){ try{ localStorage.setItem(PM_CUSTOM_KEY, JSON.stringify(pmCustomColors)); }catch(_){} }
-/* 色の種類ごとに、その色を適用する */
-function pmApplyColorKind(kind,c){
-  if(kind==='text') pmColor(c);
-  else if(kind==='oc') pmSetShapeOutline(c);
-  else if(kind==='date') pmSetDateColor(c);
-  else pmShapeColorSet(c);
-}
-function pmCcCurrent(kind){
-  if(kind==='date') return pmPrefs.dc||'#ffb300';
-  if(kind==='oc') return pmShapeOutline||'#ffffff';
-  if(kind==='text') return '#e53935';
-  return pmShapeColor||'#e53935';
-}
-let pmCcTarget='shape', pmCcTimer=null, pmCcHeld=false;
-/* 虹色ボタン：端末の色えらびを開く */
-function pmPickCustom(kind){
-  pmCcTarget=kind;
-  const inp=document.getElementById('pmColorInput'); if(!inp) return;
-  inp.value=pmCcCurrent(kind);
-  try{ if(inp.showPicker) inp.showPicker(); else inp.click(); }catch(_){ try{ inp.click(); }catch(__){} }
-}
-/* 色えらびで決まった色を登録して、そのまま使う */
-function pmCustomPicked(v){
-  if(!/^#[0-9a-f]{6}$/i.test(v||'')) return;
-  const c=v.toLowerCase();
-  const i=pmCustomColors.indexOf(c); if(i>=0) pmCustomColors.splice(i,1);
-  pmCustomColors.push(c);
-  while(pmCustomColors.length>PM_CUSTOM_MAX) pmCustomColors.shift();
-  pmSaveCustomColors(); pmRenderCustomColors();
-  pmApplyColorKind(pmCcTarget, c);
-  toast('色を登録しました（長押しで消せます）');
-}
-/* 長押しで登録から消す */
-function pmCcHold(c){
-  pmCcRelease();
-  pmCcTimer=setTimeout(async ()=>{
-    pmCcTimer=null; pmCcHeld=true;
-    const ok = (typeof appConfirm==='function') ? await appConfirm('この色を登録から消しますか？','消す','やめる') : true;
-    if(!ok) return;
-    const i=pmCustomColors.indexOf(c);
-    if(i>=0){ pmCustomColors.splice(i,1); pmSaveCustomColors(); pmRenderCustomColors(); toast('色を消しました'); }
-  }, 600);
-}
-function pmCcRelease(){ if(pmCcTimer){ clearTimeout(pmCcTimer); pmCcTimer=null; } }
-/* 登録した色を、それぞれの並びの虹色ボタンの手前に並べ直す */
-function pmRenderCustomColors(){
-  document.querySelectorAll('.pm-rainbow').forEach(rb=>{
-    const kind=rb.dataset.cc, strip=rb.parentElement;
-    strip.querySelectorAll('.pm-cc').forEach(e=>e.remove());
-    pmCustomColors.forEach(c=>{
-      const b=document.createElement('button');
-      b.className='pm-color pm-cc'+(kind==='oc'?' pm-ocbtn':kind==='shape'?' pm-shcol':kind==='date'?' pm-dcbtn':'');
-      b.dataset.c=c; if(kind==='oc') b.dataset.oc=c;
-      b.style.background=c; b.title='自分で作った色（長押しで消せます）';
-      b.addEventListener('pointerdown', e=>{ e.preventDefault(); pmCcHold(c); });
-      ['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t, pmCcRelease));
-      b.addEventListener('click', ()=>{ if(pmCcHeld){ pmCcHeld=false; return; } pmApplyColorKind(kind,c); });
-      strip.insertBefore(b, rb);
-    });
-  });
-  if(typeof pmColorSyncUi==='function') pmColorSyncUi();
-  if(typeof pmOutlineSyncUi==='function') pmOutlineSyncUi();
-  if(typeof pmDateUiSync==='function') pmDateUiSync();
-  if(typeof pmStripSync==='function') pmStripSync();
-}
-setTimeout(pmRenderCustomColors, 0);
-/* 写真に入れる日付の色を決める（すでに入れた日付にもその場で反映する） */
-function pmSetDateColor(c){
-  pmPrefs.dc=c; pmSavePrefs();
-  if(pmStamp){ pmPushUndo(); pmStamp.c=c; pmRedraw(); pmDraftSave(); }
-  pmDateUiSync();
-}
-/* 明るい色なら黒フチ、暗い色なら白フチにして、どんな写真の上でも読めるようにする */
-function pmStampOutline(c){
-  const h=(c||'').replace('#',''); if(h.length!==6) return 'rgba(0,0,0,0.75)';
-  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
-  return (0.299*r+0.587*g+0.114*b) > 140 ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.85)';
-}
-function pmStampClear(){ if(pmStamp) pmPushUndo(); pmStamp=null; pmRedraw(); pmDateUiSync(); pmDraftSave(); }
-function pmDateUiSync(){
-  // 「表示」のボタンには、今日の日付をその書き方で表示する（見たまま選べる）
-  const t=new Date(), Y=t.getFullYear(), M=t.getMonth()+1, D=t.getDate();
-  PM_DFMTS.forEach(f=>{
-    const b=document.getElementById('pmDf_'+f); if(!b) return;
-    b.textContent=pmDateFmtOf(f,Y,M,D);
-    b.classList.toggle('on', pmPrefs.df===f);
-  });
-  const tm=document.getElementById('pmTgMemo'), tp=document.getElementById('pmTgPhoto');
-  if(tm) tm.classList.toggle('on', pmPrefs.target==='memo');
-  if(tp) tp.classList.toggle('on', pmPrefs.target==='photo');
-  const showPos=pmPrefs.target==='photo';
-  const lb=document.getElementById('pmPosLb'); if(lb) lb.style.display=showPos?'':'none';
-  ['lt','rt','lb','rb'].forEach(p=>{ const b=document.getElementById('pmPos_'+p);
-    if(b){ b.style.display=showPos?'':'none'; b.classList.toggle('on', pmPrefs.pos===p); } });
-  document.querySelectorAll('.pm-dcbtn').forEach(b=>b.classList.toggle('on', b.dataset.c===pmPrefs.dc));
-  const cr=document.getElementById('pmDateColorRow'); if(cr) cr.style.display=showPos?'':'none';
-  const del=document.getElementById('pmStampDel'); if(del) del.style.display=pmStamp?'':'none';
-}
-/* 日付スタンプを描く。rect＝写真が描かれている範囲（表示キャンバス／書き出しキャンバス共通） */
-function pmDrawStamp(ctx, rect){
-  if(!pmStamp || rect.w<10 || rect.h<10) return;
-  const size=Math.max(12, Math.round(Math.min(rect.w, rect.h*1.6)*0.05));
-  const pad=Math.round(size*0.5);
-  ctx.save();
-  ctx.font=`bold ${size}px sans-serif`;
-  ctx.textBaseline='alphabetic';
-  const tw=ctx.measureText(pmStamp.text).width;
-  const pos=pmStamp.pos||'rb';
-  const x = (pos==='lt'||pos==='lb') ? rect.x+pad : rect.x+rect.w-pad-tw;
-  const y = (pos==='lt'||pos==='rt') ? rect.y+pad+size : rect.y+rect.h-pad;
-  const col=pmStamp.c||'#ffb300';   // 既定は日付カメラ風のオレンジ
-  ctx.lineJoin='round'; ctx.lineWidth=Math.max(2, size/7); ctx.strokeStyle=pmStampOutline(col);
-  ctx.strokeText(pmStamp.text, x, y);
-  ctx.fillStyle=col;
-  ctx.fillText(pmStamp.text, x, y);
-  ctx.restore();
-}
-/* メモ（contenteditable）を行ごとの「文字の連なり」（文字・色・大きさ・太字・斜体・下線）に分解する */
-function pmMemoLines(){
-  const root=document.getElementById('pmMemo');
-  const lines=[[]];
-  const push=()=>lines.push([]);
-  const hasUnderline=(el)=>{   // 下線は継承されないため祖先（<u>等）まで遡って調べる
-    for(let e=el; e && e!==root.parentElement; e=e.parentElement){
-      if(((getComputedStyle(e).textDecorationLine)||'').includes('underline')) return true;
-      if(e===root) break;
-    }
-    return false;
-  };
-  (function walk(node){
-    node.childNodes.forEach(n=>{
-      if(n.nodeType===3){
-        const t=n.textContent; if(!t) return;
-        const p=n.parentElement||root;
-        const cs=getComputedStyle(p);
-        lines[lines.length-1].push({ text:t, color:cs.color, size:(parseFloat(cs.fontSize)||28.8)/PM_VIEW, fam:cs.fontFamily||'sans-serif',
-          bold:(parseInt(cs.fontWeight,10)||400)>=600, italic:cs.fontStyle==='italic', underline:hasUnderline(p) });
-      } else if(n.nodeType===1){
-        if(n.tagName==='BR'){ if(n.nextSibling || n.parentElement===root) push(); return; }   // 行末のBR（空行の器）は行に数えない
-        const isBlock=/^(DIV|P)$/.test(n.tagName);
-        if(isBlock && lines[lines.length-1].length) push();
-        walk(n);
-        if(isBlock) push();
-      }
-    });
-  })(root);
-  while(lines.length && lines[lines.length-1].length===0) lines.pop();   // 末尾の空行を除去
-  return lines;
-}
-/* 白背景で見えない薄い色は濃い色に置き換える（ダークモードの既定色対策） */
-function pmShotColor(col, blackBg){
-  const m=/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(col||'');
-  if(!m) return col||(blackBg?'#eeeeee':'#222222');
-  const lum=(0.299*+m[1]+0.587*+m[2]+0.114*+m[3])/255;
-  if(blackBg) return lum<0.28 ? '#eeeeee' : col;   // 黒背景では暗すぎる色を明るく
-  return lum>0.72 ? '#222222' : col;               // 白背景では薄すぎる色を濃く
-}
-
-/* ── 書き出し（プレビュー・スクショ・共有） ── */
-/* スクリーンショットのファイル名：秒までの日時（同じ日でも重複しない） */
-function shotStamp(){
-  const d=new Date(); const p=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-}
-/* ファイル名を入力してもらう（そのままOKなら日時入りの既定名。キャンセルは null） */
-async function shotFileName(prefix){
-  let name=await appPrompt('ファイル名（そのままでもOK）', `${prefix}_${shotStamp()}`);
-  if(name===null) return null;
-  name=String(name).trim().replace(/[\\/:*?"<>|]/g,'_');   // ファイル名に使えない文字を置換
-  if(!name) name=`${prefix}_${shotStamp()}`;               // 空なら日時で自動命名
-  if(!/\.png$/i.test(name)) name+='.png';
-  return name;
-}
-/* 画像を端末の共有機能（LINE・メール等）へ送る。共有できない環境では false */
-async function shotShareBlob(blob, fname){
-  try{
-    const file=new File([blob], fname, {type:'image/png'});
-    if(navigator.canShare && navigator.canShare({files:[file]}) && navigator.share){
-      await navigator.share({files:[file], title:fname});
-      return true;
-    }
-  }catch(e){ if(e && e.name==='AbortError') return true; }   // 共有シートを閉じただけ＝成功扱い
-  return false;
-}
-/* PNGを保存または共有する共通処理 */
-function shotDeliver(blob, fname, share){
-  if(!blob){ toast('書き出せませんでした'); return; }
-  const download=()=>{
-    const url=URL.createObjectURL(blob);
-    const a=Object.assign(document.createElement('a'),{ href:url, download:fname });
-    a.click(); setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 1000);
-  };
-  if(share){
-    shotShareBlob(blob, fname).then(ok=>{
-      if(!ok){ download(); toast('この環境では共有できないため画像として保存しました'); }
-    });
-    return;
-  }
-  download();
-  toast('スクリーンショットを保存しました');
-}
-/* 出力プレビュー：仕上がりの画像を見せてからスクショ・共有
-   （プレビューは軽い画像で表示し、実際の保存・共有は設定の画質で作り直す） */
-let shotPrevBuild=null, shotPrevPrefix='';
-function openShotPreview(build, prefix){
-  const mk = (typeof build==='function') ? build : (()=>build);
-  let cv; try{ cv=mk(1000); }catch(_){ cv=null; }
-  if(!cv){ toast('プレビューを作れませんでした'); return; }
-  let url; try{ url=cv.toDataURL('image/png'); }catch(_){ toast('プレビューを作れませんでした'); return; }
-  shotPrevBuild=mk; shotPrevPrefix=prefix;
-  document.getElementById('shotPrevImg').src=url;
-  document.getElementById('shotPrevOverlay').classList.add('open');
-  armBackGuard(()=>{ document.getElementById('shotPrevOverlay').classList.remove('open'); shotPrevBuild=null; });
-}
-function closeShotPreview(){
-  if(!document.getElementById('shotPrevOverlay').classList.contains('open')) return;
-  document.getElementById('shotPrevOverlay').classList.remove('open');
-  shotPrevBuild=null;
-  const img=document.getElementById('shotPrevImg'); if(img) img.removeAttribute('src');
-  releaseBackGuard();
-}
-async function shotPrevDeliver(share){
-  if(!shotPrevBuild) return;
-  const fname = share ? `${shotPrevPrefix}_${shotStamp()}.png` : await shotFileName(shotPrevPrefix);
-  if(fname===null) return;
-  const cv=shotPrevBuild();   // 保存・共有は設定の画質（元のサイズ等）で作り直す
-  if(!cv){ toast('書き出せませんでした'); return; }
-  cv.toBlob(blob=>shotDeliver(blob, fname, share), 'image/png');
-}
-/* 書き出し画像（写真＋メモ。色・大きさも反映）を作る。中身が無ければ null
-   outW＝出力の横幅（省略時は設定の画質。元のサイズなら写真の実寸のまま書き出す） */
-function pmBuildShotCanvas(outW){
-  pmCleanZwsp();   // サイズ指定の目印文字を掃除してから書き出す
-  if(!pmImg && !pmMemoText().trim()) return null;
-  const W=Math.max(200, Math.round(outW || pmOutWidth()));
-  const k=W/1000;                  // 1000px基準からの倍率（文字・余白も一緒に拡大する）
-  const pad=Math.round(28*k);
-  const FSCALE=(18/15)*k;   // 画面のメモの文字px → 出力px（画面で大きくした分は書き出しも大きくなる）
-  let photoH=0, iw=0, ih=0;
-  if(pmImg){ iw=pmIW(); ih=pmIH(); photoH=Math.round(W*ih/iw); }
-  const memoLines=pmMemoLines();
-  // 1パス目：折り返しを反映した描画行（各行の高さ＝その行で一番大きい文字基準）を作る
-  const tmp=document.createElement('canvas').getContext('2d');
-  const maxW=W-pad*2;
-  const drawLines=[];   // [{h, parts:[{text,x,color,font,size}]}]
-  const minLH=Math.round(26*k);
-  memoLines.forEach(runs=>{
-    if(!runs.length){ drawLines.push({h:minLH, parts:[]}); return; }
-    let cur={parts:[], h:0}, x=0;
-    const flush=()=>{ cur.h=Math.max(minLH, cur.h); drawLines.push(cur); cur={parts:[], h:0}; x=0; };
-    runs.forEach(run=>{
-      const size=Math.round(run.size*FSCALE);
-      const font=`${run.italic?'italic ':''}${run.bold?'bold ':''}${size}px ${run.fam||'sans-serif'}`;
-      tmp.font=font;
-      let buf='';
-      const put=()=>{ if(buf){ cur.parts.push({text:buf, x, color:pmShotColor(run.color, pmBg==='black'), font, size, und:!!run.underline}); x+=tmp.measureText(buf).width; cur.h=Math.max(cur.h, Math.round(size*1.45)); buf=''; } };
-      for(const ch of run.text){
-        if(x+tmp.measureText(buf+ch).width>maxW && (buf||cur.parts.length)){ put(); flush(); tmp.font=font; }
-        buf+=ch;
-      }
-      put();
-    });
-    if(cur.parts.length||!drawLines.length) flush();
-  });
-  const memoH = drawLines.length ? (pad + drawLines.reduce((s,l)=>s+l.h,0) + pad) : 0;
-  const H=Math.max(1, photoH + memoH);
-  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
-  const ctx=cv.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
-  if(pmBg==='black' && memoH){ ctx.fillStyle='#000000'; ctx.fillRect(0,photoH,W,memoH); }   // メモ部分の背景を黒に
-  if(pmImg){
-    ctx.drawImage(pmImg,0,0,iw,ih, 0,0,W,photoH);
-    pmShapes.forEach(s=>pmDrawShape(ctx,s,W/iw,0,0));   // 図形も書き出しに入れる
-    pmDrawStamp(ctx,{x:0,y:0,w:W,h:photoH});            // 日付スタンプも書き出しに入れる
-  }
-  ctx.textBaseline='alphabetic';
-  let y=photoH+pad;
-  drawLines.forEach(l=>{
-    const base=y + l.h - Math.round(l.h*0.28);   // 行内で下寄せ気味に揃える
-    l.parts.forEach(p=>{
-      ctx.font=p.font; ctx.fillStyle=p.color; ctx.fillText(p.text, pad+p.x, base);
-      if(p.und){   // 下線を引く
-        const w=ctx.measureText(p.text).width;
-        ctx.strokeStyle=p.color; ctx.lineWidth=Math.max(1.5, p.size/12);
-        ctx.beginPath(); ctx.moveTo(pad+p.x, base+Math.max(3, p.size*0.14)); ctx.lineTo(pad+p.x+w, base+Math.max(3, p.size*0.14)); ctx.stroke();
-      }
-    });
-    y+=l.h;
-  });
-  return cv;
-}
-/* スクリーンショットとして書き出す。share=true なら端末の共有機能へ送る */
-async function pmScreenshot(share){
-  const cv=pmBuildShotCanvas();
-  if(!cv){ toast('写真かメモを入れてください'); return; }
-  const fname = share ? `写真メモ_${shotStamp()}.png` : await shotFileName('写真メモ');
-  if(fname===null) return;
-  cv.toBlob(blob=>shotDeliver(blob, fname, share), 'image/png');
-}
-/* 仕上がりをプレビューで確認（そこからスクショ・共有できる） */
-function pmPreview(){
-  if(!pmImg && !pmMemoText().trim()){ toast('写真かメモを入れてください'); return; }
-  openShotPreview(w=>pmBuildShotCanvas(w), '写真メモ');
-}
-/* ── 定型文（よく使う言葉をワンタップで） ── */
-const PM_PHRASE_DEF=['着工前','完了','配筋確認','型枠確認','打設前','打設後','是正前','是正後','立会確認','数量確認'];
-let pmPhrases=PM_PHRASE_DEF.slice();
-try{ const a=JSON.parse(localStorage.getItem('photomemo_phrases')||'null'); if(Array.isArray(a)) pmPhrases=a; }catch(_){}
-function pmSavePhrases(){ try{ localStorage.setItem('photomemo_phrases', JSON.stringify(pmPhrases)); }catch(_){} }
-/* 定型文：開いた場所で「押したときの入り先」が変わる。
-   文字タブから開けば写真の上、メモタブから開けばメモ欄に入る（もう一方は小さいボタンで選べる）。 */
-let pmPhraseTo='photo';
-function pmOpenPhrases(target){
-  pmPhraseTo = (target==='memo' || target==='photo') ? target : (pmToolOpen==='memo' ? 'memo' : 'photo');
-  const h=document.getElementById('pmPhraseHint');
-  if(h) h.textContent = (pmPhraseTo==='photo')
-    ? '言葉をタップすると写真の上に文字として置きます。「📄」を押すと下のメモに入ります。'
-    : '言葉をタップすると下のメモに入ります。「📷」を押すと写真の上に文字として置きます。';
-  pmRenderPhrases();
-  document.getElementById('pmPhraseOverlay').classList.add('open');
-  armBackGuard(()=>document.getElementById('pmPhraseOverlay').classList.remove('open'));
-}
-function pmClosePhrases(){
-  const ov=document.getElementById('pmPhraseOverlay'); if(!ov.classList.contains('open')) return;
-  ov.classList.remove('open'); releaseBackGuard();
-}
-function pmRenderPhrases(){
-  const el=document.getElementById('pmPhraseList'); if(!el) return;
-  if(!pmPhrases.length){ el.innerHTML='<div class="mode-hint">定型文がありません。下の欄から追加できます。</div>'; return; }
-  const toPhoto = (pmPhraseTo==='photo');
-  const alt = toPhoto ? ['📄','下のメモに入れる'] : ['📷','写真の上に置く'];
-  el.innerHTML=pmPhrases.map((p,i)=>`<div class="ph-row">
-    <button class="ph-txt" onclick="pmUsePhrase(${i},${toPhoto})">${pmEsc(p)}</button>
-    <button class="ph-mini" onclick="pmUsePhrase(${i},${!toPhoto})" title="${alt[1]}">${alt[0]}</button>
-    <button class="ph-mini ph-del" onclick="pmDelPhrase(${i})" title="削除">✕</button>
-  </div>`).join('');
-}
-function pmEsc(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-function pmUsePhrase(i, toPhoto){
-  const p=pmPhrases[i]; if(p==null) return;
-  pmClosePhrases();
-  if(toPhoto) pmAddText(p);
-  else pmMemoInsertText(p);
-}
-function pmAddPhrase(){
-  const inp=document.getElementById('pmPhraseNew'); if(!inp) return;
-  const v=(inp.value||'').trim(); if(!v) return;
-  pmPhrases.push(v); pmSavePhrases(); inp.value=''; pmRenderPhrases();
-}
-function pmDelPhrase(i){ pmPhrases.splice(i,1); pmSavePhrases(); pmRenderPhrases(); }
-
-/* ── 下書き（自動保存）──
-   保存ボタンは作らず、いまの状態を自動で覚えておき、次に開いた時に
-   「前回の続きから？」と聞くだけ。写真は画質を落とさず IndexedDB に置く。 */
-const PM_DRAFT_KEY='photomemo_draft';
-let pmDraftTimer=null;
-function pmIdb(){
-  return new Promise((res,rej)=>{
-    const r=indexedDB.open('photomemo',1);
-    r.onupgradeneeded=()=>{ try{ r.result.createObjectStore('kv'); }catch(_){} };
-    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
-  });
-}
-async function pmIdbPut(k,v){ try{ const db=await pmIdb(); await new Promise((res,rej)=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }catch(_){} }
-async function pmIdbGet(k){ try{ const db=await pmIdb(); return await new Promise((res)=>{ const t=db.transaction('kv','readonly'); const q=t.objectStore('kv').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>res(null); }); }catch(_){ return null; } }
-/* いまの状態を下書きとして残す（少し待ってからまとめて書く） */
-function pmDraftSave(withPhoto){
-  if(withPhoto && pmImgBlob) pmIdbPut('photo', pmImgBlob);
-  clearTimeout(pmDraftTimer);
-  pmDraftTimer=setTimeout(()=>{
-    const ed=document.getElementById('pmMemo');
-    const memoHtml=ed?ed.innerHTML:'';
-    const empty=!pmImgBlob && !pmShapes.length && !pmStamp && !pmMemoText().trim();
-    if(empty){ try{ localStorage.removeItem(PM_DRAFT_KEY); }catch(_){} return; }
-    try{
-      localStorage.setItem(PM_DRAFT_KEY, JSON.stringify({
-        shapes:pmShapes, stamp:pmStamp, rot:pmRot, memoHtml, bg:pmBg,
-        hasPhoto:!!pmImgBlob, at:Date.now() }));
-    }catch(_){}
-  }, 700);
-}
-/* 起動時：下書きがあれば聞いてから復元する */
-async function pmDraftOffer(){
-  let d=null; try{ d=JSON.parse(localStorage.getItem(PM_DRAFT_KEY)||'null'); }catch(_){}
-  if(!d) return;
-  const when=d.at?new Date(d.at):null;
-  const lb=when?`${when.getMonth()+1}/${when.getDate()} ${String(when.getHours()).padStart(2,'0')}:${String(when.getMinutes()).padStart(2,'0')}`:'';
-  const ok=await appConfirm(`前回の続き（${lb}）が残っています。開きますか？`, '開く', '新しく始める');
-  if(!ok){ try{ localStorage.removeItem(PM_DRAFT_KEY); }catch(_){} pmIdbPut('photo', null); return; }
-  pmShapes=Array.isArray(d.shapes)?d.shapes:[]; pmStamp=d.stamp||null; pmRot=d.rot||0; pmSelShape=-1;
-  if(d.bg==='white'||d.bg==='black'){ pmBg=d.bg; pmApplyBg(); }
-  const ed=document.getElementById('pmMemo'); if(ed && d.memoHtml!=null) ed.innerHTML=d.memoHtml;
-  if(d.hasPhoto){
-    const blob=await pmIdbGet('photo');
-    if(blob){
-      const url=URL.createObjectURL(blob); const img=new Image();
-      img.onload=()=>{ pmImgOrig=img; pmImgBlob=blob; pmApplyRot(); pmSetupCanvas(); pmFitView(); pmRedraw();
-        pmDateUiSync(); pmShapeSyncUi(); pmQualitySyncUi(); try{ URL.revokeObjectURL(url); }catch(_){} };
-      img.onerror=()=>{ pmRedraw(); };
-      img.src=url;
-      toast('前回の続きを開きました'); return;
-    }
-  }
-  pmRedraw(); pmDateUiSync(); pmShapeSyncUi();
-  toast('前回の続きを開きました');
-}
-/* はい／いいえを聞く小さな画面（画面の上寄りに出す） */
-function appConfirm(message, yes='OK', no='キャンセル'){
-  return new Promise(resolve=>{
-    const ov=document.createElement('div');
-    ov.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;background:rgba(0,0,0,.45)';
-    const box=document.createElement('div');
-    box.style.cssText='background:var(--panel,#fff);color:var(--text,#222);min-width:280px;max-width:90vw;padding:18px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.35);font-size:15px';
-    const msg=document.createElement('div'); msg.textContent=message; msg.style.cssText='margin-bottom:14px;font-weight:600;line-height:1.5';
-    const row=document.createElement('div'); row.style.cssText='display:flex;justify-content:flex-end;gap:8px';
-    const bn=document.createElement('button'); bn.textContent=no;
-    bn.style.cssText='padding:8px 14px;font-size:14px;border:1px solid #999;border-radius:6px;background:#eee;color:#222;cursor:pointer';
-    const by=document.createElement('button'); by.textContent=yes;
-    by.style.cssText='padding:8px 16px;font-size:14px;border:none;border-radius:6px;background:#1565c0;color:#fff;cursor:pointer;font-weight:bold';
-    const close=v=>{ try{ document.body.removeChild(ov); }catch(_){} resolve(v); };
-    bn.onclick=()=>close(false); by.onclick=()=>close(true);
-    ov.addEventListener('mousedown',e=>{ if(e.target===ov) close(false); });
-    row.appendChild(bn); row.appendChild(by); box.appendChild(msg); box.appendChild(row);
-    ov.appendChild(box); document.body.appendChild(ov);
-  });
-}
-
-/* ── 起動 ── */
-window.addEventListener('load', ()=>{
-  pmSetupCanvas();
-  pmFitView(); pmRedraw();
-  pmApplyBg();
-  pmDateUiSync(); pmUndoSyncUi(); pmQualitySyncUi(); pmShapeSyncUi();
-  const ed=document.getElementById('pmMemo');
-  if(ed) ed.addEventListener('input', ()=>pmDraftSave());   // メモの変更も下書きに残す
-  pmDraftOffer();
-});
-
-if("serviceWorker" in navigator){
-  let swRefreshing=false;
-  // 新しいservice-workerが制御を引き継いだら自動でリロードし、インストール版（スマホ等）でも
-  // 更新をすぐ反映する
+if ('serviceWorker' in navigator) {
+  let swRefreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if(swRefreshing) return;
-    swRefreshing = true;
-    location.reload();
+    if (swRefreshing) return;
+    swRefreshing = true; location.reload();
   });
-  navigator.serviceWorker.register("./service-worker.js").then(reg => {
+  navigator.serviceWorker.register('./service-worker.js').then(reg => {
     reg.update();
-    document.addEventListener('visibilitychange', () => {
-      if(document.visibilityState === 'visible') reg.update();
-    });
-  });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update(); });
+  }).catch(() => {});
 }
 </script>
 </body>

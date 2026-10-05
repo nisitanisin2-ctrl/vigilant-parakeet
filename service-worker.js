@@ -1,25 +1,23 @@
-const CACHE = 'photomemo-v32';
-const CACHE_PREFIX = 'photomemo-';   // このアプリのキャッシュだけを見分けるための名前
+const CACHE = 'saien-note-v1';
+const CACHE_PREFIX = 'saien-note-';
+// 以前ここにあった「写真メモ」アプリの古いキャッシュも片付ける
+const OLD_PREFIXES = ['photomemo-'];
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      // 自分の古いキャッシュだけを消す。キャッシュは「サイト（オリジン）ごと」に
-      // 共通なので、名前で絞らないと同じサイトにある別のアプリの分まで消してしまう。
-      Promise.all(keys.filter(k => k !== CACHE && k.startsWith(CACHE_PREFIX)).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k !== CACHE && (k.startsWith(CACHE_PREFIX) || OLD_PREFIXES.some(p => k.startsWith(p))))
+          .map(k => caches.delete(k))
+    )).then(() => self.clients.claim())
   );
 });
 
-// ネットワーク優先：オンライン時は常に最新版を取得してキャッシュも更新する。
-// オフライン時のみキャッシュから返す（更新が確実に反映されるようにするため）。
+// ネットワーク優先：オンライン時は最新版を取得、オフライン時だけキャッシュから返す
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
@@ -29,8 +27,6 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
       }
       return res;
-    }).catch(() =>
-      caches.match(e.request).then(cached => cached || caches.match('./index.html'))
-    )
+    }).catch(() => caches.match(e.request).then(cached => cached || caches.match('./index.html')))
   );
 });
