@@ -8,7 +8,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 let pass = 0, fail = 0;
 function check(name, got, want) {
   const ok = JSON.stringify(got) === JSON.stringify(want);
-  if (ok) pass++; else { fail++; console.log(`✗ ${name}\n   出た : ${JSON.stringify(got)}\n   期待 : ${JSON.stringify(want)}`); }
+  if (process.env.V) console.log('・', name); if (ok) pass++; else { fail++; console.log(`✗ ${name}\n   出た : ${JSON.stringify(got)}\n   期待 : ${JSON.stringify(want)}`); }
 }
 const srv = http.createServer((q, r) => {
   let f = path.join(ROOT, decodeURIComponent(q.url.split('?')[0])); if (f.endsWith(path.sep) || f.endsWith('/')) f += 'index.html';
@@ -70,6 +70,8 @@ srv.listen(0, async () => {
 
     // ── 畑の一覧 ──
     await page.click('#backBtn'); await w(200);
+    check('「‹ 戻る」は前の画面（設定）へ', await page.evaluate(() => view.tab), 'settings');
+    await page.click('nav [data-tab="crops"]'); await w(200);
     await page.click('#fab'); await w(150); await page.click('#cVeg [data-p="ダイコン"]'); await page.fill('#cDate', '2026-04-20');
     check('種からしかない野菜は「どこから育てる」を出さない', await page.evaluate(() => $('#cAsBox').hidden), true);
     await page.click('#cSave'); await w(250); await page.click('#backBtn'); await w(200);
@@ -78,10 +80,31 @@ srv.listen(0, async () => {
     await page.click('.crop [data-water]'); await w(200);
     check('💧で今日の水やり', await page.evaluate(() => data.logs.filter(l => l.type === 'water').length + '/' + document.querySelector('.badge.water').textContent), '1/💧今日');
 
+    // ── 野菜ごとのカレンダー ──
+    await page.click('.crop [data-open]'); await w(200);
+    check('野菜の画面にもカレンダー（作業の名前の札）', await page.evaluate(() => $('main').textContent.includes('トマトのカレンダー') + '/' + $('.calhead b').textContent + '/' + [...document.querySelectorAll('.cd .ev')].map(e => e.textContent).join(',')), 'true/2026年 5月/花が咲く,追肥');
+    await page.click('#calNext'); await w(150);
+    check('次の月：収穫はじめ', await page.evaluate(() => [...document.querySelectorAll('.cd .ev')].map(e => e.textContent).join(',')), '収穫はじめ');
+    await page.click('[data-d="2026-06-12"]'); await w(150);
+    check('日を押すとその野菜のその日の予定', await page.evaluate(() => [...document.querySelectorAll('main h2')].map(h => h.textContent).includes('2026年6月12日(金)') + '/' + [...document.querySelectorAll('.task .tx b')].map(b => b.textContent).join(',')), 'true/🍅 トマト：収穫はじめ');
+    await page.click('#fab'); await w(150);
+    check('野菜の画面の＋は、選んだ日・その野菜で記録', await page.evaluate(() => $('#lDate').value + '/' + ($('#lCrop').value === data.crops[0].id)), '2026-06-12/true');
+    // ── ブラウザの戻る ──
+    await page.goBack(); await w(200);
+    check('戻る：窓が開いていたら窓を閉じるだけ（野菜の画面のまま）', await page.evaluate(() => !$('#modalRoot').firstElementChild && view.cropId === data.crops[0].id), true);
+    await page.goBack(); await w(200);
+    check('戻る：野菜の画面 → 畑の一覧', await page.evaluate(() => view.tab + '/' + view.cropId + '/' + !!document.querySelector('.crop')), 'crops/null/true');
+    await page.click('nav [data-tab="logs"]'); await w(150); await page.click('nav [data-tab="guide"]'); await w(150);
+    await page.goBack(); await w(200);
+    check('戻る：ほかのタブ → 畑（タブを何回かえても1回で）', await page.evaluate(() => view.tab), 'crops');
+    await page.goBack(); await w(200);
+    check('戻る：畑の一覧ではページを離れず、知らせを出す', await page.evaluate(() => location.pathname.endsWith('index.html') + '/' + $('#toast').textContent), 'true/もう一度「戻る」でアプリを閉じます');
+
     // ── 予定（カレンダー） ──
     await page.click('nav [data-tab="plan"]'); await w(250);
     check('予定：2週間にやること', await page.evaluate(() => document.querySelectorAll('.task').length >= 4), true);
-    check('カレンダー：5月・今日に印・予定の点', await page.evaluate(() => $('.calhead b').textContent + '/' + $('.cd.today .n').textContent + '/' + document.querySelector('[data-d="2026-05-15"] .mk').children.length), '2026年 5月/10/2');
+    check('カレンダー：5月・今日に印・その日の札と線', await page.evaluate(() => $('.calhead b').textContent + '/' + $('.cd.today .n').textContent + '/' + [...document.querySelectorAll('[data-d="2026-05-15"] .ev, [data-d="2026-05-15"] .bar')].map(e => e.className + ':' + e.textContent).join(',')), '2026年 5月/10/ev soon:🥬手入れ,bar now:');
+    check('カレンダー：始まる日は野菜の絵＋作業、日曜は赤', await page.evaluate(() => document.querySelector('[data-d="2026-05-10"] .ev').textContent + '/' + document.querySelector('[data-d="2026-05-10"]').classList.contains('sun') + '/' + document.querySelector('[data-d="2026-05-03"]').classList.contains('pastday')), '🍅花/true/true');
     await page.click('[data-d="2026-05-15"]'); await w(200);
     check('日を押すとその日の予定', await page.evaluate(() => $('main h2:last-of-type').textContent + '/' + [...document.querySelectorAll('main .card .task .tx b')].slice(-2).map(b => b.textContent).join(',')), '2026年5月15日(金)/🍅 トマト：花が咲く,🥬 ダイコン：2回目の間引き');
     await page.click('#calNext'); await w(150);
@@ -109,7 +132,9 @@ srv.listen(0, async () => {
     check('登録できた', await page.evaluate(() => data.crops.map(c => c.name).join(',')), 'トマト,ダイコン,ジャガイモ');
 
     // ── その他の野菜（予定なし） ──
-    await page.click('#backBtn'); await w(150); await page.click('#fab'); await w(150);
+    await page.click('#backBtn'); await w(150);
+    check('育て方から登録した野菜の「戻る」は育て方へ', await page.evaluate(() => view.tab + '/' + $('#title').textContent), 'guide/育て方');
+    await page.click('nav [data-tab="crops"]'); await w(150); await page.click('#fab'); await w(150);
     await page.click('#cVeg [data-p=""]'); await page.fill('#cName', 'バジル'); await page.click('#emo [data-e="🌿"]'); await page.click('#cSave'); await w(250);
     check('その他の野菜は予定の代わりに案内', await page.evaluate(() => document.querySelector('main').textContent.includes('予定は出ていません') + '/' + data.crops[3].emoji + data.crops[3].plan), 'true/🌿');
 
@@ -121,7 +146,7 @@ srv.listen(0, async () => {
     await open();
     check('開き直しても残る', await page.evaluate(() => data.crops.length), 4);
     check('エラーなし', errs.join(' | '), '');
-  } catch (e) { fail++; console.log('✗ 止まりました：', e.message); }
+  } catch (e) { fail++; console.log('✗ 止まりました：', e.message.split('\n')[0], pass, await page.evaluate(() => JSON.stringify([view, history.state, history.length])).catch(() => '')); }
   await browser.close(); srv.close();
   console.log(`\n合計 ${pass + fail} 件 : 通った ${pass} / 通らなかった ${fail}`);
   process.exit(fail ? 1 : 0);
