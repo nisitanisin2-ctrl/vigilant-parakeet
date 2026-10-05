@@ -178,20 +178,25 @@ details.more[open] summary { border-bottom: 1px solid var(--line); margin-bottom
 .calhead { display: flex; align-items: center; gap: 6px; margin: 16px 0 8px; }
 .calhead b { flex: 1; text-align: center; font-size: 17px; }
 .calhead .btn { padding: 8px 14px; }
-.calcard { padding: 8px; }
-.calcard .wd, .calcard .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
-.calcard .wd span { text-align: center; font-size: 12px; color: var(--muted); }
+.calcard { padding: 6px; }
+.calcard .wd, .calcard .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.calcard .wd span { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding: 2px 0; }
 .calcard .wd span:first-child { color: #e53935; } .calcard .wd span:last-child { color: #1e88e5; }
-.cd { position: relative; min-height: 52px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 2px; display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.cd .n { font-size: 13px; font-weight: 600; }
-.cd.today .n { background: var(--acc); color: var(--acc-ink); border-radius: 999px; padding: 0 6px; }
-.cd.sel { outline: 2px solid var(--acc); outline-offset: -1px; }
-.cd .mk { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; min-height: 7px; }
-.cd .mk i, .legend i { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--k) 35%, transparent); display: inline-block; }
-.cd .mk i.s, .legend i.s { background: var(--k); }
-.cd .lg { font-size: 11px; line-height: 1; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.cd { position: relative; min-height: 74px; min-width: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); padding: 2px 1px 3px; display: flex; flex-direction: column; align-items: stretch; gap: 2px; overflow: hidden; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.cd .n { align-self: center; font-size: 14px; font-weight: 700; line-height: 20px; min-width: 22px; text-align: center; }
+.cd.sun .n { color: #e53935; } .cd.sat .n { color: #1e88e5; }
+.cd.pastday { background: var(--bg); } .cd.pastday .n { opacity: .55; }
+.cd.today .n { background: var(--acc); color: var(--acc-ink); border-radius: 999px; opacity: 1; }
+.cd.sel { outline: 3px solid var(--acc); outline-offset: -2px; }
+.cd .ev, .legend i.ev { display: block; font-size: 10.5px; line-height: 15px; border-radius: 4px; background: var(--k); color: #fff; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: clip; padding: 0 2px; }
+.cd .bar, .legend i.bar { display: block; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--k) 45%, transparent); margin: 1px 0; }
+.cd .done, .cd .past { opacity: .4; }
+.cd .more { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.1; }
+.cd .lg { font-size: 12px; line-height: 1; text-align: center; margin-top: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 10px 2px 0; font-size: 12px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend i.ev { width: 14px; height: 12px; padding: 0; } .legend i.bar { width: 16px; }
+@media (min-width: 600px) { .cd { min-height: 92px; padding: 3px; } .cd .ev { font-size: 12px; line-height: 17px; } }
 /* 記録と集計の切りかえ */
 .seg { display: flex; gap: 4px; margin-bottom: 10px; }
 .seg button { flex: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 9px; font-weight: 600; }
