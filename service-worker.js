@@ -1,8 +1,8 @@
-const CACHE = 'saien-note-v1';
+const CACHE = 'saien-note-v2';
 const CACHE_PREFIX = 'saien-note-';
 // 以前ここにあった「写真メモ」アプリの古いキャッシュも片付ける
 const OLD_PREFIXES = ['photomemo-'];
-const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const ASSETS = ['./', './index.html', './css/style.css', './js/veg-data.js', './js/util.js', './js/plan.js', './js/store.js', './js/app.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
