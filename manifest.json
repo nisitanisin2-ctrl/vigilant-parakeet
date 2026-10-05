@@ -1,7 +1,7 @@
 {
   "name": "菜園ノート",
   "short_name": "菜園ノート",
-  "description": "家庭菜園の植付・水やり・追肥・収穫を記録するアプリ",
+  "description": "家庭菜園の育て方の予定（種まき・追肥・収穫の日）と、水やり・収穫などの記録をつけるアプリ",
   "id": "/saien-note",
   "start_url": "./index.html",
   "scope": "./",
