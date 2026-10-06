@@ -142,10 +142,12 @@ function renderCrops(m) {
     return;
   }
   h += installBanner();
+  const wxh = wxBoardHtml(activeCrops(), true); h += wxh;
   const up = upcoming(7);
   const nt = simpleOn() ? 3 : 6;
-  if (up.length) h += `<h2 class="first">📋 近いうちにやること</h2><div class="card">${up.slice(0, nt).map(taskHtml).join('')}${up.length > nt ? `<button class="link" id="moreTasks">ほか ${up.length - nt}件 → 📅 予定へ</button>` : ''}</div>`;
-  h += sickBoardHtml(activeCrops(), !up.length);
+  if (up.length) h += `<h2${wxh ? '' : ' class="first"'}>📋 近いうちにやること</h2><div class="card">${up.slice(0, nt).map(taskHtml).join('')}${up.length > nt ? `<button class="link" id="moreTasks">ほか ${up.length - nt}件 → 📅 予定へ</button>` : ''}</div>`;
+  h += sickBoardHtml(activeCrops(), !up.length && !wxh);
+  h += sowHtml(false);
   const f = [['active', '育てている'], ['done', '終了'], ['all', 'すべて']];
   h += `<div class="filters">${f.map(([k, l]) => `<button class="chip ${cropFilter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>`;
   if (!list.length) h += `<div class="empty">該当する野菜はありません</div>`;
@@ -175,7 +177,7 @@ function renderCrops(m) {
     </div>`;
   });
   m.innerHTML = h;
-  bindTasks(m); bindInstall();
+  bindTasks(m); bindInstall(); bindSow(m);
   if ($('#moreTasks')) $('#moreTasks').onclick = () => go('plan');
   m.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { cropFilter = b.dataset.f; render(); });
   m.querySelectorAll('[data-log]').forEach(b => b.onclick = () => openLogForm({ cropId: b.dataset.log }));
@@ -413,7 +415,7 @@ function summaryHtml() {
 function renderGuide(m) {
   if (!guide.date) guide.date = today();
   const q = guide.q.trim(), list = VEG_PLANS.filter(v => !q || v.n.includes(q));
-  let h = `<input type="text" id="gQ" placeholder="🔍 野菜の名前でさがす" value="${esc(guide.q)}">
+  let h = sowHtml(true) + `<input type="text" id="gQ" placeholder="🔍 野菜の名前でさがす" value="${esc(guide.q)}">
     <div class="vgrid">${list.map(v => `<button class="${v.n === guide.n ? 'on' : ''}" data-v="${esc(v.n)}"><span>${v.i}</span>${esc(v.n)}</button>`).join('') || '<div class="muted">見つかりません</div>'}</div>`;
   const v = planByName(guide.n);
   if (!v) h += `<div class="card muted">野菜を押すと、<b>いつまくか・予定・肥料・育て方のコツ・病気</b>が出ます（${VEG_PLANS.length}種類）。</div>`;
@@ -431,6 +433,7 @@ function renderGuide(m) {
       ${careHtml(v, guide.area, true)}`;
   }
   m.innerHTML = h;
+  bindSow(m);
   const qi = $('#gQ'); qi.oninput = () => { guide.q = qi.value; const pos = qi.selectionStart; render(); const e = $('#gQ'); e.focus(); e.setSelectionRange(pos, pos); };
   m.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { guide.n = b.dataset.v; render(); setTimeout(() => { const s = $('#gSel'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
   m.querySelectorAll('[data-as]').forEach(b => b.onclick = () => { guide.as = b.dataset.as; render(); });

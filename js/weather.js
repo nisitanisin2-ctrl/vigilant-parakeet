@@ -95,10 +95,11 @@ function wxFor(loc, onNew) {
   return c;
 }
 async function wxFetch(loc) {
-  const u = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=16`;
+  const u = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max&timezone=Asia%2FTokyo&forecast_days=16&past_days=1`;
   const r = await fetch(u); if (!r.ok) throw new Error('天気予報を取れませんでした');
   const j = await r.json(), d = j.daily || {}, days = {};
-  (d.time || []).forEach((t, i) => { days[t] = { c: d.weather_code[i], hi: d.temperature_2m_max[i], lo: d.temperature_2m_min[i], pp: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null }; });
+  (d.time || []).forEach((t, i) => { days[t] = { c: d.weather_code[i], hi: d.temperature_2m_max[i], lo: d.temperature_2m_min[i], pp: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null,
+    r: d.precipitation_sum ? d.precipitation_sum[i] : null, wd: d.wind_speed_10m_max ? d.wind_speed_10m_max[i] : null }; });   // r：雨の量mm、wd：いちばん強い風 km/h（きのうの分もある）
   return { at: Date.now(), days };
 }
 /* 名前でさがす（市町村など）→ [{name, lat, lon}] */

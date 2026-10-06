@@ -324,3 +324,11 @@ body.simple { font-size: 18px; }
 .qrbox { display: flex; justify-content: center; background: #fff; border-radius: 14px; padding: 10px; border: 1px solid var(--line); }
 .qrbox canvas { width: min(240px, 70vw); height: auto; image-rendering: pixelated; }
 .qrurl { margin-top: 8px; text-align: center; font-size: 14px; word-break: break-all; color: var(--acc); font-weight: 700; }
+/* 天気の注意・今月まけるもの */
+.wxboard { padding: 4px 12px; }
+.wxa { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.wxa:last-child { border-bottom: 0; } .wxa .ic { font-size: 24px; line-height: 1.2; }
+.wxa b { display: block; font-size: 15px; } .wxa small { display: block; color: var(--muted); font-size: 13px; } .wxa small.cs { color: var(--text); margin-top: 2px; }
+.wxa.frost b { color: #1565c0; } .wxa.heat b, .wxa.rain b { color: #c62828; } .wxa.water.ok b { color: #1565c0; }
+.sowrow { display: flex; flex-wrap: wrap; gap: 6px; } .sowcard .chip { font-size: 14px; }
+.simple .wxa b { font-size: 17px; } .simple .wxa small { font-size: 15px; }

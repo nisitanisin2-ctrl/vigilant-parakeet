@@ -31,7 +31,7 @@ srv.listen(0, async () => {
   await page.route('https://api.open-meteo.com/**', r => {
     wxCalls++;
     const time = [...Array(16)].map((_, i) => { const d = new Date(2026, 4, 10 + i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
-    r.fulfill({ contentType: 'application/json', body: JSON.stringify({ daily: { time, weather_code: time.map((_, i) => [0, 3, 63][i % 3]), temperature_2m_max: time.map((_, i) => 25 + (i % 2)), temperature_2m_min: time.map((_, i) => i === 2 ? 2 : 14), precipitation_probability_max: time.map((_, i) => [10, 30, 80][i % 3]) } }) });
+    r.fulfill({ contentType: 'application/json', body: JSON.stringify({ daily: { time, weather_code: time.map((_, i) => [0, 3, 63][i % 3]), temperature_2m_max: time.map((_, i) => 25 + (i % 2)), temperature_2m_min: time.map((_, i) => i === 2 ? 2 : 14), precipitation_probability_max: time.map((_, i) => [10, 30, 80][i % 3]), precipitation_sum: time.map((_, i) => [0, 2, 35][i % 3]), wind_speed_10m_max: time.map((_, i) => i === 1 ? 45 : 12) } }) });
   });
   await page.route('https://geocoding-api.open-meteo.com/**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ results: [{ name: 'つくば市', admin1: '茨城県', latitude: 36.08, longitude: 140.08, country_code: 'JP' }, { name: 'Tsukuba', latitude: 1, longitude: 1, country_code: 'XX' }] }) }));
   const open = async () => { await page.goto(URL); await page.waitForFunction(() => window.APP_READY); };
@@ -166,9 +166,13 @@ srv.listen(0, async () => {
     await page.click('[data-sub="sum"]'); await w(200);
     check('集計：収穫の表', await page.evaluate(() => [...document.querySelectorAll('table')[0].querySelectorAll('td')].slice(0, 3).map(t => t.textContent).join('/')), '🍅 トマト/1回/5個');
 
+    // ── 今月まけるもの ──
+    check('まく時期を月に（年またぎも）', await page.evaluate(() => [...sowMonths({ sow: '3〜4月・9〜10月' })].join(',') + '/' + [...sowMonths({ sow: '10〜2月' })].join(',')), '3,4,9,10/10,11,12,1,2');
+    check('今月（5月）まける野菜・北海道は4週間おそめ（4月の分）', await page.evaluate(() => { const a = sowList(data.fields[0]); const h = sowList(Object.assign({}, data.fields[0], { area: 'hokkaido' })); return a.mo + ':' + a.list.some(v => v.n === 'オクラ') + '/' + h.mo + ':' + h.list.some(v => v.n === 'オクラ') + ':' + h.list.some(v => v.n === 'ジャガイモ'); }), '5:true/5:false:false');
     // ── 育て方 ──
     await page.click('nav [data-tab="guide"]'); await w(200);
     check('育て方：33種類', await page.evaluate(() => document.querySelectorAll('.vgrid button').length), 33);
+    check('育て方の上に「今月まける・植えるもの」', await page.evaluate(() => $('details.fold[data-fold="sow"] summary h2').textContent.startsWith('🗓 今月まける・植えるもの5月') + '/' + (document.querySelectorAll('[data-sow]').length > 5)), 'true/true');
     await page.fill('#gQ', 'イモ'); await w(150);
     check('名前でさがす', await page.evaluate(() => [...document.querySelectorAll('.vgrid button')].map(b => b.textContent).join(',')), '🥔ジャガイモ,🍠サツマイモ,🥔サトイモ');
     await page.click('[data-v="ジャガイモ"]'); await w(250);
@@ -265,7 +269,11 @@ srv.listen(0, async () => {
     await page.click('[data-d="2026-05-12"]'); await w(200);
     check('霜と雨の日はひとこと', await page.evaluate(() => [...document.querySelectorAll('.wxday .tip')].map(t => t.textContent.slice(0, 2)).join(',')), '🥶,☔ ');
     check('いちど取ったら3時間は取り直さない・出どころを書く', await page.evaluate(() => $('.calcard').textContent.includes('Open-Meteo.com')) + '/' + wxCalls, 'true/1');
-    await page.click('nav [data-tab="crops"]'); await w(150); await page.click('.crop [data-open]'); await w(300);
+    await page.click('nav [data-tab="crops"]'); await w(300);
+    check('畑の上に天気の注意（霜・大雨・強風、気をつける野菜）', await page.evaluate(() => { return [...document.querySelectorAll('.wxboard .wxa b')].map(b => b.textContent).join(' / '); }), 'あす 5/11(月)：強い風（45km/h） / あさって 5/12(火)：霜（最低2℃） / あさって 5/12(火)：大雨（35mm）');
+    check('霜は夏野菜と小さい苗だけ', await page.evaluate(() => document.querySelectorAll('.wxboard .wxa.frost small.cs')[0].textContent.includes('トマト')), true);
+    check('水やりのひとこと（きのう雨・きょう雨の予報）', await page.evaluate(() => { const w = { days: {} }; w.days[addDays(today(), -1)] = { r: 12 }; const a = waterHint(w).t; w.days[addDays(today(), -1)] = { r: 0 }; w.days[today()] = { pp: 80, hi: 20 }; return a + ' | ' + waterHint(w).t; }), 'きのう雨（12mm）が降ったので、畑は水やり不要かも | きょうは雨の予報（80%）。畑は水やりお休みでよさそう');
+    await page.click('.crop [data-open]'); await w(300);
     check('野菜の画面のカレンダーにも天気', await page.evaluate(() => document.querySelectorAll('.cd .wx').length > 0), true);
     await page.click('#backBtn'); await w(150);
     // ── バージョン・新しくなったこと ──
