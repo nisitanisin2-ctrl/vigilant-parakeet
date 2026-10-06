@@ -151,8 +151,6 @@ function renderCrops(m) {
   const up = upcoming(7);
   const nt = simpleOn() ? 3 : 6;
   if (up.length) h += `<h2${wxh ? '' : ' class="first"'}>📋 近いうちにやること</h2><div class="card">${up.slice(0, nt).map(taskHtml).join('')}${up.length > nt ? `<button class="link" id="moreTasks">ほか ${up.length - nt}件 → 📅 予定へ</button>` : ''}</div>`;
-  h += sickBoardHtml(activeCrops(), !up.length && !wxh);
-  h += sowHtml(false);
   const f = [['active', '育てている'], ['done', '終了'], ['all', 'すべて']];
   h += `<div class="filters">${f.map(([k, l]) => `<button class="chip ${cropFilter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>`;
   if (!list.length) h += `<div class="empty">該当する野菜はありません</div>`;
@@ -182,6 +180,8 @@ function renderCrops(m) {
       </div>` : ''}
     </div>`;
   });
+  // 病気・害虫の注意報と今月まけるものは、野菜の一覧の下に
+  h += sickBoardHtml(activeCrops(), false) + sowHtml(false);
   m.innerHTML = h;
   bindTasks(m); bindInstall(); bindSow(m); bindCropSeg(m); bindBackupBanner();
   if ($('#moreTasks')) $('#moreTasks').onclick = () => go('plan');

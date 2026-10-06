@@ -109,6 +109,8 @@ srv.listen(0, async () => {
       '注意報:🦠 灰色かび病:🍅トマト / 注意報:🐛 アブラムシ:🍅トマト / 注意報:🐛 アオムシ・コナガ:🥬ダイコン / 注意報:🐛 ヨトウムシ:🥬ダイコン / 注意:🦠 疫病:🍅トマト/ほか 1つ');
     check('カードに⚠️のしるし', await page.evaluate(() => [...document.querySelectorAll('.crop .badge.sick')].map(b => b.textContent).join(',')), '⚠️灰色かび病 ほか2,⚠️アオムシ・コナガ ほか2');
     check('注意報を押すと見分け方・手当て', await page.evaluate(() => { const d = document.querySelector('.skboard details.sk'); d.open = true; return d.querySelector('.skb').textContent.includes('見分け方') && d.querySelector('.skb').textContent.includes('涼しくてじめじめ'); }), true);
+    check('注意報と今月まけるものは野菜の一覧の下', await page.evaluate(() => { const cs = document.querySelectorAll('.crop'), last = cs[cs.length - 1], sk = $('details.fold[data-fold="sick"]'), sw = $('details.fold[data-fold="sow"]');
+      return !!(last.compareDocumentPosition(sk) & Node.DOCUMENT_POSITION_FOLLOWING) + '/' + !!(sk.compareDocumentPosition(sw) & Node.DOCUMENT_POSITION_FOLLOWING); }), 'true/true');
     check('注意報の見出し（数）', await page.evaluate(() => $('details.fold[data-fold="sick"] > summary h2').textContent + '/' + $('details.fold[data-fold="sick"]').open), '⚠️ 病気・害虫の注意報注意報 4・注意 2・5月/true');
     await page.click('details.fold[data-fold="sick"] > summary'); await w(150);
     check('見出しを押すと折りたたむ・おぼえる', await page.evaluate(() => $('details.fold[data-fold="sick"]').open + '/' + localStorage.getItem('saien_fold_sick')), 'false/0');
