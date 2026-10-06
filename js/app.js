@@ -470,6 +470,34 @@ function bindInstall() {
   if ($('#instHide')) $('#instHide').onclick = () => { try { localStorage.setItem('saien-install-hide', '1'); } catch (e) {} render(); };
 }
 
+/* ===== アドレスを教える（QRコード） =====
+   相手のスマホのカメラで読むと菜園ノートが開く。インターネットに置いたものを開いているときはそのアドレス、
+   表電卓の中・この端末だけのアドレスで開いているときは、公開している菜園ノートのアドレスにする */
+const SAIEN_URL = 'https://nisitanisin2-ctrl.github.io/vigilant-parakeet/';
+function appUrl() {
+  if (EMBED || !/^https:/.test(location.protocol) || /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname)) return SAIEN_URL;
+  return new URL('./', location.href).href.replace(/[?#].*$/, '');
+}
+function openQrShare() {
+  const url = appUrl();
+  const s = openModal(`<h3>📱 菜園ノートのアドレス</h3>
+    <p class="muted" style="margin-top:0">相手のスマホのカメラでこのQRコードを読むと、菜園ノートが開きます。ホーム画面に入れると、アプリとして使えます（データはそれぞれの端末に別々に残ります）。</p>
+    <div class="qrbox"><canvas id="qrCv" aria-label="菜園ノートのアドレスのQRコード"></canvas></div>
+    <div class="qrurl" id="qrUrl">${esc(url)}</div>
+    <div class="row" style="margin-top:10px"><button class="btn" style="flex:1" id="qrCopy">📋 コピー</button>${navigator.share ? '<button class="btn" style="flex:1" id="qrShare">📤 送る</button>' : ''}<button class="btn" style="flex:1" id="qrSave">🖼 画像で保存</button></div>
+    <div class="actions"><button class="btn primary" id="qrClose">閉じる</button></div>`);
+  qrDraw(s.querySelector('#qrCv'), url, 8);
+  $('#qrClose').onclick = closeModal;
+  $('#qrCopy').onclick = async () => { try { await navigator.clipboard.writeText(url); toast('アドレスをコピーしました'); } catch (e) { prompt('このアドレスをコピーしてください', url); } };
+  if ($('#qrShare')) $('#qrShare').onclick = async () => { try { await navigator.share({ title: '菜園ノート', text: '家庭菜園の予定と記録のアプリ「菜園ノート」', url }); } catch (e) {} };
+  $('#qrSave').onclick = () => {
+    const cv = document.createElement('canvas'); qrDraw(cv, url, 12);
+    cv.toBlob(b => { if (!b) { toast('画像にできませんでした'); return; }
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: '菜園ノート_QRコード.png' });
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('QRコードを画像で保存しました'); }, 'image/png');
+  };
+}
+
 /* ===== ⚙ 設定 ===== */
 /* 地域の入力欄（畑1つぶん） */
 function areaFormHtml(f) {
@@ -487,7 +515,8 @@ async function renderSettings(m) {
   let est = '';
   try { if (navigator.storage?.estimate) { const e = await navigator.storage.estimate(); est = `使用容量：約${(e.usage / 1048576).toFixed(1)}MB`; } } catch (e) {}
   const cnt = f => data.crops.filter(c => c.fieldId === f.id).length;
-  m.innerHTML = `<h2 class="first">📲 アプリとして入れる</h2><div class="card">${installHtml()}</div>
+  m.innerHTML = `<h2 class="first">📲 アプリとして入れる</h2><div class="card">${installHtml()}
+      <button class="btn block" id="qrBtn" style="margin-top:10px">📱 アドレスをQRコードで教える</button></div>
     <h2>👀 見やすさ</h2><div class="card">
       <label class="sw" style="margin-top:0"><input type="checkbox" id="sSimple" ${simpleOn() ? 'checked' : ''}> <b>シンプルモード</b></label>
       <p class="muted small">画面の小さいスマホ用。文字とボタンを大きくして、出すものを少なくします（カードは名前・つぎの予定・水やり・注意だけ、カレンダーは色の帯と天気の絵だけ）。この端末だけの設定です。</p></div>
@@ -520,6 +549,7 @@ async function renderSettings(m) {
       <button class="btn block" id="updBtn">🔄 更新をたしかめる</button>
       <p class="muted small">新しい版が届くと、下に「新しい版が用意できました」と出ます。「いま更新」を押すと新しくなります。</p></div>`}`;
   bindInstall();
+  $('#qrBtn').onclick = openQrShare;
   $('#sSimple').onchange = e => { setSimple(e.target.checked); render(); toast(e.target.checked ? '👀 シンプルモードにしました' : 'ふつうの表示にもどしました'); };
   $('#wnBtn').onclick = openWhatsNew;
   if ($('#updBtn')) $('#updBtn').onclick = checkUpdate;

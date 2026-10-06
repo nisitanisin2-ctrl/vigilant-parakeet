@@ -320,3 +320,7 @@ body.simple { font-size: 18px; }
 .emo.grow .gsteps b.on { background: #2e7d32; }
 .emo.grow.big .gsteps { gap: 3px; } .emo.grow.big .gsteps b { width: 8px; height: 8px; }
 .emo.grow small.gp { font-weight: 400; color: var(--muted); font-size: 11px; }
+/* アドレスのQRコード */
+.qrbox { display: flex; justify-content: center; background: #fff; border-radius: 14px; padding: 10px; border: 1px solid var(--line); }
+.qrbox canvas { width: min(240px, 70vw); height: auto; image-rendering: pixelated; }
+.qrurl { margin-top: 8px; text-align: center; font-size: 14px; word-break: break-all; color: var(--acc); font-weight: 700; }
