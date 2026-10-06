@@ -62,12 +62,14 @@ srv.listen(0, async () => {
 
     check('野菜の画面：カレンダーのあとに育て方の予定', await page.evaluate(() => [...document.querySelectorAll('main h2')].map(h => h.textContent.replace(/[^📅📋⚠️📝].*$/u, '').trim()).filter(Boolean).slice(0, 2).join(',')), '📅,📋');
     await page.click('#growAdj'); await w(150);
-    check('実物に合わせる窓：その野菜の段階', await page.evaluate(() => [...document.querySelectorAll('#gSt button')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join(',')), '苗を植えた,花が咲いた*,収穫できる');
+    check('実物に合わせる窓：その野菜の段階', await page.evaluate(() => [...document.querySelectorAll('#gSt button')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join(',')), '苗を植えた,根づいた,育ってきた,大きく育った,花が咲いた*,実がなった,収穫できる');
     await page.click('#gSt [data-st="nae"]'); await w(100);
     check('段階を選ぶと絵と「予定より○日おくれ」', await page.evaluate(() => $('#gPrev b').textContent + '/' + /予定より\d+日おくれ/.test($('#gPrev small').textContent)), '苗を植えた/true');
-    await page.click('#gLess'); await page.click('#gLess'); await page.click('#gSave'); await w(200);
+    await page.click('#gLess'); await w(100);
+    check('植えた日より前には小さくできない', await page.evaluate(() => $('#gPrev b').textContent + '/' + $('#toast').textContent.slice(0, 13)), '苗を植えた/これより小さくはできません');
+    await page.click('#gSave'); await w(200);
     check('保存すると絵が変わる（✋合わせ中）', await page.evaluate(() => { const c = data.crops[0]; return (c.growShift > 0) + '/' + $('.detail-top .emo.grow small').textContent + '/' + $('#growAdj').textContent; }), 'true/苗を植えた/✋ 合わせ中');
-    check('合わせたあとも日がたつと育つ', await page.evaluate(() => growStage(data.crops[0], addDays(today(), 30)).st), 'flower');
+    check('合わせたあとも日がたつと育つ', await page.evaluate(() => [10, 20, 35].map(d => growStage(data.crops[0], addDays(today(), d)).st).join(',')), 'big,flower,fruit');
     await page.click('#growAdj'); await w(100); await page.click('#gAuto'); await page.click('#gSave'); await w(200);
     check('予定どおりにもどす', await page.evaluate(() => ('growShift' in data.crops[0]) + '/' + $('.detail-top .emo.grow small').textContent), 'false/花が咲いた');
     check('野菜の画面に育ち具合の絵（苗から15日・花が咲いた）', await page.evaluate(() => { const g = $('.detail-top .emo.grow'); return g.dataset.st + '/' + g.querySelector('.e').textContent + '/' + !!g.querySelector('svg.growpic') + '/' + g.querySelector('small').textContent; }), 'flower/🍅/true/花が咲いた');
@@ -75,7 +77,7 @@ srv.listen(0, async () => {
       const mk = (plan, d, as, st) => ({ plan, plantedAt: d, as, status: st || 'growing', done: {}, emoji: '🌱', fieldId: data.fields[0].id });
       return [mk('ダイコン', '2026-05-20', 'seed'), mk('ダイコン', '2026-05-09', 'seed'), mk('ダイコン', '2026-05-06', 'seed'), mk('ダイコン', '2026-04-01', 'seed'), mk('キャベツ', '2026-03-01', 'nae'), mk('キャベツ', '2026-03-25', 'nae'), mk('トマト', '2026-05-09', 'nae'), mk('トマト', '2026-05-09', 'nae', 'harvesting'), mk('トマト', '2026-05-09', 'nae', 'done'), mk('', '2026-05-01', 'seed')]
         .map(c => { const g = growStage(c); return g.st + ':' + g.label; }).join(',');
-    }), 'before:あと10日,seed:種をまいた,sprout:芽が出た,grow:育っている,harvest:収穫できる,flower:結球,nae:苗を植えた,harvest:収穫できる,end:おわり,sprout:芽が出た');
+    }), 'before:あと10日,seed:種をまいた,sprout:芽が出た,big:大きく育った,harvest:収穫できる,fruit:巻いてきた,nae:苗を植えた,harvest:収穫できる,end:おわり,sprout:芽が出た');
     // ── やった ──
     await page.click('.plan [data-done$=":4"]'); await w(250);
     check('✓ やった：予定に印・記録にも残る', await page.evaluate(() => { const c = data.crops[0]; return JSON.stringify(c.done) + '/' + data.logs.map(l => l.type + ':' + l.memo + ':' + l.date).join(','); }), '{"4":"2026-05-10"}/observe:花が咲く:2026-05-10');
@@ -102,7 +104,7 @@ srv.listen(0, async () => {
     await page.click('#fab'); await w(150); await page.click('#cVeg [data-p="ダイコン"]'); await page.fill('#cDate', '2026-04-20');
     check('種からしかない野菜は「どこから育てる」を出さない', await page.evaluate(() => $('#cAsBox').hidden), true);
     await page.click('#cSave'); await w(250); await page.click('#backBtn'); await w(200);
-    check('畑のカードに小さい野菜の絵と育ち具合', await page.evaluate(() => [...document.querySelectorAll('.crop .emo.grow')].map(g => g.querySelector('.e').textContent + g.querySelector('small').textContent).join(',')), '🍅収穫できる,🥬育っている');
+    check('畑のカードに小さい野菜の絵と育ち具合', await page.evaluate(() => [...document.querySelectorAll('.crop .emo.grow')].map(g => g.querySelector('.e').textContent + g.querySelector('small').textContent).join(',')), '🍅収穫できる,🥬本葉が出た');
     check('病気・害虫の注意報：畑の上に（多い時期が先・5つ＋ほか）', await page.evaluate(() => [...document.querySelectorAll('.skboard > details.sk:not(.more) > summary')].map(x => x.querySelector('.lv').textContent + ':' + x.querySelector('b').textContent + ':' + x.querySelector('small').textContent).join(' / ') + '/' + $('.skboard details.more summary').textContent),
       '注意報:🦠 灰色かび病:🍅トマト / 注意報:🐛 アブラムシ:🍅トマト / 注意報:🐛 アオムシ・コナガ:🥬ダイコン / 注意報:🐛 ヨトウムシ:🥬ダイコン / 注意:🦠 疫病:🍅トマト/ほか 1つ');
     check('カードに⚠️のしるし', await page.evaluate(() => [...document.querySelectorAll('.crop .badge.sick')].map(b => b.textContent).join(',')), '⚠️灰色かび病 ほか2,⚠️アオムシ・コナガ ほか2');

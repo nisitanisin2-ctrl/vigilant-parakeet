@@ -314,3 +314,9 @@ body.simple { font-size: 18px; }
 .emo.grow .gadj { margin-top: 6px; border: 1px solid var(--acc); background: var(--panel); color: var(--acc); border-radius: 999px; padding: 3px 8px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 .gprev { display: flex; align-items: center; gap: 14px; background: var(--acc-soft); border-radius: 14px; padding: 8px 14px; margin-bottom: 10px; }
 .gprev b { display: block; font-size: 18px; color: var(--acc); } .gprev small { color: var(--muted); }
+/* 育ち具合の絵（8段階） */
+.emo.grow .growpic { border-radius: 10px; }
+.emo.grow .gsteps { display: flex; gap: 2px; margin: 3px 0 1px; } .emo.grow .gsteps b { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
+.emo.grow .gsteps b.on { background: #2e7d32; }
+.emo.grow.big .gsteps { gap: 3px; } .emo.grow.big .gsteps b { width: 8px; height: 8px; }
+.emo.grow small.gp { font-weight: 400; color: var(--muted); font-size: 11px; }
