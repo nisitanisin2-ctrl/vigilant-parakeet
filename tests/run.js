@@ -189,6 +189,24 @@ srv.listen(0, async () => {
     await page.click('#cVeg [data-p=""]'); await page.fill('#cName', 'バジル'); await page.click('#emo [data-e="🌿"]'); await page.click('#cSave'); await w(250);
     check('その他の野菜は予定の代わりに案内', await page.evaluate(() => document.querySelector('main').textContent.includes('予定は出ていません') + '/' + data.crops[3].emoji + data.crops[3].plan), 'true/🌿');
 
+    // ── 自分の野菜・品種 ──
+    await page.click('nav [data-tab="guide"]'); await w(200); await page.fill('#gQ', ''); await w(150); await page.click('#gMine'); await w(150);
+    await page.fill('#mpName', 'アイコ'); await page.selectOption('#mpBase', 'トマト'); await page.click('#mpCopy'); await w(100);
+    check('似ている野菜の日数を写す', await page.evaluate(() => document.querySelectorAll('#mpSteps .mpstep').length === planByName('トマト').s.length && document.querySelector('#mpFrom .on').dataset.f), '種まき');
+    await page.fill('#mpSteps [data-i="0"][data-k="1"]', '4'); await page.click('#mpSave'); await w(250);
+    check('⭐自分の野菜を足す（育て方の一覧と、えらんだ所）', await page.evaluate(() => data.myPlans.length + '/' + data.myPlans[0].s[0].join(',') + '/' + document.querySelector('.vgrid .mine').textContent + '/' + !!$('#gEditMine') + '/' + document.querySelectorAll('details.more').length), '1/発芽,4,8/🍅⭐アイコ/true/3');
+    await page.click('#gAdd'); await w(200);
+    check('畑に登録の窓にも出る', await page.evaluate(() => document.querySelector('#cVeg .on').textContent), '🍅⭐アイコ');
+    await page.click('#cSave'); await w(250);
+    check('自分の野菜で予定・絵（トマトの形）', await page.evaluate(() => { const c = data.crops.find(x => x.plan === 'アイコ'); return (cropRows(c).length === planByName('トマト').s.length + 1) + '/' + growShape(c) + '/' + careOf(planByName('アイコ')).k.length; }), 'true/fruit/6');
+    await page.click('#backBtn'); await w(150); await page.click('[data-v="アイコ"]'); await w(150); await page.click('#gEditMine'); await w(150);
+    await page.fill('#mpName', 'アイコ（ミニ）'); await page.click('#mpSave'); await w(200);
+    check('名前を変えると畑の野菜もついてくる', await page.evaluate(() => data.crops.filter(c => c.plan === 'アイコ（ミニ）').length + '/' + planByName('アイコ')), '1/null');
+    await page.click('#gEditMine'); await w(150); await page.click('#mpDel'); await w(250);
+    check('消すと畑の野菜は予定なしに（記録は残る）', await page.evaluate(() => data.myPlans.length + '/' + data.crops.filter(c => c.name === 'アイコ' && !c.plan).length), '0/1');
+    await page.evaluate(async () => { data.crops = data.crops.filter(c => c.name !== 'アイコ'); await save(); });
+    await page.click('nav [data-tab="crops"]'); await w(150);
+
     // ── バックアップ ──
     const json = await page.evaluate(async () => JSON.stringify({ app: 'saien-note', version: 2, data, photos: {} }));
     await page.evaluate(async () => { data.crops = []; data.logs = []; await save(); });

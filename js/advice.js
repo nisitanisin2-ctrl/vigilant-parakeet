@@ -19,7 +19,7 @@ function sowMonths(v) {
 function sowList(f = curField(), off = 0, t = today()) {
   const d = new Date(addDays(t, -(areaDef(f).w || 0) * 7) + 'T00:00'); d.setMonth(d.getMonth() + off);
   const mo = d.getMonth() + 1;
-  return { mo: (+t.slice(5, 7) + off - 1) % 12 + 1, list: VEG_PLANS.filter(v => sowMonths(v).has(mo)) };
+  return { mo: (+t.slice(5, 7) + off - 1) % 12 + 1, list: allPlans().filter(v => sowMonths(v).has(mo)) };
 }
 function sowHtml(first) {
   const f = curField(), now = sowList(f, 0), next = sowList(f, 1);
@@ -33,7 +33,7 @@ function bindSow(m) { m.querySelectorAll('[data-sow]').forEach(b => b.onclick = 
 
 /* ===== ② 天気の注意 ===== */
 /* 霜に弱い野菜（夏野菜・いも）と、まだ小さい苗 */
-const frostWeak = c => ['fruit', 'vine', 'corn', 'bean'].includes(growShape(c)) && c.plan !== 'エンドウ' && c.plan !== 'ソラマメ' || ['サツマイモ', 'サトイモ', 'ジャガイモ'].includes(c.plan);
+const frostWeak = c => ['fruit', 'vine', 'corn', 'bean'].includes(growShape(c)) && lookName(c) !== 'エンドウ' && lookName(c) !== 'ソラマメ' || ['サツマイモ', 'サトイモ', 'ジャガイモ'].includes(lookName(c));
 const tall = c => { const g = growStage(c); return g && ['fruit', 'corn', 'bean'].includes(growShape(c)) && STAGE_NO[g.st] >= 3; };
 const isRainCode = c => c >= 61 && c <= 67 || c >= 80;
 /* [{d:日, k:'frost'|'rain'|'heat'|'wind', t:見出し, tip:手当て, crops:[c]}]（きょう・あす・あさって） */

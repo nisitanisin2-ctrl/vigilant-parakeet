@@ -414,16 +414,17 @@ function summaryHtml() {
 /* ===== 📖 育て方 ===== */
 function renderGuide(m) {
   if (!guide.date) guide.date = today();
-  const q = guide.q.trim(), list = VEG_PLANS.filter(v => !q || v.n.includes(q));
+  const q = guide.q.trim(), list = allPlans().filter(v => !q || v.n.includes(q)), mine = v => data.myPlans.includes(v);
   let h = sowHtml(true) + `<input type="text" id="gQ" placeholder="🔍 野菜の名前でさがす" value="${esc(guide.q)}">
-    <div class="vgrid">${list.map(v => `<button class="${v.n === guide.n ? 'on' : ''}" data-v="${esc(v.n)}"><span>${v.i}</span>${esc(v.n)}</button>`).join('') || '<div class="muted">見つかりません</div>'}</div>`;
+    <div class="vgrid">${list.map(v => `<button class="${v.n === guide.n ? 'on' : ''}${mine(v) ? ' mine' : ''}" data-v="${esc(v.n)}"><span>${v.i}</span>${mine(v) ? '⭐' : ''}${esc(v.n)}</button>`).join('') || '<div class="muted">見つかりません</div>'}</div>
+    <button class="btn block" id="gMine" style="margin-bottom:10px">＋ 自分の野菜・品種を足す（作業と日数を決める）</button>`;
   const v = planByName(guide.n);
-  if (!v) h += `<div class="card muted">野菜を押すと、<b>いつまくか・予定・肥料・育て方のコツ・病気</b>が出ます（${VEG_PLANS.length}種類）。</div>`;
+  if (!v) h += `<div class="card muted">野菜を押すと、<b>いつまくか・予定・肥料・育て方のコツ・病気</b>が出ます（${VEG_PLANS.length}種類${data.myPlans.length ? `と自分の野菜${data.myPlans.length}` : ''}）。⭐ は自分で足した野菜です。</div>`;
   else {
     if (guide.as === 'nae' && !canNae(v)) guide.as = 'seed';
     const rows = planRows(v, guide.date, guide.as), harv = rows.filter(r => r.kind.k === 'harvest')[0];
-    h += `<div class="card gsel" id="gSel"><div class="gt">${v.i} <b>${esc(v.n)}</b></div>
-      <div class="fl"><b>${esc(v.from || '種まき')}に向く時期</b><span>${esc(v.sow)}${shiftText() ? `<br><small>${esc(areaText())}では標準の地域より ${esc(shiftText())}</small>` : ''}</span></div>
+    h += `<div class="card gsel" id="gSel"><div class="gt">${v.i} <b>${esc(v.n)}</b>${mine(v) ? ` <small class="muted">⭐自分の野菜${v.base ? `（${esc(v.base)}に似ている）` : ''}</small> <button class="btn" id="gEditMine" style="float:right;padding:6px 12px">✏️ 直す</button>` : ''}</div>
+      <div class="fl"><b>${esc(v.from || '種まき')}に向く時期</b><span>${esc(v.sow || '—')}${shiftText() ? `<br><small>${esc(areaText())}では標準の地域より ${esc(shiftText())}</small>` : ''}</span></div>
       <div class="gform"><label>${canNae(v) ? `<span class="seg mini">${['seed', 'nae'].map(a => `<button class="${guide.as === a ? 'on' : ''}" data-as="${a}">${a === 'seed' ? '種から' : '苗から'}</button>`).join('')}</span>` : ''}
         <span>${esc(startLabel(v, guide.as))}の日</span><input type="date" id="gDate" value="${guide.date}"></label></div>
       ${harv ? `<div class="gbig">${esc(harv.what)}は <b>${harv.d1 === harv.d2 ? harv.d1 : harv.d1 + '〜' + harv.d2}日後</b>（${fmtRange(harv.from, harv.to)}）</div>` : ''}
@@ -434,6 +435,8 @@ function renderGuide(m) {
   }
   m.innerHTML = h;
   bindSow(m);
+  $('#gMine').onclick = () => openMyPlanForm(null);
+  if ($('#gEditMine')) $('#gEditMine').onclick = () => openMyPlanForm(v);
   const qi = $('#gQ'); qi.oninput = () => { guide.q = qi.value; const pos = qi.selectionStart; render(); const e = $('#gQ'); e.focus(); e.setSelectionRange(pos, pos); };
   m.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { guide.n = b.dataset.v; render(); setTimeout(() => { const s = $('#gSel'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
   m.querySelectorAll('[data-as]').forEach(b => b.onclick = () => { guide.as = b.dataset.as; render(); });
@@ -542,7 +545,7 @@ async function renderSettings(m) {
       <p><b>🌱 畑</b>：育てている野菜の一覧。上に「近いうちにやること」。💧で今日の水やり、✏️で記録。野菜を押すと、予定の表とカレンダー・肥料・コツ・記録が見られます。</p>
       <p><b>📅 予定</b>：すべての野菜の予定をカレンダーで。作業が始まる日に「🍅追肥」の札、時期が続く日に色の線、記録した日に絵。日を押すとその日の予定と記録。</p>
       <p><b>📝 記録</b>：作業の記録と、年ごとの収穫・作業の集計。</p>
-      <p><b>📖 育て方</b>：${VEG_PLANS.length}種類の野菜の、まく時期・予定・肥料・コツ・病気と害虫。「この内容で畑に登録する」で畑に入れられます。</p>
+      <p><b>📖 育て方</b>：${VEG_PLANS.length}種類の野菜の、まく時期・予定・肥料・コツ・病気と害虫。「この内容で畑に登録する」で畑に入れられます。「＋ 自分の野菜・品種を足す」で、ない野菜や品種を作業と日数つきで足せます。</p>
       <p><b>📍 畑ごとに管理</b>：ここ（設定）で入れると、畑を足して、畑ごとに野菜・予定・記録・地域を分けられます。「すべての畑」でまとめても見られます。</p>
       <p><b>↩ 戻る</b>：スマホの「戻る」で1つ前の画面に戻ります。畑の一覧でもう一度押すとアプリを閉じます。</p>
       <p class="muted small">予定の日数は家庭菜園のふつうの目安です。天気や育ち方を見て決めてください。農薬は、ラベルで「使ってよい作物」と「収穫の何日前まで」を必ず確かめてください。</p></div>
@@ -613,7 +616,7 @@ function openCropForm(c, pre) {
   c = c || Object.assign({ emoji: '🌱', name: '', variety: '', place: '', plantedAt: today(), status: 'growing', memo: '', plan: '', as: 'seed', area: 0, done: {}, fieldId: curField().id }, pre || {});
   const s = openModal(`<h3>${isNew ? '🌱 野菜を登録' : '野菜を直す'}</h3>
     <label class="f">野菜（押すと名前と予定が入ります）</label>
-    <div class="pick veg" id="cVeg">${VEG_PLANS.map(v => `<button type="button" data-p="${esc(v.n)}" class="${c.plan === v.n ? 'on' : ''}">${v.i}${esc(v.n)}</button>`).join('')}<button type="button" data-p="" class="${!c.plan ? 'on' : ''}">🌱その他</button></div>
+    <div class="pick veg" id="cVeg">${allPlans().map(v => `<button type="button" data-p="${esc(v.n)}" class="${c.plan === v.n ? 'on' : ''}">${v.i}${data.myPlans.includes(v) ? '⭐' : ''}${esc(v.n)}</button>`).join('')}<button type="button" data-p="" class="${!c.plan ? 'on' : ''}">🌱その他</button></div>
     <div id="cEmoBox" ${c.plan ? 'hidden' : ''}><label class="f">絵</label><div class="pick emoji" id="emo">${PRESETS.map(([e, n]) => `<button type="button" data-e="${e}" title="${n}" class="${c.emoji === e ? 'on' : ''}">${e}</button>`).join('')}</div></div>
     <label class="f">名前</label><input type="text" id="cName" value="${esc(c.name)}" placeholder="例：トマト">
     <label class="f">品種（なくてもよい）</label><input type="text" id="cVar" value="${esc(c.variety)}" placeholder="例：桃太郎">
@@ -637,7 +640,7 @@ function openCropForm(c, pre) {
   sync();
   s.querySelectorAll('#cVeg button').forEach(b => b.onclick = () => {
     s.querySelectorAll('#cVeg button').forEach(x => x.classList.remove('on')); b.classList.add('on');
-    const v = planByName(b.dataset.p), nm = $('#cName'), names = VEG_PLANS.map(x => x.n);
+    const v = planByName(b.dataset.p), nm = $('#cName'), names = allPlans().map(x => x.n);
     plan = v ? v.n : '';
     if (v) { emoji = v.i; if (!nm.value.trim() || names.includes(nm.value.trim())) nm.value = v.n; }
     else if (names.includes(nm.value.trim())) nm.value = '';

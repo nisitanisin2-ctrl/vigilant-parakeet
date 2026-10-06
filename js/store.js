@@ -3,6 +3,7 @@
      crops: 育てている野菜 [{id, emoji, name, variety, place, plantedAt, status, memo,
                             plan:育て方の予定に使う野菜の名前（VEG_PLANS の n。なければ ''）, as:'seed'（種から）|'nae'（苗から）,
                             area:広さ㎡（肥料の量に使う）, done:{予定の番号: やった日}, fieldId:どの畑か, growShift:育ち具合の絵のずらし（日・なくてもよい）}],
+     myPlans: 自分で足した野菜・品種 [{n:名前, i:絵, from:'種まき'|'植えつけ', sow:まく時期, s:[[作業, 何日目から, 何日目まで]], base:似ている野菜}],
      logs:  作業の記録 [{id, cropId, type, date, memo, amount, unit, hasPhoto, ts}],
      fields: 畑 [{id, name, area:地域, alt:標高m, cold:寒冷地か, loc:天気予報の場所{name, lat, lon}|null}]（地域は畑ごと。予定の日数の補正に使う）,
      settings: {multi:畑ごとに管理するか, cur:いま見ている畑のid（'all' はすべての畑。開いたときは 'all'）}
@@ -43,6 +44,7 @@ function normalize(d) {
   d = d || {};
   d.crops = Array.isArray(d.crops) ? d.crops : [];
   d.logs = Array.isArray(d.logs) ? d.logs : [];
+  d.myPlans = Array.isArray(d.myPlans) ? d.myPlans.filter(p => p && p.n && Array.isArray(p.s)) : [];   // 自分で足した野菜・品種
   const old = d.settings || {};
   d.settings = { multi: !!old.multi, cur: old.cur || '' };
   d.fields = Array.isArray(d.fields) ? d.fields.filter(f => f && f.id) : [];
@@ -114,7 +116,24 @@ async function importData(file) {
    excalc_veg_area（地域・標高・寒冷地・畑の広さ）・excalc_veg_my（自分で足した野菜）。前のデータは消さずに残す */
 const MIG_KEY = 'saien_mig_excalc';
 const xlYmd = s => { const d = new Date(Date.UTC(1899, 11, 30) + Math.round(Number(s)) * 86400000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
+/* 前の道具で「自分で足した野菜」（excalc_veg_my）を、⭐自分の野菜（data.myPlans）として引き継ぐ（v17から。1回だけ）。
+   前に引き継いで「予定のない野菜」になっていた分も、その野菜の予定につなぎ直す */
+async function migrateExcalcMy() {
+  let ls; try { ls = window.localStorage; if (ls.getItem(MIG_KEY + '_my')) return 0; } catch (e) { return 0; }
+  let my = []; try { my = JSON.parse(ls.getItem('excalc_veg_my') || '[]') || []; } catch (e) {}
+  let n = 0;
+  for (const x of my) {
+    if (!x || !x.n || !Array.isArray(x.s) || planByName(x.n)) continue;
+    data.myPlans.push({ n: String(x.n), i: x.i || '🌱', from: x.from === '植えつけ' ? '植えつけ' : '種まき', sow: String(x.sow || ''), s: x.s.map(r => [String(r[0] || ''), Math.max(0, +r[1] || 0), Math.max(+r[1] || 0, +r[2] || 0)]).filter(r => r[0]), base: '' });
+    n++;
+  }
+  data.crops.forEach(c => { if (!c.plan && planByName(c.name) && /^x-/.test(c.id)) { c.plan = c.name; c.memo = String(c.memo || '').replace(/\n?（表電卓で自分で足した野菜）/, '').trim(); } });
+  if (n) await save();
+  try { ls.setItem(MIG_KEY + '_my', String(Date.now())); } catch (e) {}
+  return n;
+}
 async function migrateExcalc() {
+  await migrateExcalcMy();
   let ls; try { ls = window.localStorage; if (ls.getItem(MIG_KEY)) return 0; } catch (e) { return 0; }
   const js = k => { try { return JSON.parse(ls.getItem(k) || 'null'); } catch (e) { return null; } };
   const plots = (js('excalc_veg_plots') || []).filter(p => p && p.n && isFinite(p.s));

@@ -332,3 +332,8 @@ body.simple { font-size: 18px; }
 .wxa.frost b { color: #1565c0; } .wxa.heat b, .wxa.rain b { color: #c62828; } .wxa.water.ok b { color: #1565c0; }
 .sowrow { display: flex; flex-wrap: wrap; gap: 6px; } .sowcard .chip { font-size: 14px; }
 .simple .wxa b { font-size: 17px; } .simple .wxa small { font-size: 15px; }
+/* 自分の野菜 */
+.vgrid button.mine { border-style: dashed; }
+.mpstep { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+.mpstep input[type=text] { flex: 1; min-width: 0; } .mpstep input[type=number] { width: 58px; padding: 8px 4px; text-align: center; }
+.mpstep span { font-size: 13px; color: var(--muted); } .mpstep .x { border: 0; background: none; color: var(--muted); font-size: 18px; padding: 4px; }
