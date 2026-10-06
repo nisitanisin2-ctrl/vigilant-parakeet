@@ -214,6 +214,8 @@ srv.listen(0, async () => {
     await page.click('nav [data-tab="settings"]'); await w(200);
     await page.selectOption('#sLoc [data-loc-pref]', '8'); await w(200);
     check('県から選ぶ', await page.evaluate(() => JSON.stringify(data.fields[0].loc) + '/' + $('#sLoc .locnow b').textContent), '{"name":"栃木 宇都宮","lat":36.57,"lon":139.88}/栃木 宇都宮');
+    await page.selectOption('#sLoc [data-loc-pref]', { label: '兵庫北部（豊岡）' }); await w(200);
+    check('県の一覧に兵庫北部', await page.evaluate(() => JSON.stringify(data.fields[0].loc)), '{"name":"兵庫北部 豊岡","lat":35.54,"lon":134.82}');
     await page.fill('#sLoc [data-loc-q]', 'つくば'); await page.click('#sLoc [data-loc-find]'); await w(300);
     check('名前でさがす（日本だけ）', await page.evaluate(() => [...document.querySelectorAll('#sLoc [data-loc-i]')].map(b => b.textContent).join(',')), '茨城県 つくば市');
     await page.click('#sLoc [data-loc-i="0"]'); await w(200);
