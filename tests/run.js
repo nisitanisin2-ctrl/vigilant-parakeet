@@ -60,6 +60,16 @@ srv.listen(0, async () => {
     check('野菜の画面に「いま気をつけたい病気・害虫」', await page.evaluate(() => [...document.querySelectorAll('main h2')].some(h => h.textContent.startsWith('⚠️ いま気をつけたい病気・害虫注意報 2・5月ごろ')) + '/' + [...document.querySelectorAll('.skboard details.sk b')].map(b => b.textContent).join(',')), 'true/🦠 灰色かび病,🐛 アブラムシ,🦠 疫病');
     check('肥料・コツ・病気（広さ3㎡で全体の量）', await page.evaluate(() => [...document.querySelectorAll('details.more summary')].map(s => s.textContent.replace(/（.*/, '')).join(',') + '/' + document.querySelector('details.more').textContent.includes('3㎡で 360〜450g')), '🧪 肥料,💡 育て方のコツ,🐛 出やすい病気・害虫/true');
 
+    check('野菜の画面：カレンダーのあとに育て方の予定', await page.evaluate(() => [...document.querySelectorAll('main h2')].map(h => h.textContent.replace(/[^📅📋⚠️📝].*$/u, '').trim()).filter(Boolean).slice(0, 2).join(',')), '📅,📋');
+    await page.click('#growAdj'); await w(150);
+    check('実物に合わせる窓：その野菜の段階', await page.evaluate(() => [...document.querySelectorAll('#gSt button')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join(',')), '苗を植えた,花が咲いた*,収穫できる');
+    await page.click('#gSt [data-st="nae"]'); await w(100);
+    check('段階を選ぶと絵と「予定より○日おくれ」', await page.evaluate(() => $('#gPrev b').textContent + '/' + /予定より\d+日おくれ/.test($('#gPrev small').textContent)), '苗を植えた/true');
+    await page.click('#gLess'); await page.click('#gLess'); await page.click('#gSave'); await w(200);
+    check('保存すると絵が変わる（✋合わせ中）', await page.evaluate(() => { const c = data.crops[0]; return (c.growShift > 0) + '/' + $('.detail-top .emo.grow small').textContent + '/' + $('#growAdj').textContent; }), 'true/苗を植えた/✋ 合わせ中');
+    check('合わせたあとも日がたつと育つ', await page.evaluate(() => growStage(data.crops[0], addDays(today(), 30)).st), 'flower');
+    await page.click('#growAdj'); await w(100); await page.click('#gAuto'); await page.click('#gSave'); await w(200);
+    check('予定どおりにもどす', await page.evaluate(() => ('growShift' in data.crops[0]) + '/' + $('.detail-top .emo.grow small').textContent), 'false/花が咲いた');
     check('野菜の画面に育ち具合の絵（苗から15日・花が咲いた）', await page.evaluate(() => { const g = $('.detail-top .emo.grow'); return g.dataset.st + '/' + g.querySelector('.e').textContent + '/' + !!g.querySelector('svg.growpic') + '/' + g.querySelector('small').textContent; }), 'flower/🍅/true/花が咲いた');
     check('育ち具合：段階の決まり方', await page.evaluate(() => {
       const mk = (plan, d, as, st) => ({ plan, plantedAt: d, as, status: st || 'growing', done: {}, emoji: '🌱', fieldId: data.fields[0].id });

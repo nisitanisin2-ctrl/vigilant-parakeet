@@ -2,7 +2,7 @@
    data = {
      crops: 育てている野菜 [{id, emoji, name, variety, place, plantedAt, status, memo,
                             plan:育て方の予定に使う野菜の名前（VEG_PLANS の n。なければ ''）, as:'seed'（種から）|'nae'（苗から）,
-                            area:広さ㎡（肥料の量に使う）, done:{予定の番号: やった日}, fieldId:どの畑か}],
+                            area:広さ㎡（肥料の量に使う）, done:{予定の番号: やった日}, fieldId:どの畑か, growShift:育ち具合の絵のずらし（日・なくてもよい）}],
      logs:  作業の記録 [{id, cropId, type, date, memo, amount, unit, hasPhoto, ts}],
      fields: 畑 [{id, name, area:地域, alt:標高m, cold:寒冷地か, loc:天気予報の場所{name, lat, lon}|null}]（地域は畑ごと。予定の日数の補正に使う）,
      settings: {multi:畑ごとに管理するか, cur:いま見ている畑のid（'all' はすべての畑。開いたときは 'all'）}
@@ -57,6 +57,7 @@ function normalize(d) {
     if (!(c.area > 0)) c.area = 0;
     if (!c.done || typeof c.done !== 'object') c.done = {};
     if (!d.fields.some(f => f.id === c.fieldId)) c.fieldId = d.fields[0].id;
+    if (c.growShift != null && !isFinite(c.growShift)) delete c.growShift;   // 育ち具合を実物に合わせた日数（grow.js）
   });
   return d;
 }
