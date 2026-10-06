@@ -157,7 +157,7 @@ function renderCrops(m) {
     }
     if (tot) badges.push(`<span class="badge acc">🧺${tot}</span>`);
     h += `<div class="card crop">
-      <div class="emo">${c.emoji}</div>
+      ${growBox(c)}
       <div class="info" data-open="${c.id}">
         <div class="name">${esc(c.name)}${c.variety ? `<small>${esc(c.variety)}</small>` : ''}</div>
         ${c.place || showFieldName() ? `<div class="muted">📍${showFieldName() ? esc(fieldOf(c).name) + (c.place ? '・' : '') : ''}${esc(c.place)}</div>` : ''}
@@ -191,7 +191,7 @@ function renderDetail(m) {
   const n = c.plantedAt ? daysBetween(c.plantedAt, today()) : null;
   let h = `<div class="card">
     <div class="detail-top">
-      <div class="emo">${c.emoji}</div>
+      ${growBox(c, true)}
       <div style="flex:1;min-width:0">
         <div class="name" style="font-size:20px;font-weight:700">${esc(c.name)}</div>
         ${c.variety ? `<div class="muted">品種：${esc(c.variety)}</div>` : ''}
