@@ -463,8 +463,15 @@ async function renderSettings(m) {
       <p><b>📖 育て方</b>：${VEG_PLANS.length}種類の野菜の、まく時期・予定・肥料・コツ・病気と害虫。「この内容で畑に登録する」で畑に入れられます。</p>
       <p><b>📍 畑ごとに管理</b>：ここ（設定）で入れると、畑を足して、畑ごとに野菜・予定・記録・地域を分けられます。「すべての畑」でまとめても見られます。</p>
       <p><b>↩ 戻る</b>：スマホの「戻る」で1つ前の画面に戻ります。畑の一覧でもう一度押すとアプリを閉じます。</p>
-      <p class="muted small">予定の日数は家庭菜園のふつうの目安です。天気や育ち方を見て決めてください。農薬は、ラベルで「使ってよい作物」と「収穫の何日前まで」を必ず確かめてください。</p></div>`;
+      <p class="muted small">予定の日数は家庭菜園のふつうの目安です。天気や育ち方を見て決めてください。農薬は、ラベルで「使ってよい作物」と「収穫の何日前まで」を必ず確かめてください。</p></div>
+    <h2>ℹ️ バージョン</h2><div class="card">
+      <div class="ver"><span>🌱</span><div><b>菜園ノート ${APP_VERSION}</b><small>${esc(WHATSNEW[0].t)}</small></div></div>
+      <button class="btn block" id="wnBtn">🆕 新しくなったこと</button><div style="height:8px"></div>
+      <button class="btn block" id="updBtn">🔄 更新をたしかめる</button>
+      <p class="muted small">新しい版が届くと、下に「新しい版が用意できました」と出ます。「いま更新」を押すと新しくなります。</p></div>`;
   bindInstall();
+  $('#wnBtn').onclick = openWhatsNew;
+  $('#updBtn').onclick = checkUpdate;
   $('#sMulti').onchange = async e => {
     data.settings.multi = e.target.checked;
     data.settings.cur = 'all';   // はじめは、すべての畑を出す
@@ -651,12 +658,75 @@ function start() {
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
   start();
   window.APP_READY = true;
+  setTimeout(maybeTellWhatsNew, 600);
 })();
+/* ===== 下に出るお知らせ（新しい版・新しくなったこと）。表電卓と同じ ===== */
+function showNotice(o) {
+  let el = $('#noticeBar');
+  if (!el) { el = document.createElement('div'); el.id = 'noticeBar'; el.className = 'notice-bar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.innerHTML = `<div class="nb-t">${esc(o.title)}</div>${o.sub ? `<div class="nb-s">${esc(o.sub)}</div>` : ''}<div class="nb-row"><button class="btn nb-no">${esc(o.no || 'あとで')}</button><button class="btn primary nb-yes">${esc(o.yes || 'OK')}</button></div>`;
+  el.querySelector('.nb-no').onclick = () => { hideNotice(); if (o.onNo) o.onNo(); };
+  el.querySelector('.nb-yes').onclick = () => { hideNotice(); if (o.onYes) o.onYes(); };
+  requestAnimationFrame(() => el.classList.add('show'));
+}
+function hideNotice() { const el = $('#noticeBar'); if (el) el.classList.remove('show'); }
+
+/* ===== 新しくなったこと =====
+   前に使っていた版と違っていたら、下に一度だけ知らせる。はじめて使う人には出さない。「あとで」でもその版は見たことにする */
+const SEEN_VER_KEY = 'saien_seen_ver';
+function seenVer() { try { return localStorage.getItem(SEEN_VER_KEY) || ''; } catch (e) { return ''; } }
+function markSeenVer() { try { localStorage.setItem(SEEN_VER_KEY, APP_VERSION); } catch (e) {} }
+function openWhatsNew() {
+  markSeenVer();
+  const s = openModal(`<h3>🆕 新しくなったこと</h3><p class="muted" style="margin-top:0">いまの版：<b>${APP_VERSION}</b></p>
+    ${WHATSNEW.map((w, i) => `<details class="more wn"${i === 0 ? ' open' : ''}><summary>${w.v}　${esc(w.t)}</summary><ul>${w.li.map(x => `<li>${x}</li>`).join('')}</ul></details>`).join('')}
+    <div class="actions"><button class="btn primary" id="wnClose">閉じる</button></div>`);
+  s.querySelector('#wnClose').onclick = closeModal;
+}
+function maybeTellWhatsNew() {
+  const prev = seenVer();
+  // はじめて使う人には出さない（v6 までは版をおぼえていなかったので、野菜か記録があれば前から使っている人）
+  if (!prev && !data.crops.length && !data.logs.length) { markSeenVer(); return false; }
+  if (prev === APP_VERSION) return false;
+  const w = WHATSNEW.find(x => x.v === APP_VERSION);
+  if (!w) { markSeenVer(); return false; }
+  showNotice({ title: `${APP_VERSION} に新しくなりました`, sub: w.t, yes: '見る', no: 'あとで', onYes: openWhatsNew, onNo: markSeenVer });
+  return true;
+}
+
+/* ===== 新しい版の入れかえ =====
+   新しい版が届いても勝手に読み込み直さず、「いま更新」を押したときだけ入れ替える（入力の途中で画面が変わらないように）。
+   「あとで」を押したら、開き直すまでは聞かない */
+let swReg = null, swUpdateDeclined = false;
+function swOfferUpdate(worker, force) {
+  if (!worker || (swUpdateDeclined && !force)) return;
+  showNotice({ title: '新しい版が用意できました', sub: '「いま更新」を押すと読み込み直します。入力の途中なら「あとで」を選んでください。',
+    yes: 'いま更新', no: 'あとで', onYes: () => { try { worker.postMessage('SKIP_WAITING'); } catch (e) { location.reload(); } }, onNo: () => { swUpdateDeclined = true; } });
+}
+/* 設定の「🔄 更新をたしかめる」 */
+async function checkUpdate() {
+  if (!swReg) { toast('ここでは更新をたしかめられません（電波・ブラウザをたしかめてください）'); return; }
+  toast('たしかめています…');
+  try { await swReg.update(); } catch (e) { toast('たしかめられませんでした。電波のある所でもう一度どうぞ'); return; }
+  setTimeout(() => {
+    const w = swReg.waiting || swReg.installing;
+    if (w) { if (w.state === 'installed') swOfferUpdate(w, true); else toast('新しい版を取りこんでいます。少しすると「いま更新」が出ます'); }
+    else toast(`いまの版（${APP_VERSION}）がいちばん新しい版です`);
+  }, 800);
+}
 if ('serviceWorker' in navigator && location.protocol !== 'file:' && !/[?&]nosw/.test(location.search)) {   // nosw はテストのとき
   let swRefreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (swRefreshing) return; swRefreshing = true; location.reload(); });
+  const hadCtrl = !!navigator.serviceWorker.controller;   // はじめて開いたとき（まだ入っていない）は読み込み直さない
+  // 入れ替わったら読み込み直す。入れ替わるのは「いま更新」を押したときだけ
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (swRefreshing || !hadCtrl) return; swRefreshing = true; location.reload(); });
   navigator.serviceWorker.register('./service-worker.js').then(reg => {
+    swReg = reg;
     reg.update();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update(); });
+    if (reg.waiting && navigator.serviceWorker.controller) swOfferUpdate(reg.waiting);   // 前に「あとで」を押したまま開き直した
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing; if (!nw) return;
+      nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) swOfferUpdate(nw); });   // はじめて入れたときは聞かない
+    });
   }).catch(() => {});
 }

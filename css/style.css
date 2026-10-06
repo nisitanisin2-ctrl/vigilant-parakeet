@@ -242,3 +242,14 @@ label.sw { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-
 .emo.grow .gbar { display: block; width: 84px; height: 6px; border-radius: 3px; background: var(--line); margin: 4px 0 1px; overflow: hidden; }
 .emo.grow .gbar b { display: block; height: 100%; background: #2e7d32; }
 .emo.grow .gbar + small { font-weight: 400; color: var(--muted); font-size: 11px; }
+/* 下に出るお知らせ（新しい版・新しくなったこと） */
+.notice-bar { position: fixed; left: 12px; right: 12px; bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 60; max-width: 560px; margin: 0 auto;
+  background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--acc); border-radius: 14px; padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.18);
+  transform: translateY(160%); opacity: 0; transition: transform .25s, opacity .25s; pointer-events: none; }
+.notice-bar.show { transform: none; opacity: 1; pointer-events: auto; }
+.notice-bar .nb-t { font-weight: 700; } .notice-bar .nb-s { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.notice-bar .nb-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+/* バージョン・新しくなったこと */
+.ver { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; } .ver > span { font-size: 30px; }
+.ver b { display: block; font-size: 17px; } .ver small { color: var(--muted); }
+details.wn ul { margin: 6px 0 10px; padding-left: 1.2em; } details.wn li { margin: 4px 0; font-size: 14px; line-height: 1.6; }
