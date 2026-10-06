@@ -1,6 +1,9 @@
 /* 便利な部品（どの画面からも使う）。
    日付は 'YYYY-MM-DD' の文字で持つ（端末の時刻に合わせた「今日」）。 */
 'use strict';
+/* 表電卓の道具「🌱 野菜」として、表電卓の中（iframe）で開いているか。
+   そのときは：インストールの案内・更新の知らせ・service-worker は表電卓にまかせ、畑の一覧で「戻る」を押すと道具を閉じる */
+const EMBED = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);

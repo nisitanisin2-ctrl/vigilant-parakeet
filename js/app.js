@@ -80,6 +80,7 @@ function onPop(e) {
   if (st.v) { view = home ? { tab: 'crops', cropId: null } : st.v; render(); window.scrollTo(0, 0); return; }
   // いちばん下まで戻った
   if (home || view.tab !== 'crops' || view.cropId) { view = { tab: 'crops', cropId: null }; history.pushState({ v: view, d: 1 }, ''); render(); window.scrollTo(0, 0); return; }
+  if (EMBED) { try { window.parent.closeSaien(); return; } catch (e) {} }   // 表電卓の中：道具を閉じる
   toast('もう一度「戻る」でアプリを閉じます', 2500);
 }
 function render() {
@@ -451,6 +452,7 @@ async function doInstall() {
   installEvt = null; render();
 }
 function installHtml() {
+  if (EMBED) return `<p style="margin:0">いまは<b>表電卓の道具「🌱 野菜」</b>として開いています。データは表電卓の中に残ります。<br><small class="muted">単独のアプリ（菜園ノート）としても使えます：nisitanisin2-ctrl.github.io/vigilant-parakeet/（データは別々です）</small></p>`;
   if (isStandalone()) return `<p style="margin:0">✅ いまはアプリとして開いています。表電卓とは別のアプリです。</p>`;
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   return `<p style="margin-top:0">菜園ノートは<b>表電卓とは別のアプリ</b>です。ホーム画面に入れると、表電卓とは別の 🌱 アイコンで開けます（データも別に残ります）。電波がなくても使えます。</p>
@@ -460,7 +462,7 @@ function installHtml() {
 }
 function installBanner() {
   let hide = false; try { hide = localStorage.getItem('saien-install-hide') === '1'; } catch (e) {}
-  if (!installEvt || isStandalone() || hide) return '';
+  if (EMBED || !installEvt || isStandalone() || hide) return '';
   return `<div class="card inst"><span>📲</span><p><b>菜園ノートをアプリとして入れる</b><br><small>表電卓とは別のアイコンで、すぐ開けます</small></p><button class="btn primary" id="instBtn">入れる</button><button class="x" id="instHide" aria-label="出さない">×</button></div>`;
 }
 function bindInstall() {
@@ -514,13 +516,13 @@ async function renderSettings(m) {
       <p class="muted small">予定の日数は家庭菜園のふつうの目安です。天気や育ち方を見て決めてください。農薬は、ラベルで「使ってよい作物」と「収穫の何日前まで」を必ず確かめてください。</p></div>
     <h2>ℹ️ バージョン</h2><div class="card">
       <div class="ver"><span>🌱</span><div><b>菜園ノート ${APP_VERSION}</b><small>${esc(WHATSNEW[0].t)}</small></div></div>
-      <button class="btn block" id="wnBtn">🆕 新しくなったこと</button><div style="height:8px"></div>
+      <button class="btn block" id="wnBtn">🆕 新しくなったこと</button>${EMBED ? '<p class="muted small">表電卓の更新といっしょに新しくなります。</p></div>' : `<div style="height:8px"></div>
       <button class="btn block" id="updBtn">🔄 更新をたしかめる</button>
-      <p class="muted small">新しい版が届くと、下に「新しい版が用意できました」と出ます。「いま更新」を押すと新しくなります。</p></div>`;
+      <p class="muted small">新しい版が届くと、下に「新しい版が用意できました」と出ます。「いま更新」を押すと新しくなります。</p></div>`}`;
   bindInstall();
   $('#sSimple').onchange = e => { setSimple(e.target.checked); render(); toast(e.target.checked ? '👀 シンプルモードにしました' : 'ふつうの表示にもどしました'); };
   $('#wnBtn').onclick = openWhatsNew;
-  $('#updBtn').onclick = checkUpdate;
+  if ($('#updBtn')) $('#updBtn').onclick = checkUpdate;
   $('#sMulti').onchange = async e => {
     data.settings.multi = e.target.checked;
     data.settings.cur = 'all';   // はじめは、すべての畑を出す
@@ -712,10 +714,11 @@ function start() {
 }
 (async () => {
   await load();
+  if (EMBED) await migrateExcalc();
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
   start();
   window.APP_READY = true;
-  setTimeout(maybeTellWhatsNew, 600);
+  if (!EMBED) setTimeout(maybeTellWhatsNew, 600);
 })();
 /* ===== 下に出るお知らせ（新しい版・新しくなったこと）。表電卓と同じ ===== */
 function showNotice(o) {
@@ -771,7 +774,7 @@ async function checkUpdate() {
     else toast(`いまの版（${APP_VERSION}）がいちばん新しい版です`);
   }, 800);
 }
-if ('serviceWorker' in navigator && location.protocol !== 'file:' && !/[?&]nosw/.test(location.search)) {   // nosw はテストのとき
+if (!EMBED && 'serviceWorker' in navigator && location.protocol !== 'file:' && !/[?&]nosw/.test(location.search)) {   // nosw はテストのとき
   let swRefreshing = false;
   const hadCtrl = !!navigator.serviceWorker.controller;   // はじめて開いたとき（まだ入っていない）は読み込み直さない
   // 入れ替わったら読み込み直す。入れ替わるのは「いま更新」を押したときだけ
