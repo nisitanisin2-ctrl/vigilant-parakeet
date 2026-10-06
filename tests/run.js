@@ -40,7 +40,7 @@ srv.listen(0, async () => {
     await open();
     await page.evaluate(async () => { await kvSet('data', { settings: { area: 'tohoku', alt: 300, cold: false }, crops: [{ id: 'old1', emoji: '🍒', name: 'ミニトマト', variety: '', place: '', plantedAt: '2026-04-01', status: 'growing', memo: '' }], logs: [{ id: 'l1', cropId: 'old1', type: 'water', date: '2026-05-09', memo: '', ts: 1 }] }); });
     await open();
-    check('前のデータを読める・名前から予定の野菜をさがす（ミニトマト→トマト）', await page.evaluate(() => { const c = data.crops[0]; return [c.name, c.plan, c.as, JSON.stringify(c.done), data.logs.length, data.fields.length, data.fields[0].area, data.fields[0].alt, c.fieldId === data.fields[0].id, data.settings.multi].join('/'); }), 'ミニトマト/トマト/seed/{}/1/1/tohoku/300/true/false');
+    check('前のデータを読める・名前から予定の野菜をさがす（ミニトマト→ミニトマト）', await page.evaluate(() => { const c = data.crops[0]; return [c.name, c.plan, c.as, JSON.stringify(c.done), data.logs.length, data.fields.length, data.fields[0].area, data.fields[0].alt, c.fieldId === data.fields[0].id, data.settings.multi].join('/'); }), 'ミニトマト/ミニトマト/seed/{}/1/1/tohoku/300/true/false');
     await page.evaluate(async () => { await kvSet('data', undefined); }); await open();
 
     // ── はじめて ──
@@ -49,7 +49,10 @@ srv.listen(0, async () => {
 
     // ── 野菜を登録（苗から） ──
     await page.click('#fab'); await w(150);
-    check('登録の窓：33種類の野菜＋その他', await page.evaluate(() => document.querySelectorAll('#cVeg button').length), 34);
+    check('登録の窓：61種類の野菜＋その他', await page.evaluate(() => document.querySelectorAll('#cVeg button').length), 62);
+    await page.fill('#cVegQ', 'トマ'); await w(50);
+    check('登録の窓で野菜をさがす', await page.evaluate(() => [...document.querySelectorAll('#cVeg button')].filter(b => !b.hidden).map(b => b.textContent).join(',')), '🍅トマト,🍅ミニトマト,🌱その他');
+    await page.fill('#cVegQ', '');
     await page.click('#cVeg [data-p="トマト"]');
     check('野菜を押すと名前が入り、苗からを選べる', await page.evaluate(() => $('#cName').value + '/' + !$('#cAsBox').hidden + '/' + $('#cEmoBox').hidden), 'トマト/true/true');
     await page.click('#cAs [data-a="nae"]'); await page.fill('#cDate', '2026-04-25'); await page.fill('#cArea', '3');
@@ -186,10 +189,15 @@ srv.listen(0, async () => {
     check('今月（5月）まける野菜・北海道は4週間おそめ（4月の分）', await page.evaluate(() => { const a = sowList(data.fields[0]); const h = sowList(Object.assign({}, data.fields[0], { area: 'hokkaido' })); return a.mo + ':' + a.list.some(v => v.n === 'オクラ') + '/' + h.mo + ':' + h.list.some(v => v.n === 'オクラ') + ':' + h.list.some(v => v.n === 'ジャガイモ'); }), '5:true/5:false:false');
     // ── 育て方 ──
     await page.click('nav [data-tab="guide"]'); await w(200);
-    check('育て方：33種類', await page.evaluate(() => document.querySelectorAll('.vgrid button').length), 33);
+    check('育て方：61種類', await page.evaluate(() => document.querySelectorAll('.vgrid button').length), 61);
+    check('ふえた野菜は、予定・肥料・絵・連作の仲間・病気がそろっている', await page.evaluate(() => VEG_MORE.filter(m => { const v = planByName(m.n), c = { plan: m.n, plantedAt: '2026-01-01', as: 'seed', status: 'growing', done: {}, emoji: m.i, fieldId: data.fields[0].id };
+      try { return !(v && VEG_FERT[VEG_CARE[m.n].f] && VEG_TIPS[m.n] && familyOf(m.n) && m.k.every(k => VEG_SICK[k] && SICK_SEASON[k]) && growOptions(c).length >= 5 && growSvg(c, growStage(c, '2026-03-01')).startsWith('<svg') && sowMonths(v).size); } catch (e) { return true; } }).map(m => m.n).join(',') || 'そろっている'), 'そろっている');
+    await page.click('[data-gg="negi"]'); await w(100);
+    check('種類でしぼる（ねぎ）', await page.evaluate(() => [...document.querySelectorAll('.vgrid button')].map(b => b.textContent).join(',')), '🧅タマネギ,🌱ネギ,🧄ニンニク,🌿ニラ,🧅ラッキョウ,🌱ワケギ');
+    await page.click('[data-gg="all"]'); await w(100);
     check('育て方の上に「今月まける・植えるもの」', await page.evaluate(() => $('details.fold[data-fold="sow"] summary h2').textContent.startsWith('🗓 今月まける・植えるもの5月') + '/' + (document.querySelectorAll('[data-sow]').length > 5)), 'true/true');
     await page.fill('#gQ', 'イモ'); await w(150);
-    check('名前でさがす', await page.evaluate(() => [...document.querySelectorAll('.vgrid button')].map(b => b.textContent).join(',')), '🥔ジャガイモ,🍠サツマイモ,🥔サトイモ');
+    check('名前でさがす', await page.evaluate(() => [...document.querySelectorAll('.vgrid button')].map(b => b.textContent).join(',')), '🥔ジャガイモ,🍠サツマイモ,🥔サトイモ,🍠ナガイモ');
     await page.click('[data-v="ジャガイモ"]'); await w(250);
     check('選ぶと向く時期・収穫まで・予定', await page.evaluate(() => $('.gsel').textContent.includes('2〜3月・8〜9月') + '/' + $('.gbig').textContent), 'true/収穫は 90〜110日後（8/8(土)〜8/28(金)）');
     await page.click('#gAdd'); await w(200);

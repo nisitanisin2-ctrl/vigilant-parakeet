@@ -2,7 +2,7 @@
    🌱 畑 …… 育てている野菜の一覧。上に「近いうちにやること」。押すとその野菜の詳しい画面（予定・肥料・記録）
    📅 予定 … 月のカレンダーに、すべての野菜の予定（色の点）と記録（絵）を出す。日を押すとその日の予定と記録
    📝 記録 … 作業の記録の一覧と、年ごとの集計
-   📖 育て方 … 33種類の野菜の育て方（いつまく・予定・肥料・コツ・病気）。ここから畑に登録できる
+   📖 育て方 … 61種類の野菜の育て方（いつまく・予定・肥料・コツ・病気）。ここから畑に登録できる
    ⚙ 設定 …… 地域（予定の日数の補正）・バックアップ・使い方 */
 'use strict';
 const PRESETS = [
@@ -51,7 +51,7 @@ function upcoming(days) {
 let view = { tab: 'crops', cropId: null };
 let cropFilter = 'active', logTypeFilter = 'all', logSub = 'list', cropSub = 'list';
 let cal = { y: 0, m: 0, sel: '' }, cropCal = { id: '', y: 0, m: 0, sel: '' };
-let guide = { n: '', q: '', date: '', as: 'seed', area: 1 };
+let guide = { n: '', q: '', g: 'all', date: '', as: 'seed', area: 1 };
 
 /* ブラウザ（スマホ）の「戻る」はアプリの中で戻る：窓を閉じる → 野菜の画面から一覧へ → ほかのタブから畑へ。
    畑の一覧で戻ると「もう一度でアプリを閉じます」と出し、もう一度押したときだけページを離れる。
@@ -430,8 +430,9 @@ function summaryHtml() {
 /* ===== 📖 育て方 ===== */
 function renderGuide(m) {
   if (!guide.date) guide.date = today();
-  const q = guide.q.trim(), list = allPlans().filter(v => !q || v.n.includes(q)), mine = v => data.myPlans.includes(v);
+  const q = guide.q.trim(), list = allPlans().filter(v => (!q || v.n.includes(q)) && (guide.g === 'all' || vegGroup(v) === guide.g)), mine = v => data.myPlans.includes(v);
   let h = sowHtml(true) + `<input type="text" id="gQ" placeholder="🔍 野菜の名前でさがす" value="${esc(guide.q)}">
+    <div class="filters gg">${VEG_GROUPS.map(([k, l]) => `<button class="chip ${guide.g === k ? 'on' : ''}" data-gg="${k}">${l}<small>${k === 'all' ? allPlans().length : allPlans().filter(v => vegGroup(v) === k).length}</small></button>`).join('')}</div>
     <div class="vgrid">${list.map(v => `<button class="${v.n === guide.n ? 'on' : ''}${mine(v) ? ' mine' : ''}" data-v="${esc(v.n)}"><span>${v.i}</span>${mine(v) ? '⭐' : ''}${esc(v.n)}</button>`).join('') || '<div class="muted">見つかりません</div>'}</div>
     <button class="btn block" id="gMine" style="margin-bottom:10px">＋ 自分の野菜・品種を足す（作業と日数を決める）</button>`;
   const v = planByName(guide.n);
@@ -453,6 +454,7 @@ function renderGuide(m) {
   m.innerHTML = h;
   bindSow(m);
   $('#gMine').onclick = () => openMyPlanForm(null); bindOwn(m);
+  m.querySelectorAll('[data-gg]').forEach(b => b.onclick = () => { guide.g = b.dataset.gg; render(); });
   if ($('#gEditMine')) $('#gEditMine').onclick = () => openMyPlanForm(v);
   const qi = $('#gQ'); qi.oninput = () => { guide.q = qi.value; const pos = qi.selectionStart; render(); const e = $('#gQ'); e.focus(); e.setSelectionRange(pos, pos); };
   m.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { guide.n = b.dataset.v; render(); setTimeout(() => { const s = $('#gSel'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
@@ -645,6 +647,7 @@ function openCropForm(c, pre) {
   c = c || Object.assign({ emoji: '🌱', name: '', variety: '', place: '', plantedAt: today(), status: 'growing', memo: '', plan: '', as: 'seed', area: 0, done: {}, fieldId: curField().id }, pre || {});
   const s = openModal(`<h3>${isNew ? '🌱 野菜を登録' : '野菜を直す'}</h3>
     <label class="f">野菜（押すと名前と予定が入ります）</label>
+    <input type="text" id="cVegQ" placeholder="🔍 野菜をさがす（${allPlans().length}種類）" style="margin-bottom:6px">
     <div class="pick veg" id="cVeg">${allPlans().map(v => `<button type="button" data-p="${esc(v.n)}" class="${c.plan === v.n ? 'on' : ''}">${v.i}${data.myPlans.includes(v) ? '⭐' : ''}${esc(v.n)}</button>`).join('')}<button type="button" data-p="" class="${!c.plan ? 'on' : ''}">🌱その他</button></div>
     <div id="cEmoBox" ${c.plan ? 'hidden' : ''}><label class="f">絵</label><div class="pick emoji" id="emo">${PRESETS.map(([e, n]) => `<button type="button" data-e="${e}" title="${n}" class="${c.emoji === e ? 'on' : ''}">${e}</button>`).join('')}</div></div>
     <label class="f">名前</label><input type="text" id="cName" value="${esc(c.name)}" placeholder="例：トマト">
@@ -696,6 +699,7 @@ function openCropForm(c, pre) {
     else if (names.includes(nm.value.trim())) nm.value = '';
     sync();
   });
+  $('#cVegQ').oninput = e => { const q = e.target.value.trim(); s.querySelectorAll('#cVeg button').forEach(b => { b.hidden = !!q && !!b.dataset.p && !b.dataset.p.includes(q); }); };
   s.querySelectorAll('#emo button').forEach(b => b.onclick = () => { s.querySelectorAll('#emo button').forEach(x => x.classList.remove('on')); b.classList.add('on'); emoji = b.dataset.e; });
   s.querySelectorAll('#cAs button').forEach(b => b.onclick = () => { as = b.dataset.a; sync(); });
   $('#cCancel').onclick = closeModal;

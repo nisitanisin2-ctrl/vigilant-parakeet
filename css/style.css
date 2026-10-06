@@ -382,3 +382,4 @@ body.simple { font-size: 18px; }
 .fab.mic { bottom: calc(150px + env(safe-area-inset-bottom)); width: 48px; height: 48px; font-size: 22px; right: 22px; background: var(--panel); color: var(--text); border: 1px solid var(--line); }
 .vbig { font-size: 20px; padding: 16px; margin-bottom: 8px; }
 .vres { margin-top: 10px; } .vit { display: flex; gap: 8px; align-items: center; padding: 6px 0; font-size: 15px; } .vit input { width: 20px; height: 20px; }
+.filters.gg .chip small { margin-left: 4px; color: var(--muted); font-size: 11px; } .filters.gg .chip.on small { color: inherit; }
