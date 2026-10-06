@@ -1,5 +1,5 @@
 // 版を上げたら、ここも js/version.js の APP_VERSION と同じにする（テストでたしかめている）
-const CACHE = 'saien-note-v13';
+const CACHE = 'saien-note-v14';
 const CACHE_PREFIX = 'saien-note-';
 // 以前ここにあった「写真メモ」アプリの古いキャッシュも片付ける
 const OLD_PREFIXES = ['photomemo-'];

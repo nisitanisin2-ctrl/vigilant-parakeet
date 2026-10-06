@@ -41,10 +41,10 @@ function sickMonth(f, t = today()) { const w = areaDef(f).w || 0; return +addDay
 /* 育ち具合の条件に合うか */
 function sickStageOk(c, g, st) {
   if (!st) return true;
-  const no = { before: -1, seed: 0, nae: 1, sprout: 1, grow: 2, flower: 3, harvest: 4, end: 5 }[g.st];
-  if (st === 'young') return no <= 1 || daysBetween(c.plantedAt, today()) <= 25;
-  if (st === 'flower') return no >= 3;
-  if (st === 'fruit') return no >= 4 || (no === 3 && growShape(c) === 'fruit');
+  const no = g.st === 'before' ? -1 : g.st === 'end' ? 8 : STAGE_NO[g.st];   // 0 種 … 5 花 6 実 7 収穫
+  if (st === 'young') return no <= 2 || daysBetween(c.plantedAt, today()) <= 25;
+  if (st === 'flower') return no >= 5;
+  if (st === 'fruit') return no >= 6 || (no === 5 && ['fruit', 'vine', 'bean', 'corn', 'berry'].includes(growShape(c)));
   return true;
 }
 /* その野菜の、いま気をつけたい病気・害虫 [{k, d:VEG_SICK, s:SICK_SEASON, peak}]（多い時期が先） */

@@ -259,7 +259,11 @@ function openGrowForm(c) {
     s.querySelectorAll('#gSt button').forEach(b => b.classList.toggle('on', b.dataset.st === g.st));
   };
   s.querySelectorAll('#gSt button').forEach(b => b.onclick = () => { shift = growShiftFor(c, b.dataset.st, shift || 0); draw(); });
-  $('#gLess').onclick = () => { shift = (shift || 0) + 3; draw(); };
+  $('#gLess').onclick = () => {
+    const nx = (shift || 0) + 3, g = growStage(Object.assign({}, c, { growShift: nx }));
+    if (g.st === 'before') { toast('これより小さくはできません（植えた日より前になります）'); return; }
+    shift = nx; draw();
+  };
   $('#gMore').onclick = () => { shift = (shift || 0) - 3; draw(); };
   $('#gAuto').onclick = () => { shift = null; draw(); };
   $('#gSave').onclick = async () => {
