@@ -5,7 +5,7 @@
 'use strict';
 
 /* ===== 野菜をさがす ===== */
-/* 野菜の一覧：もとからの33種類と、自分で足した野菜・品種（data.myPlans。{n, i, from, sow, s, base:似ている野菜}） */
+/* 野菜の一覧：もとからの野菜（veg-data.js の33種類と veg-more.js で足した分）と、自分で足した野菜・品種（data.myPlans。{n, i, from, sow, s, base:似ている野菜}） */
 const allPlans = () => VEG_PLANS.concat((typeof data !== 'undefined' && data.myPlans) || []);
 const planByName = n => allPlans().find(v => v.n === n) || null;
 /* 名前から、予定に使う野菜をさがす（「ミニトマト」→トマト、「エダマメ・豆」→エダマメ）。なければ '' */

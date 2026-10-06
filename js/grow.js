@@ -8,7 +8,7 @@
 /* ===== 野菜の形 =====
    fruit：実がなる（支柱）、vine：つるが地面をはう（カボチャ・スイカ）、corn：トウモロコシ、bean：豆、berry：イチゴ、
    root：根を食べる、tuber：いも、leaf：葉物、head：結球する（キャベツなど）、allium：タマネギ・ネギ */
-const GROW_SHAPE_BY_NAME = { 'カボチャ': 'vine', 'スイカ': 'vine', 'トウモロコシ': 'corn', 'キャベツ': 'head', 'ハクサイ': 'head', 'レタス': 'head', 'ブロッコリー': 'head' };
+const GROW_SHAPE_BY_NAME = { 'カボチャ': 'vine', 'スイカ': 'vine', 'メロン': 'vine', 'トウガン': 'vine', 'カリフラワー': 'head', 'トウモロコシ': 'corn', 'キャベツ': 'head', 'ハクサイ': 'head', 'レタス': 'head', 'ブロッコリー': 'head' };
 const GROW_SHAPE_BY_F = { fruit: 'fruit', corn: 'corn', bean: 'bean', berry: 'berry', root: 'root', potato: 'tuber', sweet: 'tuber', taro: 'tuber', leaf: 'leaf', allium: 'allium' };
 /* 絵に使う野菜の名前（自分で足した野菜は「似ている野菜」の絵にする） */
 const lookName = c => { const v = planByName(c.plan); return (v && v.base) || c.plan; };
@@ -19,9 +19,12 @@ const GROW_LOOK = {
   'カボチャ': ['#33691e', 'r'], 'スイカ': ['#2e7d32', 'r'], 'イチゴ': ['#e53935', 'r'], 'エダマメ': ['#7cb342', 'l'], 'エンドウ': ['#7cb342', 'l'], 'ソラマメ': ['#689f38', 'l'],
   'ダイコン': ['#e3eecf', 'l'], 'ニンジン': ['#ef6c00', 'l'], 'カブ': ['#f7f5ef', 'r'], 'ラディッシュ': ['#d81b60', 'r'], 'ビーツ': ['#6a1b4d', 'r'],
   'ジャガイモ': ['#c9a46a', 'r'], 'サツマイモ': ['#9c2f5b', 'l'], 'サトイモ': ['#8d6e63', 'r'], 'タマネギ': ['#d9a441', 'r'], 'ニンニク': ['#efe9dc', 'r'], 'ネギ': ['#f2f2ea', 'l'],
+  'ミニトマト': ['#e53935', 'r'], 'シシトウ': ['#43a047', 'l'], 'トウガラシ': ['#d32f2f', 'l'], 'パプリカ': ['#fb8c00', 'r'], 'ゴーヤ': ['#9ccc65', 'l'], 'メロン': ['#b5c95a', 'r'], 'トウガン': ['#4f7f3a', 'l'],
+  'ラッカセイ': ['#d7b98a', 'l'], 'インゲン': ['#7cb342', 'l'], 'スナップエンドウ': ['#8bc34a', 'l'], 'ゴボウ': ['#8d6e4f', 'l'], 'ショウガ': ['#e0c07a', 'r'], 'ナガイモ': ['#c9a46a', 'l'],
+  'ラッキョウ': ['#f3efe6', 'r'], 'ワケギ': ['#f2f2ea', 'l'], 'ニラ': ['#f2f2ea', 'l'], 'カリフラワー': ['#f5f2e6', 'r'],
   'キャベツ': ['#a5d6a7', 'r'], 'ハクサイ': ['#e6f0c8', 'l'], 'レタス': ['#c5e1a5', 'r'], 'ブロッコリー': ['#2e6b2e', 'r']
 };
-const FLOWER_COL = { 'ナス': '#9575cd', 'ジャガイモ': '#f3f0ff', 'エダマメ': '#efe6ff', 'エンドウ': '#f8f0ff', 'ソラマメ': '#fafafa', 'イチゴ': '#ffffff', 'オクラ': '#fff59d' };
+const FLOWER_COL = { 'シシトウ': '#fafafa', 'トウガラシ': '#fafafa', 'パプリカ': '#fafafa', 'インゲン': '#f3e5f5', 'スナップエンドウ': '#fafafa', 'ラッカセイ': '#fdd835', 'ナス': '#9575cd', 'ジャガイモ': '#f3f0ff', 'エダマメ': '#efe6ff', 'エンドウ': '#f8f0ff', 'ソラマメ': '#fafafa', 'イチゴ': '#ffffff', 'オクラ': '#fff59d' };
 
 const STAGE_NO = { seed: 0, nae: 1, sprout: 1, leaf: 2, young: 3, big: 4, flower: 5, fruit: 6, harvest: 7 };
 const STAGE_LABEL = { before: 'これから', seed: '種をまいた', nae: '苗を植えた', sprout: '芽が出た', leaf: '本葉が出た', young: '育ってきた', big: '大きく育った',
@@ -32,7 +35,7 @@ const SHAPE_LABEL = {
   root: { fruit: '根が太ってきた' }, tuber: { fruit: 'いもが太ってきた' }, leaf: { fruit: '収穫まぢか' },
   head: { flower: '巻きはじめた', fruit: '巻いてきた' }, allium: { fruit: '玉が太ってきた' }
 };
-const PLAN_LABEL = { 'ブロッコリー': { fruit: 'つぼみが育った' }, 'ネギ': { fruit: '太ってきた' }, 'レタス': { fruit: '収穫まぢか' } };
+const PLAN_LABEL = { 'ブロッコリー': { fruit: 'つぼみが育った' }, 'ネギ': { fruit: '太ってきた' }, 'ニラ': { fruit: '刈りごろが近い', harvest: '刈りとれる' }, 'ワケギ': { fruit: '刈りごろが近い', harvest: '刈りとれる' }, 'ショウガ': { fruit: '根が太ってきた' }, 'ナガイモ': { fruit: 'いもがのびてきた' }, 'カリフラワー': { fruit: '花蕾が育った' }, 'レタス': { fruit: '収穫まぢか' } };
 const stageLabel = (shape, st, c) => (st === 'leaf' && c.as === 'nae' ? '根づいた' : (PLAN_LABEL[lookName(c)] || {})[st] || (SHAPE_LABEL[shape] || {})[st]) || STAGE_LABEL[st];
 const KIND_STAGE = { sprout: 'sprout', flower: 'flower', harvest: 'harvest' };
 
@@ -248,12 +251,13 @@ function growSvg(c, g, px = 56) {
 }
 /* タマネギ・ニンニク・ネギ：細長い葉。玉が太り、収穫のころは葉が倒れる */
 function gAllium(v, st, look = ['#d9a441', 'r'], plan) {
-  const negi = plan === 'ネギ', h = 12 + 26 * (v || 0.3), fallen = !negi && (st === 'harvest' || st === 'end'), fr = STAGE_NO[st] >= 6 || st === 'harvest' || st === 'end';
+  const negi = plan === 'ネギ', stand = negi || plan === 'ニラ' || plan === 'ワケギ', h = 12 + 26 * (v || 0.3), fallen = !stand && (st === 'harvest' || st === 'end'), fr = STAGE_NO[st] >= 6 || st === 'harvest' || st === 'end';
   let s = '';
   for (const [dx, a, col] of [[-2.5, -12, '#5d9b38'], [0, 0, '#79b84a'], [2.5, 12, '#4f8a2f'], [-1, -5, '#6aa843'], [1, 6, '#5d9b38']]) {
     s += fallen ? `<path d="M${32 + dx} 49 Q${r2(32 + dx + a)} ${r2(49 - h * .45)} ${r2(32 + dx + a * 2.4 + (a >= 0 ? 14 : -14))} ${r2(49 - h * .15)}" stroke="${col}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
       : `<path d="M${32 + dx} 50 Q${r2(32 + dx + a * .3)} ${r2(50 - h * .5)} ${r2(32 + dx + a * .7)} ${r2(50 - h)}" stroke="${col}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
   }
+  if (stand && !negi) return s;   // ニラ・ワケギは葉を刈る（玉はない）
   if (negi) return `<rect x="29.5" y="${r2(50 - h * .3)}" width="5" height="${r2(h * .3)}" rx="2" fill="#f2f2ea"/>` + s;
   if (fr) { const z = fallen ? 6.5 : 4.5; s = `<ellipse cx="32" cy="${r2(51 - z * .6)}" rx="${z}" ry="${r2(z * .85)}" fill="${look[0]}" stroke="#00000022" stroke-width=".5"/><ellipse cx="32" cy="${r2(51 - z * .6)}" rx="${z}" ry="${r2(z * .85)}" fill="url(#ggShine)"/>` + s; }
   return s;
