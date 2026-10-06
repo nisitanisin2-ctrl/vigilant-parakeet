@@ -151,6 +151,7 @@ srv.listen(0, async () => {
     check('はじめは畑を分けない（📍の切りかえなし）', await page.evaluate(() => $('#fieldSel').hidden + '/' + !!$('#sArea')), 'true/true');
     await page.click('#sMulti'); await w(200);
     check('畑ごとに管理を入れると畑の一覧', await page.evaluate(() => data.settings.multi + '/' + [...document.querySelectorAll('.fitem b')].map(b => b.textContent).join(',') + '/' + !!$('#sArea')), 'true/📍わたしの畑/false');
+    check('畑ごとに管理を入れたときは、すべての畑', await page.evaluate(() => data.settings.cur), 'all');
     await page.click('#fAdd'); await w(150);
     await page.fill('#fName', '山の畑'); await page.selectOption('#sArea', 'hokkaido'); await w(50);
     check('畑の窓：地域を選ぶと補正が出る', await page.evaluate(() => $('#sFix').textContent.includes('1.20倍')), true);
@@ -170,6 +171,8 @@ srv.listen(0, async () => {
     check('わたしの畑に切りかえ', await page.evaluate(() => document.querySelectorAll('.crop').length), 4);
     await page.click('nav [data-tab="logs"]'); await w(150);
     check('記録もその畑のぶんだけ', await page.evaluate(() => document.querySelectorAll('.log').length), 3);
+    await open(); await page.click('nav [data-tab="settings"]'); await page.click('nav [data-tab="crops"]'); await w(200);
+    check('開き直すと、すべての畑が出る', await page.evaluate(() => data.settings.cur + '/' + $('#fieldSel').value + '/' + document.querySelectorAll('.crop').length), 'all/all/5');
     await page.click('nav [data-tab="settings"]'); await w(150);
     await page.click(`[data-fedit="${await page.evaluate(() => data.fields[1].id)}"]`); await w(150);
     await page.click('#fDel'); await w(250);

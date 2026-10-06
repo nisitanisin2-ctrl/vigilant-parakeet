@@ -5,7 +5,7 @@
                             area:広さ㎡（肥料の量に使う）, done:{予定の番号: やった日}, fieldId:どの畑か}],
      logs:  作業の記録 [{id, cropId, type, date, memo, amount, unit, hasPhoto, ts}],
      fields: 畑 [{id, name, area:地域, alt:標高m, cold:寒冷地か}]（地域は畑ごと。予定の日数の補正に使う）,
-     settings: {multi:畑ごとに管理するか, cur:いま見ている畑のid（'all' はすべての畑）}
+     settings: {multi:畑ごとに管理するか, cur:いま見ている畑のid（'all' はすべての畑。開いたときは 'all'）}
    }
    写真は大きいので data とは別に 'photo:記録のid' で入れている。 */
 'use strict';
@@ -49,7 +49,7 @@ function normalize(d) {
   // 前のかたちは地域が1つだけ（settings.area）だったので、それを1つめの畑にする
   if (!d.fields.length) d.fields.push({ id: 'f1', name: 'わたしの畑', area: old.area || 'kanto', alt: Number(old.alt) || 0, cold: !!old.cold });
   d.fields.forEach(f => { f.name = String(f.name || '畑'); f.area = f.area || 'kanto'; f.alt = Math.max(0, Number(f.alt) || 0); f.cold = !!f.cold; });
-  if (d.settings.cur !== 'all' && !d.fields.some(f => f.id === d.settings.cur)) d.settings.cur = d.fields[0].id;
+  if (d.settings.cur !== 'all' && !d.fields.some(f => f.id === d.settings.cur)) d.settings.cur = 'all';
   d.crops.forEach(c => {
     if (c.plan === undefined) c.plan = guessPlan(c.name);   // 名前から育て方の予定をさがす（トマト→トマト）
     if (c.as !== 'nae') c.as = 'seed';
@@ -67,7 +67,7 @@ const multiOn = () => !!data.settings.multi;
 const curField = () => (multiOn() && fieldById(data.settings.cur)) || data.fields[0];   // 地域・新しい野菜に使う畑
 const inView = c => !multiOn() || data.settings.cur === 'all' || c.fieldId === data.settings.cur;   // いま見ている畑の野菜か
 async function load() {
-  try { data = normalize(await kvGet('data')); }
+  try { data = normalize(await kvGet('data')); data.settings.cur = 'all'; }   // 開いたときは、すべての畑を出す
   catch (e) { data = normalize(null); toast('データを読み込めませんでした'); }
 }
 async function save() {

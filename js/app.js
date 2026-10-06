@@ -467,7 +467,7 @@ async function renderSettings(m) {
   bindInstall();
   $('#sMulti').onchange = async e => {
     data.settings.multi = e.target.checked;
-    if (data.settings.cur !== 'all' && !fieldById(data.settings.cur)) data.settings.cur = f0.id;
+    data.settings.cur = 'all';   // はじめは、すべての畑を出す
     await save(); render();
     toast(e.target.checked ? '畑ごとに管理します。「＋ 畑を足す」で畑を足せます' : '畑を分けずに、すべての野菜を出します');
   };
@@ -507,7 +507,7 @@ function openFieldForm(f) {
     if (!confirm(`畑「${f.name}」を消しますか？${n ? `\n野菜${n}件は「${others[0].name}」に移ります。` : ''}`)) return;
     data.crops.forEach(c => { if (c.fieldId === f.id) c.fieldId = others[0].id; });
     data.fields = others;
-    if (data.settings.cur === f.id) data.settings.cur = others[0].id;
+    if (data.settings.cur === f.id) data.settings.cur = 'all';
     await save(); closeModal(); render(); toast('消しました');
   };
 }

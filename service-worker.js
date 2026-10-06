@@ -1,4 +1,4 @@
-const CACHE = 'saien-note-v4';
+const CACHE = 'saien-note-v5';
 const CACHE_PREFIX = 'saien-note-';
 // 以前ここにあった「写真メモ」アプリの古いキャッシュも片付ける
 const OLD_PREFIXES = ['photomemo-'];
