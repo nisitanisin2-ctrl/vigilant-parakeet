@@ -28,13 +28,13 @@ srv.listen(0, async () => {
   try {
     // ── 前の菜園ノート（v1）のデータを引き継ぐ ──
     await open();
-    await page.evaluate(async () => { await kvSet('data', { crops: [{ id: 'old1', emoji: '🍒', name: 'ミニトマト', variety: '', place: '', plantedAt: '2026-04-01', status: 'growing', memo: '' }], logs: [{ id: 'l1', cropId: 'old1', type: 'water', date: '2026-05-09', memo: '', ts: 1 }] }); });
+    await page.evaluate(async () => { await kvSet('data', { settings: { area: 'tohoku', alt: 300, cold: false }, crops: [{ id: 'old1', emoji: '🍒', name: 'ミニトマト', variety: '', place: '', plantedAt: '2026-04-01', status: 'growing', memo: '' }], logs: [{ id: 'l1', cropId: 'old1', type: 'water', date: '2026-05-09', memo: '', ts: 1 }] }); });
     await open();
-    check('前のデータを読める・名前から予定の野菜をさがす（ミニトマト→トマト）', await page.evaluate(() => { const c = data.crops[0]; return [c.name, c.plan, c.as, JSON.stringify(c.done), data.logs.length, data.settings.area].join('/'); }), 'ミニトマト/トマト/seed/{}/1/kanto');
+    check('前のデータを読める・名前から予定の野菜をさがす（ミニトマト→トマト）', await page.evaluate(() => { const c = data.crops[0]; return [c.name, c.plan, c.as, JSON.stringify(c.done), data.logs.length, data.fields.length, data.fields[0].area, data.fields[0].alt, c.fieldId === data.fields[0].id, data.settings.multi].join('/'); }), 'ミニトマト/トマト/seed/{}/1/1/tohoku/300/true/false');
     await page.evaluate(async () => { await kvSet('data', undefined); }); await open();
 
     // ── はじめて ──
-    check('はじめは使い方の3つの手順', await page.evaluate(() => document.querySelectorAll('.steps > div').length + '/' + document.querySelector('.steps').textContent.includes('植えた野菜')), '4/true');
+    check('はじめは使い方の3つの手順', await page.evaluate(() => document.querySelectorAll('.steps > div').length + '/' + document.querySelector('.steps').textContent.includes('植えた野菜')), '5/true');
     check('下のタブ5つ', await page.evaluate(() => [...document.querySelectorAll('nav.tabs button')].map(b => b.textContent.trim()).join(',')), '🌱畑,📅予定,📝記録,📖育て方,⚙️設定');
 
     // ── 野菜を登録（苗から） ──
@@ -66,7 +66,7 @@ srv.listen(0, async () => {
     check('地域を北海道にすると補正＋20%（春まきは4週間おそめ）', await page.evaluate(() => $('#sFix').textContent.replace(/\s+/g, '')), '補正＋20%（日数を1.20倍）／種まきの時期は標準より4週間おそめ');
     await page.evaluate(() => go('crops', data.crops[0].id)); await w(200);
     check('予定の日数ものびる（花が咲く 18〜36日後）', (await prs())[1], '花が咲く 5/13(水)〜5/31(日) あと3日');
-    await page.evaluate(async () => { data.settings.area = 'kanto'; await save(); }); await page.evaluate(() => render()); await w(150);
+    await page.evaluate(async () => { data.fields[0].area = 'kanto'; await save(); }); await page.evaluate(() => render()); await w(150);
 
     // ── 畑の一覧 ──
     await page.click('#backBtn'); await w(200);
@@ -142,9 +142,40 @@ srv.listen(0, async () => {
     const json = await page.evaluate(async () => JSON.stringify({ app: 'saien-note', version: 2, data, photos: {} }));
     await page.evaluate(async () => { data.crops = []; data.logs = []; await save(); });
     await page.evaluate(async j => { await importData(new File([j], 'b.json')); }, json); await w(100);
-    check('バックアップから戻す', await page.evaluate(() => data.crops.length + '/' + data.logs.length + '/' + data.settings.area), '4/3/kanto');
+    check('バックアップから戻す', await page.evaluate(() => data.crops.length + '/' + data.logs.length + '/' + data.fields[0].area), '4/3/kanto');
     await open();
     check('開き直しても残る', await page.evaluate(() => data.crops.length), 4);
+    // ── 畑ごとに管理 ──
+    await page.click('nav [data-tab="settings"]'); await w(200);
+    check('設定に「アプリとして入れる」（表電卓とは別）', await page.evaluate(() => document.querySelector('main').textContent.includes('表電卓とは別のアプリ')), true);
+    check('はじめは畑を分けない（📍の切りかえなし）', await page.evaluate(() => $('#fieldSel').hidden + '/' + !!$('#sArea')), 'true/true');
+    await page.click('#sMulti'); await w(200);
+    check('畑ごとに管理を入れると畑の一覧', await page.evaluate(() => data.settings.multi + '/' + [...document.querySelectorAll('.fitem b')].map(b => b.textContent).join(',') + '/' + !!$('#sArea')), 'true/📍わたしの畑/false');
+    await page.click('#fAdd'); await w(150);
+    await page.fill('#fName', '山の畑'); await page.selectOption('#sArea', 'hokkaido'); await w(50);
+    check('畑の窓：地域を選ぶと補正が出る', await page.evaluate(() => $('#sFix').textContent.includes('1.20倍')), true);
+    await page.click('#fSave'); await w(200);
+    check('畑を足すと、その畑を見ている', await page.evaluate(() => data.fields.length + '/' + (data.settings.cur === data.fields[1].id) + '/' + data.fields[1].area), '2/true/hokkaido');
+    await page.click('nav [data-tab="crops"]'); await w(200);
+    check('新しい畑は空・上に📍の切りかえ', await page.evaluate(() => !$('#fieldSel').hidden + '/' + $('#fieldSel').selectedOptions[0].textContent + '/' + document.querySelectorAll('.crop').length + '/' + $('main').textContent.includes('まだ野菜がありません')), 'true/📍山の畑/0/true');
+    await page.click('#fab'); await w(150);
+    check('登録の窓に畑の選択（いまの畑）', await page.evaluate(() => $('#cField').selectedOptions[0].textContent), '📍山の畑（北海道）');
+    await page.click('#cVeg [data-p="トマト"]'); await page.click('#cAs [data-a="nae"]'); await page.fill('#cDate', '2026-04-25'); await page.click('#cSave'); await w(250);
+    check('その畑の地域で予定（北海道は花が 5/13〜）', (await prs())[1], '花が咲く 5/13(水)〜5/31(日) あと3日');
+    await page.click('#backBtn'); await w(200);
+    check('山の畑には1件だけ', await page.evaluate(() => document.querySelectorAll('.crop').length), 1);
+    await page.selectOption('#fieldSel', 'all'); await w(200);
+    check('すべての畑：全部と畑の名前', await page.evaluate(() => document.querySelectorAll('.crop').length + '/' + [...document.querySelectorAll('.crop .muted')].some(e => e.textContent.includes('山の畑'))), '5/true');
+    await page.selectOption('#fieldSel', await page.evaluate(() => data.fields[0].id)); await w(200);
+    check('わたしの畑に切りかえ', await page.evaluate(() => document.querySelectorAll('.crop').length), 4);
+    await page.click('nav [data-tab="logs"]'); await w(150);
+    check('記録もその畑のぶんだけ', await page.evaluate(() => document.querySelectorAll('.log').length), 3);
+    await page.click('nav [data-tab="settings"]'); await w(150);
+    await page.click(`[data-fedit="${await page.evaluate(() => data.fields[1].id)}"]`); await w(150);
+    await page.click('#fDel'); await w(250);
+    check('畑を消すと野菜はほかの畑へ', await page.evaluate(() => data.fields.length + '/' + data.crops.filter(c => c.fieldId === data.fields[0].id).length), '1/5');
+    await page.click('#sMulti'); await w(150);
+    check('畑ごとに管理を切る', await page.evaluate(() => data.settings.multi + '/' + !!$('#sArea')), 'false/true');
     check('エラーなし', errs.join(' | '), '');
   } catch (e) { fail++; console.log('✗ 止まりました：', e.message.split('\n')[0], pass, await page.evaluate(() => JSON.stringify([view, history.state, history.length])).catch(() => '')); }
   await browser.close(); srv.close();

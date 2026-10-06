@@ -2,9 +2,10 @@
    data = {
      crops: 育てている野菜 [{id, emoji, name, variety, place, plantedAt, status, memo,
                             plan:育て方の予定に使う野菜の名前（VEG_PLANS の n。なければ ''）, as:'seed'（種から）|'nae'（苗から）,
-                            area:広さ㎡（肥料の量に使う）, done:{予定の番号: やった日}}],
+                            area:広さ㎡（肥料の量に使う）, done:{予定の番号: やった日}, fieldId:どの畑か}],
      logs:  作業の記録 [{id, cropId, type, date, memo, amount, unit, hasPhoto, ts}],
-     settings: {area:地域, alt:標高m, cold:寒冷地か}
+     fields: 畑 [{id, name, area:地域, alt:標高m, cold:寒冷地か}]（地域は畑ごと。予定の日数の補正に使う）,
+     settings: {multi:畑ごとに管理するか, cur:いま見ている畑のid（'all' はすべての畑）}
    }
    写真は大きいので data とは別に 'photo:記録のid' で入れている。 */
 'use strict';
@@ -35,22 +36,36 @@ async function kvSet(key, val) {
   });
 }
 
-const SETTINGS0 = { area: 'kanto', alt: 0, cold: false };
-let data = { crops: [], logs: [], settings: { ...SETTINGS0 } };
+const SETTINGS0 = { multi: false, cur: '' };
+let data = { crops: [], logs: [], fields: [], settings: { ...SETTINGS0 } };
 /* 前のかたち（菜園ノートの v1）から読んだときも、足りない項目をうめる */
 function normalize(d) {
   d = d || {};
   d.crops = Array.isArray(d.crops) ? d.crops : [];
   d.logs = Array.isArray(d.logs) ? d.logs : [];
-  d.settings = Object.assign({ ...SETTINGS0 }, d.settings || {});
+  const old = d.settings || {};
+  d.settings = { multi: !!old.multi, cur: old.cur || '' };
+  d.fields = Array.isArray(d.fields) ? d.fields.filter(f => f && f.id) : [];
+  // 前のかたちは地域が1つだけ（settings.area）だったので、それを1つめの畑にする
+  if (!d.fields.length) d.fields.push({ id: 'f1', name: 'わたしの畑', area: old.area || 'kanto', alt: Number(old.alt) || 0, cold: !!old.cold });
+  d.fields.forEach(f => { f.name = String(f.name || '畑'); f.area = f.area || 'kanto'; f.alt = Math.max(0, Number(f.alt) || 0); f.cold = !!f.cold; });
+  if (d.settings.cur !== 'all' && !d.fields.some(f => f.id === d.settings.cur)) d.settings.cur = d.fields[0].id;
   d.crops.forEach(c => {
     if (c.plan === undefined) c.plan = guessPlan(c.name);   // 名前から育て方の予定をさがす（トマト→トマト）
     if (c.as !== 'nae') c.as = 'seed';
     if (!(c.area > 0)) c.area = 0;
     if (!c.done || typeof c.done !== 'object') c.done = {};
+    if (!d.fields.some(f => f.id === c.fieldId)) c.fieldId = d.fields[0].id;
   });
   return d;
 }
+/* ===== 畑 =====
+   「畑ごとに管理する」が切ってあるときは、畑の分け方を気にせず全部の野菜を出す（地域は1つめの畑のもの） */
+const fieldById = id => data.fields.find(f => f.id === id) || null;
+const fieldOf = c => (c && fieldById(c.fieldId)) || data.fields[0];
+const multiOn = () => !!data.settings.multi;
+const curField = () => (multiOn() && fieldById(data.settings.cur)) || data.fields[0];   // 地域・新しい野菜に使う畑
+const inView = c => !multiOn() || data.settings.cur === 'all' || c.fieldId === data.settings.cur;   // いま見ている畑の野菜か
 async function load() {
   try { data = normalize(await kvGet('data')); }
   catch (e) { data = normalize(null); toast('データを読み込めませんでした'); }
@@ -71,7 +86,7 @@ async function delPhoto(id) { photoCache.delete(id); await kvSet('photo:' + id, 
 async function exportData() {
   const photos = {};
   for (const l of data.logs) if (l.hasPhoto) { const p = await getPhoto(l.id); if (p) photos[l.id] = p; }
-  const blob = new Blob([JSON.stringify({ app: 'saien-note', version: 2, exportedAt: new Date().toISOString(), data, photos })], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ app: 'saien-note', version: 3, exportedAt: new Date().toISOString(), data, photos })], { type: 'application/json' });
   const name = `菜園ノート_${today()}.json`;
   const file = new File([blob], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {

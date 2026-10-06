@@ -221,3 +221,13 @@ details.more[open] summary { border-bottom: 1px solid var(--line); margin-bottom
 label.sw { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 15px; } label.sw input { width: 20px; height: 20px; }
 .help p { margin: 0 0 10px; line-height: 1.7; }
 .steps p { margin: 0; flex: 1; }
+/* 畑の切りかえ（見出しの右）と、畑の一覧（設定） */
+#fieldSel { width: auto; max-width: 48%; padding: 6px 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.5); background: rgba(255,255,255,.15); color: inherit; font-size: 15px; font-weight: 700; }
+#fieldSel option { color: #222; background: #fff; }
+.flist { margin: 8px 0 10px; }
+.fitem { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.fitem > div { flex: 1; min-width: 0; } .fitem small { display: block; color: var(--muted); font-size: 12.5px; }
+/* アプリとして入れる（畑の一覧の上） */
+.card.inst { display: flex; align-items: center; gap: 10px; background: var(--acc-soft); }
+.card.inst > span { font-size: 26px; } .card.inst p { flex: 1; margin: 0; } .card.inst small { color: var(--muted); }
+.card.inst .x { border: 0; background: none; font-size: 20px; color: var(--muted); padding: 4px; cursor: pointer; }
