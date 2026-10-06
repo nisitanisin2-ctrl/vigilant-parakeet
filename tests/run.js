@@ -22,7 +22,9 @@ srv.listen(0, async () => {
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
   page.on('dialog', d => d.accept());
-  await page.addInitScript(() => { window.APP_TODAY = '2026-05-10'; });
+  const VER = fs.readFileSync(path.join(ROOT, 'js/version.js'), 'utf8').match(/APP_VERSION = '(v\d+)'/)[1];
+  // 「新しくなりました」のお知らせは、たしかめるところ以外では出さない（見たことにしておく）
+  await page.addInitScript(v => { window.APP_TODAY = '2026-05-10'; try { if (!sessionStorage.getItem('keepSeen')) localStorage.setItem('saien_seen_ver', v); } catch (e) {} }, VER);
   const w = ms => page.waitForTimeout(ms);
   const open = async () => { await page.goto(URL); await page.waitForFunction(() => window.APP_READY); };
   try {
@@ -186,6 +188,31 @@ srv.listen(0, async () => {
     check('畑を消すと野菜はほかの畑へ', await page.evaluate(() => data.fields.length + '/' + data.crops.filter(c => c.fieldId === data.fields[0].id).length), '1/5');
     await page.click('#sMulti'); await w(150);
     check('畑ごとに管理を切る', await page.evaluate(() => data.settings.multi + '/' + !!$('#sArea')), 'false/true');
+    // ── バージョン・新しくなったこと ──
+    const verJs = fs.readFileSync(path.join(ROOT, 'js/version.js'), 'utf8').match(/APP_VERSION = '(v\d+)'/)[1];
+    const swJs = fs.readFileSync(path.join(ROOT, 'service-worker.js'), 'utf8');
+    check('版と service-worker の CACHE が同じ・ASSETS に version.js', [swJs.includes(`'saien-note-${verJs}'`), swJs.includes("'./js/version.js'"), swJs.includes("'./js/grow.js'")], [true, true, true]);
+    check('いちばん新しい「新しくなったこと」は今の版', await page.evaluate(() => WHATSNEW[0].v === APP_VERSION), true);
+    await page.click('nav [data-tab="settings"]'); await w(200);
+    check('設定にバージョン', await page.evaluate(() => $('.ver b').textContent), '菜園ノート ' + verJs);
+    await page.click('#wnBtn'); await w(150);
+    check('「新しくなったこと」の窓', await page.evaluate(() => document.querySelectorAll('#modalRoot details.wn').length === WHATSNEW.length && $('#modalRoot details.wn[open] summary').textContent.startsWith(APP_VERSION)), true);
+    await page.click('#wnClose'); await w(100);
+    const keep = json => page.evaluate(async j => { sessionStorage.setItem('keepSeen', '1'); localStorage.removeItem('saien_seen_ver'); await kvSet('data', j); }, json);
+    await keep({ crops: [], logs: [] }); await open(); await w(900);
+    check('はじめて使う人には新しくなったことを出さない', await page.evaluate(() => !document.querySelector('#noticeBar.show') && localStorage.getItem('saien_seen_ver') === APP_VERSION), true);
+    await keep(JSON.parse(json).data); await open(); await w(900);
+    check('v6 まで使っていた人（版をおぼえていない・野菜あり）には出す', await page.evaluate(() => !!document.querySelector('#noticeBar.show')), true);
+    await page.evaluate(() => localStorage.setItem('saien_seen_ver', 'v1')); await open(); await w(900);
+    check('前の版から開くと、下に「新しくなりました」', await page.evaluate(() => $('#noticeBar.show .nb-t').textContent + '/' + $('#noticeBar .nb-s').textContent), verJs + ' に新しくなりました/' + await page.evaluate(() => WHATSNEW[0].t));
+    await page.click('#noticeBar .nb-yes'); await w(200);
+    check('「見る」で中身・見たことになる', await page.evaluate(() => !!$('#modalRoot details.wn') + '/' + localStorage.getItem('saien_seen_ver')), 'true/' + verJs);
+    await open(); await w(900);
+    check('もう一度開いても出ない', await page.evaluate(() => !document.querySelector('#noticeBar.show')), true);
+    await page.evaluate(() => swOfferUpdate({ postMessage: m => { window.__msg = m; } })); await w(100);
+    check('新しい版：「いま更新」で入れかえを頼む', await page.evaluate(() => $('#noticeBar .nb-t').textContent), '新しい版が用意できました');
+    await page.click('#noticeBar .nb-yes'); await w(100);
+    check('SKIP_WAITING を送る', await page.evaluate(() => window.__msg), 'SKIP_WAITING');
     check('エラーなし', errs.join(' | '), '');
   } catch (e) { fail++; console.log('✗ 止まりました：', e.message.split('\n')[0], pass, await page.evaluate(() => JSON.stringify([view, history.state, history.length])).catch(() => '')); }
   await browser.close(); srv.close();
