@@ -26,6 +26,14 @@ srv.listen(0, async () => {
   // 「新しくなりました」のお知らせは、たしかめるところ以外では出さない（見たことにしておく）
   await page.addInitScript(v => { window.APP_TODAY = '2026-05-10'; try { if (!sessionStorage.getItem('keepSeen')) localStorage.setItem('saien_seen_ver', v); } catch (e) {} }, VER);
   const w = ms => page.waitForTimeout(ms);
+  // 天気予報（Open-Meteo）はテストではにせの答えを返す
+  let wxCalls = 0;
+  await page.route('https://api.open-meteo.com/**', r => {
+    wxCalls++;
+    const time = [...Array(16)].map((_, i) => { const d = new Date(2026, 4, 10 + i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+    r.fulfill({ contentType: 'application/json', body: JSON.stringify({ daily: { time, weather_code: time.map((_, i) => [0, 3, 63][i % 3]), temperature_2m_max: time.map((_, i) => 25 + (i % 2)), temperature_2m_min: time.map((_, i) => i === 2 ? 2 : 14), precipitation_probability_max: time.map((_, i) => [10, 30, 80][i % 3]) } }) });
+  });
+  await page.route('https://geocoding-api.open-meteo.com/**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ results: [{ name: 'つくば市', admin1: '茨城県', latitude: 36.08, longitude: 140.08, country_code: 'JP' }, { name: 'Tsukuba', latitude: 1, longitude: 1, country_code: 'XX' }] }) }));
   const open = async () => { await page.goto(URL); await page.waitForFunction(() => window.APP_READY); };
   try {
     // ── 前の菜園ノート（v1）のデータを引き継ぐ ──
@@ -200,6 +208,25 @@ srv.listen(0, async () => {
     check('畑を消すと野菜はほかの畑へ', await page.evaluate(() => data.fields.length + '/' + data.crops.filter(c => c.fieldId === data.fields[0].id).length), '1/5');
     await page.click('#sMulti'); await w(150);
     check('畑ごとに管理を切る', await page.evaluate(() => data.settings.multi + '/' + !!$('#sArea')), 'false/true');
+    // ── 天気予報 ──
+    await page.click('nav [data-tab="plan"]'); await w(200);
+    check('場所を決めていないときは案内だけ（取りにいかない）', await page.evaluate(() => document.querySelectorAll('.cd .wx').length + '/' + $('.calcard').textContent.includes('設定で場所を決めると')) + '/' + wxCalls, '0/true/0');
+    await page.click('nav [data-tab="settings"]'); await w(200);
+    await page.selectOption('#sLoc [data-loc-pref]', '8'); await w(200);
+    check('県から選ぶ', await page.evaluate(() => JSON.stringify(data.fields[0].loc) + '/' + $('#sLoc .locnow b').textContent), '{"name":"栃木 宇都宮","lat":36.57,"lon":139.88}/栃木 宇都宮');
+    await page.fill('#sLoc [data-loc-q]', 'つくば'); await page.click('#sLoc [data-loc-find]'); await w(300);
+    check('名前でさがす（日本だけ）', await page.evaluate(() => [...document.querySelectorAll('#sLoc [data-loc-i]')].map(b => b.textContent).join(',')), '茨城県 つくば市');
+    await page.click('#sLoc [data-loc-i="0"]'); await w(200);
+    check('さがした場所にする', await page.evaluate(() => data.fields[0].loc.name + '/' + data.fields[0].loc.lat), '茨城県 つくば市/36.08');
+    await page.click('nav [data-tab="plan"]'); await w(200); await page.click('#calToday'); await w(500);
+    check('カレンダーに16日ぶんの天気（絵と最高/最低）', await page.evaluate(() => document.querySelectorAll('.cd .wx').length + '/' + $('[data-d="2026-05-10"] .wx').textContent + '/' + $('[data-d="2026-05-12"] .wx').textContent + '/' + !document.querySelector('[data-d="2026-05-09"] .wx')), '16/☀️25/14/🌧️25/2/true');
+    check('えらんだ日の天気', await page.evaluate(() => $('.wxday').textContent.replace(/\s+/g, '')), '☀️晴れ茨城県つくば市の天気予報25℃/14℃☂10%');
+    await page.click('[data-d="2026-05-12"]'); await w(200);
+    check('霜と雨の日はひとこと', await page.evaluate(() => [...document.querySelectorAll('.wxday .tip')].map(t => t.textContent.slice(0, 2)).join(',')), '🥶,☔ ');
+    check('いちど取ったら3時間は取り直さない・出どころを書く', await page.evaluate(() => $('.calcard').textContent.includes('Open-Meteo.com')) + '/' + wxCalls, 'true/1');
+    await page.click('nav [data-tab="crops"]'); await w(150); await page.click('.crop [data-open]'); await w(300);
+    check('野菜の画面のカレンダーにも天気', await page.evaluate(() => document.querySelectorAll('.cd .wx').length > 0), true);
+    await page.click('#backBtn'); await w(150);
     // ── バージョン・新しくなったこと ──
     const verJs = fs.readFileSync(path.join(ROOT, 'js/version.js'), 'utf8').match(/APP_VERSION = '(v\d+)'/)[1];
     const swJs = fs.readFileSync(path.join(ROOT, 'service-worker.js'), 'utf8');
