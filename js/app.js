@@ -86,7 +86,7 @@ function onPop(e) {
 function render() {
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === view.tab));
   $('#backBtn').hidden = !view.cropId;
-  $('#fab').hidden = !['crops', 'logs', 'plan'].includes(view.tab) || (view.tab === 'logs' && logSub === 'sum');
+  $('#fab').hidden = !['crops', 'logs', 'plan'].includes(view.tab) || (view.tab === 'logs' && (logSub === 'sum' || logSub === 'stock'));
   const fs = $('#fieldSel'), showFs = multiOn() && !view.cropId && ['crops', 'plan', 'logs'].includes(view.tab);
   fs.hidden = !showFs;
   if (showFs) fs.innerHTML = data.fields.map(f => `<option value="${f.id}">📍${esc(f.name)}</option>`).join('') + `<option value="all">📍すべての畑</option>`, fs.value = data.settings.cur;
@@ -388,7 +388,8 @@ function renderPlan(m) {
 
 /* ===== 📝 記録・📊 集計 ===== */
 function renderLogs(m) {
-  let h = `<div class="seg"><button class="${logSub === 'list' ? 'on' : ''}" data-sub="list">📝 一覧</button><button class="${logSub === 'photo' ? 'on' : ''}" data-sub="photo">📷 写真</button><button class="${logSub === 'sum' ? 'on' : ''}" data-sub="sum">📊 集計</button></div>`;
+  let h = `<div class="seg"><button class="${logSub === 'list' ? 'on' : ''}" data-sub="list">📝 一覧</button><button class="${logSub === 'photo' ? 'on' : ''}" data-sub="photo">📷 写真</button><button class="${logSub === 'sum' ? 'on' : ''}" data-sub="sum">📊 集計</button><button class="${logSub === 'stock' ? 'on' : ''}" data-sub="stock">🧺 種・費用</button></div>`;
+  if (logSub === 'stock') { m.innerHTML = h + stockTabHtml(); bindSub(m); bindStock(m); return; }
   if (logSub === 'photo') { m.innerHTML = h + albumTabHtml(); bindSub(m); bindLogList(m); return; }
   if (logSub === 'sum') { m.innerHTML = h + summaryHtml(); bindSub(m); m.querySelectorAll('[data-y]').forEach(b => b.onclick = () => { summaryHtml.year = b.dataset.y; render(); }); return; }
   const logs = data.logs.filter(l => viewLog(l) && (logTypeFilter === 'all' || l.type === logTypeFilter)).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
@@ -550,6 +551,11 @@ async function renderSettings(m) {
     ${multi ? '' : `<h2>🌡 住んでいる地域（予定の日の補正）</h2><div class="card">${areaFormHtml(f0)}
       <p class="muted small">寒いところほど育ちがゆっくりなので、予定の日数をのばして出します（標高100mごとに約2%）。</p></div>
     <h2>🌤 天気予報の場所</h2><div class="card"><p class="muted small" style="margin-top:0">決めると、📅 予定と野菜の画面のカレンダーに<b>16日先までの天気予報</b>（天気・最高/最低気温・雨の確率）が出ます。霜や大雨の日はひとことも出ます。</p><div id="sLoc"></div></div>`}
+    <h2>👨‍👩‍👧 家族と共有</h2><div class="card">
+      <p class="muted" style="margin-top:0">同じ畑を家族で見るとき：<b>共有ファイル</b>を送り、受け取った人が<b>「合わせる」</b>。相手のデータは消さずに、ない野菜・記録・写真だけが足されます（同じ野菜はまとめます）。</p>
+      <button class="btn block" id="shOut">📤 共有ファイルを送る（写真ごと）</button><div style="height:8px"></div>
+      <button class="btn block" id="shIn">📥 受け取った共有ファイルを合わせる</button>
+      <input type="file" id="mergeFile" accept="application/json,.json" hidden></div>
     <h2>💾 データ</h2><div class="card">
       <p style="margin-top:0">${multi ? `畑 ${data.fields.length}つ・` : ''}野菜 ${data.crops.length}件・記録 ${data.logs.length}件・写真 ${data.logs.filter(l => l.hasPhoto).length}枚</p>
       <p class="muted">${est}<br><b>${esc(backupText())}</b><br>データはこの端末のブラウザの中だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきバックアップしてください。</p>
@@ -588,6 +594,13 @@ async function renderSettings(m) {
     m.querySelectorAll('[data-fedit]').forEach(b => b.onclick = () => openFieldForm(fieldById(b.dataset.fedit)));
     $('#fAdd').onclick = () => openFieldForm(null);
   }
+  $('#shOut').onclick = exportShare;
+  $('#shIn').onclick = () => $('#mergeFile').click();
+  $('#mergeFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { const n = await mergeShare(f); render(); toast(`合わせました：野菜${n.crops}件・記録${n.logs}件・畑${n.fields}・種など${n.stock}件を足しました`, 3500); }
+    catch (err) { alert('合わせられませんでした：' + err.message); }
+  };
   $('#exp').onclick = exportData;
   $('#imp').onclick = () => $('#importFile').click();
 }
@@ -639,6 +652,7 @@ function openCropForm(c, pre) {
     <div id="cBedBox"></div>
     <label class="f">${multiOn() ? '畑の中の場所' : '場所'}（なくてもよい）</label><input type="text" id="cPlace" value="${esc(c.place)}" placeholder="例：南の畝・プランター1">
     <div id="cRot" class="tip warn" hidden></div>
+    <div id="cSeed" class="tip" hidden></div>
     <div id="cAsBox"><label class="f">どこから育てる？</label><div class="pick" id="cAs"><button type="button" data-a="seed">種から</button><button type="button" data-a="nae">苗から</button></div></div>
     <label class="f" id="cDateLb">種まき・植付けの日</label><input type="date" id="cDate" value="${esc(c.plantedAt)}">
     <label class="f">畑の広さ（㎡・なくてもよい。肥料の量に使います）</label><input type="number" id="cArea" inputmode="decimal" min="0" step="any" value="${c.area || ''}" placeholder="例：3">
@@ -668,6 +682,8 @@ function openCropForm(c, pre) {
     if (!canNae(v)) as = 'seed';
     s.querySelectorAll('#cAs button').forEach(b => b.classList.toggle('on', b.dataset.a === as));
     $('#cDateLb').textContent = v ? `${startLabel(v, as)}の日` : '種まき・植付けの日';
+    const sd = isNew ? seedsFor(plan) : [];
+    $('#cSeed').hidden = !sd.length; if (sd.length) $('#cSeed').innerHTML = '🌰 種が残っています：' + sd.map(x => esc(x.name) + (x.expire ? `（期限 ${fmtDate(x.expire)}${expireState(x) === 'out' ? '・切れています' : ''}）` : '')).join('、');
     rot();
   };
   sync();

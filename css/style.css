@@ -372,3 +372,9 @@ body.simple { font-size: 18px; }
 .hvr { padding: 8px 0; border-bottom: 1px solid var(--line); } .hvr:last-of-type { border-bottom: 0; } .hvr b { font-size: 15px; } .hvr small { margin-left: 8px; font-weight: 700; } .hvr small.up { color: #2e7d32; } .hvr small.dn { color: #c62828; }
 .hvb { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 3px; } .hvb span { width: 34px; color: var(--muted); } .hvb i { height: 12px; border-radius: 6px; background: #2e7d32; min-width: 2px; } .hvb.prev i { background: #a5d6a7; } .hvb em { font-style: normal; font-size: 13px; }
 .own { margin: 10px 0 0; padding: 10px; border-radius: 10px; background: #f3e5f5; font-size: 14px; } .own .btn { margin-top: 6px; display: block; } .own small { color: var(--muted); }
+/* 種・資材・費用 */
+.spent b { font-size: 26px; color: var(--acc); } .spk { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--muted); margin: 4px 0; }
+.stl { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); cursor: pointer; } .stl:last-child { border-bottom: 0; }
+.stl .k { font-size: 22px; } .stl > div { flex: 1; min-width: 0; } .stl b { display: block; font-size: 15px; } .stl small { color: var(--muted); font-size: 12.5px; }
+.stl .out { color: #c62828; font-weight: 700; } .stl .near { color: #ef6c00; font-weight: 700; } .stl .pr { font-weight: 700; white-space: nowrap; }
+.seg button { padding: 9px 4px; font-size: 14px; }

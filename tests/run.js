@@ -277,6 +277,28 @@ srv.listen(0, async () => {
     await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 't25'); data.logs = data.logs.filter(l => !['ph1', 'h25a', 'h26b', 'h25t'].includes(l.id)).concat(window.__keep.filter(l => !['h25a', 'h26b'].includes(l.id))); await save(); });
     await page.click('#backBtn'); await w(150);
 
+    // ── 種・資材・費用 ──
+    await page.click('nav [data-tab="logs"]'); await w(150); await page.click('[data-sub="stock"]'); await w(150);
+    await page.click('#stAdd'); await w(150); await page.selectOption('#stPlan', 'キュウリ'); await w(50);
+    check('種：野菜を選ぶと名前が入る', await page.evaluate(() => $('#stName').value + '/' + !$('#stExBox').hidden), 'キュウリの種/true');
+    await page.fill('#stDate', '2026-03-01'); await page.fill('#stPrice', '330'); await page.fill('#stEx', '2026-06-30'); await page.click('#stSave'); await w(200);
+    await page.click('#stAdd'); await w(150); await page.click('#stK [data-k="fert"]'); await page.fill('#stName', '化成肥料'); await page.fill('#stDate', '2026-04-01'); await page.fill('#stPrice', '980'); await page.click('#stSave'); await w(200);
+    check('今年かかったお金・残っている種（期限もうすぐ）', await page.evaluate(() => $('.spent b').textContent + '/' + $('.spk').textContent.replace(/\s+/g, '') + '/' + document.querySelectorAll('h2')[1].textContent + '/' + !!document.querySelector('.stl .near')), '1,310円/🌰種330円🧪肥料980円/🌰 残っている種1種類/true');
+    await page.click('[data-sub="list"]'); await w(100); await page.click('nav [data-tab="crops"]'); await w(150); await page.click('#fab'); await w(150);
+    await page.click('#cVeg [data-p="キュウリ"]'); await w(100);
+    check('登録の窓で「種が残っています」', await page.evaluate(() => !$('#cSeed').hidden && $('#cSeed').textContent), '🌰 種が残っています：キュウリの種（期限 6/30(火)）');
+    await page.click('#cCancel'); await w(100);
+    // ── 家族と共有（合わせる） ──
+    const shareJson = await page.evaluate(() => { const c0 = data.crops[0]; return JSON.stringify({ app: 'saien-note', kind: 'share', data: {
+      fields: [{ id: 'famF', name: '実家の畑', area: 'tohoku', alt: 0, cold: false }], myPlans: [], stock: [],
+      crops: [Object.assign({}, c0, { done: Object.assign({}, c0.done, { 9: '2026-05-09' }) }), { id: 'famC', emoji: '🥔', name: 'ジャガイモ', plan: 'ジャガイモ', as: 'seed', plantedAt: '2026-03-10', status: 'growing', done: {}, fieldId: 'famF', place: '', memo: '', variety: '', area: 0 }],
+      logs: [{ id: 'famL', cropId: 'famC', type: 'water', date: '2026-05-09', memo: '母', amount: '', unit: '個', hasPhoto: true, ts: 9 }] },
+      photos: { famL: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' } }); });
+    const before2 = await page.evaluate(() => data.crops.length + '/' + data.logs.length);
+    check('共有ファイルを合わせる（消さずに足す）', await page.evaluate(async j => { const n = await mergeShare(new File([j], 's.json')); return [n.crops, n.logs, n.fields, data.crops.length, data.logs.length, data.crops[0].done[9], data.settings.multi, !!(await getPhoto('famL'))].join('/'); }, shareJson), (() => { const [c, l] = before2.split('/').map(Number); return `1/1/1/${c + 1}/${l + 1}/2026-05-09/true/true`; })());
+    check('もう一度合わせても増えない', await page.evaluate(async j => { const n = await mergeShare(new File([j], 's.json')); return n.crops + n.logs + n.fields; }, shareJson), 0);
+    await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 'famC'); data.logs = data.logs.filter(l => l.id !== 'famL'); data.fields = data.fields.filter(f => f.id !== 'famF'); delete data.crops[0].done[9]; data.settings.multi = false; data.settings.cur = 'all'; data.stock = []; await save(); render(); });
+
     // ── バックアップ ──
     const json = await page.evaluate(async () => JSON.stringify({ app: 'saien-note', version: 2, data, photos: {} }));
     await page.evaluate(async () => { data.crops = []; data.logs = []; await save(); });

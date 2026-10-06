@@ -44,6 +44,7 @@ function normalize(d) {
   d = d || {};
   d.crops = Array.isArray(d.crops) ? d.crops : [];
   d.logs = Array.isArray(d.logs) ? d.logs : [];
+  d.stock = Array.isArray(d.stock) ? d.stock.filter(s => s && s.id && s.name && STOCK_KINDS[s.kind]) : [];   // 種・資材・費用（share.js）
   d.myPlans = Array.isArray(d.myPlans) ? d.myPlans.filter(p => p && p.n && Array.isArray(p.s)) : [];   // 自分で足した野菜・品種
   const old = d.settings || {};
   d.settings = { multi: !!old.multi, cur: old.cur || '', backupAt: +old.backupAt || 0, adj: old.adj && typeof old.adj === 'object' ? old.adj : {} };   // backupAt：前のバックアップ、adj：自分の実績に合わせた日数の倍率
