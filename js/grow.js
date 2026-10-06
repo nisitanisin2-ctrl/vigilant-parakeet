@@ -10,7 +10,9 @@
    root：根を食べる、tuber：いも、leaf：葉物、head：結球する（キャベツなど）、allium：タマネギ・ネギ */
 const GROW_SHAPE_BY_NAME = { 'カボチャ': 'vine', 'スイカ': 'vine', 'トウモロコシ': 'corn', 'キャベツ': 'head', 'ハクサイ': 'head', 'レタス': 'head', 'ブロッコリー': 'head' };
 const GROW_SHAPE_BY_F = { fruit: 'fruit', corn: 'corn', bean: 'bean', berry: 'berry', root: 'root', potato: 'tuber', sweet: 'tuber', taro: 'tuber', leaf: 'leaf', allium: 'allium' };
-const growShape = c => GROW_SHAPE_BY_NAME[c.plan] || GROW_SHAPE_BY_F[careOf(planByName(c.plan)).f] || 'leaf';
+/* 絵に使う野菜の名前（自分で足した野菜は「似ている野菜」の絵にする） */
+const lookName = c => { const v = planByName(c.plan); return (v && v.base) || c.plan; };
+const growShape = c => GROW_SHAPE_BY_NAME[lookName(c)] || GROW_SHAPE_BY_F[careOf(planByName(c.plan)).f] || 'leaf';
 /* 実・根の色と形（r：丸い、l：長い） */
 const GROW_LOOK = {
   'トマト': ['#e53935', 'r'], 'キュウリ': ['#2e7d32', 'l'], 'ナス': ['#4a148c', 'l'], 'ピーマン': ['#2e7d32', 'r'], 'オクラ': ['#689f38', 'l'], 'ズッキーニ': ['#33691e', 'l'],
@@ -31,7 +33,7 @@ const SHAPE_LABEL = {
   head: { flower: '巻きはじめた', fruit: '巻いてきた' }, allium: { fruit: '玉が太ってきた' }
 };
 const PLAN_LABEL = { 'ブロッコリー': { fruit: 'つぼみが育った' }, 'ネギ': { fruit: '太ってきた' }, 'レタス': { fruit: '収穫まぢか' } };
-const stageLabel = (shape, st, c) => (st === 'leaf' && c.as === 'nae' ? '根づいた' : (PLAN_LABEL[c.plan] || {})[st] || (SHAPE_LABEL[shape] || {})[st]) || STAGE_LABEL[st];
+const stageLabel = (shape, st, c) => (st === 'leaf' && c.as === 'nae' ? '根づいた' : (PLAN_LABEL[lookName(c)] || {})[st] || (SHAPE_LABEL[shape] || {})[st]) || STAGE_LABEL[st];
 const KIND_STAGE = { sprout: 'sprout', flower: 'flower', harvest: 'harvest' };
 
 /* いまの育ち具合 {st:段階, label:ことば, v:0〜1（絵の大きさ）, pct:収穫はじめまでの進み（0〜1。分からなければ null）, manual}
@@ -161,8 +163,8 @@ const gSeed = () => `<path d="M14 51 Q32 47 50 51" stroke="#5a3e2a" stroke-width
 
 function growSvg(c, g, px = 56) {
   if (!g) return '';
-  const shape = g.shape || growShape(c), look = GROW_LOOK[c.plan] || ['#7cb342', 'r'], v = g.v != null ? g.v : 1, st = g.st;
-  const fcol = FLOWER_COL[c.plan] || '#fdd835';
+  const shape = g.shape || growShape(c), look = GROW_LOOK[lookName(c)] || ['#7cb342', 'r'], v = g.v != null ? g.v : 1, st = g.st;
+  const fcol = FLOWER_COL[lookName(c)] || '#fdd835';
   let s = '';
   if (st === 'before') s = `<path d="M32 50 V36" stroke="#9e9e9e" stroke-width="1.4" stroke-dasharray="2 2"/><text x="32" y="30" font-size="12" text-anchor="middle">❔</text>`;
   else if (st === 'seed') s = gSeed();
@@ -184,7 +186,7 @@ function growSvg(c, g, px = 56) {
         s = `<path d="M32 50 Q${r2(32 - 20 * L)} ${r2(48 - 2 * L)} ${r2(32 - 28 * L)} 49 M32 50 Q${r2(32 + 20 * L)} ${r2(47 - 2 * L)} ${r2(32 + 28 * L)} 48" stroke="url(#ggStem)" stroke-width="1.6" fill="none"/>`;
         for (const [x, a] of [[32, 0], [32 - 13 * L, -40], [32 + 13 * L, 40], [32 - 24 * L, -55], [32 + 24 * L, 55]]) s += gLeaf(x, 50, 8 + 8 * v, a, 0.55, a % 80 ? 'url(#ggLeafD)' : 'url(#ggLeaf)');
         if (fl) s += gFlower(20, 40, fcol, 3.2) + gFlower(44, 41, fcol, 3);
-        if (fr) s += ripe ? `<ellipse cx="40" cy="45" rx="8.5" ry="6.5" fill="${look[0]}"/>${c.plan === 'スイカ' ? '<path d="M34 41 Q36 45 34 49 M38 39.5 Q40 45 38 51 M42 39.5 Q44 45 42 51 M46 41 Q47.5 45 46 49" stroke="#1b4d1b" stroke-width="1.3" fill="none"/>' : '<path d="M36 40 Q37 45 36 50 M40 38.6 V51 M44 40 Q43 45 44 50" stroke="#24521b" stroke-width=".8" fill="none"/>'}<ellipse cx="40" cy="45" rx="8.5" ry="6.5" fill="url(#ggShine)"/>`
+        if (fr) s += ripe ? `<ellipse cx="40" cy="45" rx="8.5" ry="6.5" fill="${look[0]}"/>${lookName(c) === 'スイカ' ? '<path d="M34 41 Q36 45 34 49 M38 39.5 Q40 45 38 51 M42 39.5 Q44 45 42 51 M46 41 Q47.5 45 46 49" stroke="#1b4d1b" stroke-width="1.3" fill="none"/>' : '<path d="M36 40 Q37 45 36 50 M40 38.6 V51 M44 40 Q43 45 44 50" stroke="#24521b" stroke-width=".8" fill="none"/>'}<ellipse cx="40" cy="45" rx="8.5" ry="6.5" fill="url(#ggShine)"/>`
           : `<circle cx="40" cy="46" r="3.6" fill="#8bc34a"/><circle cx="40" cy="46" r="3.6" fill="url(#ggShine)"/>`;
         break;
       }
@@ -208,12 +210,12 @@ function growSvg(c, g, px = 56) {
         break;
       }
       case 'root': {
-        s = gRosette(0.45 + v * 0.55, { n: 7, len: 24, w: c.plan === 'ニンジン' ? 0.28 : 0.38 });
+        s = gRosette(0.45 + v * 0.55, { n: 7, len: 24, w: lookName(c) === 'ニンジン' ? 0.28 : 0.38 });
         if (STAGE_NO[st] >= 4 || st === 'end') { const z = st === 'big' ? 3 : fr && !ripe ? 4.5 : 6; s = `<ellipse cx="32" cy="50" rx="${z}" ry="${r2(z * 1.1)}" fill="${look[0]}" stroke="#00000030" stroke-width=".6"/><ellipse cx="32" cy="50" rx="${z}" ry="${r2(z * 1.1)}" fill="url(#ggShine)"/>` + s; }
         break;
       }
       case 'tuber': {
-        const sweet = c.plan === 'サツマイモ', taro = c.plan === 'サトイモ';
+        const sweet = lookName(c) === 'サツマイモ', taro = lookName(c) === 'サトイモ';
         if (sweet) { s = `<path d="M32 50 Q18 47 6 49 M32 50 Q46 46 58 48" stroke="url(#ggStem)" stroke-width="1.5" fill="none"/>`; for (const x of [10, 18, 26, 38, 46, 54]) s += gLeaf(x, 49, 6 + 6 * v, (x - 32) * 2, 0.6, x % 3 ? 'url(#ggLeafD)' : 'url(#ggLeaf)'); }
         else if (taro) { s = ''; for (const [x, a] of [[30, -18], [34, 16], [32, 0]]) s += `<path d="M32 51 L${r2(x + a / 3)} ${r2(51 - 18 * v - 10)}" stroke="#7a9a4a" stroke-width="1.5"/>` + `<ellipse cx="${r2(x + a / 3)}" cy="${r2(51 - 18 * v - 14)}" rx="${r2(5 + 4 * v)}" ry="${r2(4 + 3 * v)}" fill="${a ? 'url(#ggLeafD)' : 'url(#ggLeaf)'}"/>`; }
         else s = gBush(v * .75, { leafLen: 8, w: 0.55 }).s.replace(/url\(#ggLeaf\)/g, ripe ? 'url(#ggLeafY)' : 'url(#ggLeaf)');
@@ -222,7 +224,7 @@ function growSvg(c, g, px = 56) {
         break;
       }
       case 'head': {
-        const broc = c.plan === 'ブロッコリー';
+        const broc = lookName(c) === 'ブロッコリー';
         s = gRosette(0.5 + v * 0.5, { n: 8, len: 22, w: 0.62, fill: broc ? 'url(#ggLeafD)' : 'url(#ggLeaf)' });
         if (STAGE_NO[st] >= 5 || st === 'end') {
           const z = fl ? 5 : fr && !ripe ? 7 : 9.5;
@@ -235,14 +237,14 @@ function growSvg(c, g, px = 56) {
         }
         break;
       }
-      case 'allium': s = gAllium(v, st, look, c.plan); break;
+      case 'allium': s = gAllium(v, st, look, lookName(c)); break;
       default: {   // 葉物
         s = gRosette(0.35 + v * 0.65, { n: 9, len: 24, w: 0.5 });
       }
     }
   }
   const body = st === 'end' ? `<g opacity=".45">${s}</g><text x="52" y="12" font-size="11" text-anchor="middle">✔️</text>` : s;
-  return `<svg class="growpic" viewBox="0 0 64 64" width="${px}" height="${px}" role="img" aria-label="${esc(g.label)}">${G_DEFS}${gSoil(c.plan === 'ネギ' && STAGE_NO[st] >= 4)}${body}</svg>`;
+  return `<svg class="growpic" viewBox="0 0 64 64" width="${px}" height="${px}" role="img" aria-label="${esc(g.label)}">${G_DEFS}${gSoil(lookName(c) === 'ネギ' && STAGE_NO[st] >= 4)}${body}</svg>`;
 }
 /* タマネギ・ニンニク・ネギ：細長い葉。玉が太り、収穫のころは葉が倒れる */
 function gAllium(v, st, look = ['#d9a441', 'r'], plan) {

@@ -5,7 +5,9 @@
 'use strict';
 
 /* ===== 野菜をさがす ===== */
-const planByName = n => VEG_PLANS.find(v => v.n === n) || null;
+/* 野菜の一覧：もとからの33種類と、自分で足した野菜・品種（data.myPlans。{n, i, from, sow, s, base:似ている野菜}） */
+const allPlans = () => VEG_PLANS.concat((typeof data !== 'undefined' && data.myPlans) || []);
+const planByName = n => allPlans().find(v => v.n === n) || null;
 /* 名前から、予定に使う野菜をさがす（「ミニトマト」→トマト、「エダマメ・豆」→エダマメ）。なければ '' */
 function guessPlan(name) {
   const s = String(name || '').trim(); if (!s) return '';
@@ -62,7 +64,8 @@ function kindOf(label) {
    [{i:番号, what:作業, from:はじめの日, to:おわりの日, d1, d2:何日後, kind}]。i=0 は種まき（植えた日）そのもの */
 function planRows(v, start, as, st = curField()) {
   if (!v || !start) return [];
-  const f = areaFactor(st), base = as === 'nae' && canNae(v) ? transplantDay(v) : 0, bf = Math.round(base * f);
+  const f = areaFactor(st) * (typeof adjFactor === 'function' ? adjFactor(v.n, as) : 1), base =   // 地域の補正 × 自分の実績に合わせた分（records.js）
+    as === 'nae' && canNae(v) ? transplantDay(v) : 0, bf = Math.round(base * f);
   const rows = [{ i: 0, what: startLabel(v, as), from: start, to: start, d1: 0, d2: 0, kind: kindOf('植える') }];
   (v.s || []).forEach(([what, a, b], k) => {
     const b1 = Math.max(0, Math.round(Number(a) || 0)), b2 = Math.max(b1, Math.round(Number(b) || b1));
@@ -95,7 +98,7 @@ function nextTask(c, t = today()) {
 }
 
 /* ===== 肥料・病気・コツ ===== */
-const careOf = v => (v && VEG_CARE[v.n]) || { f: 'leaf', k: [] };
+const careOf = v => (v && (VEG_CARE[v.n] || VEG_CARE[v.base])) || { f: 'leaf', k: [] };
 const fertOf = v => VEG_FERT[careOf(v).f] || VEG_FERT.leaf;
 /* 「100〜150g/㎡（3㎡で 300〜450g）」 */
 function amtText(range, unit, area) {
@@ -109,7 +112,8 @@ function amtText(range, unit, area) {
 /* 肥料・コツ・病気をまとめた HTML（野菜の詳しい画面と、育て方の画面で使う） */
 function careHtml(v, area, open) {
   if (!v) return '';
-  const f = fertOf(v), tips = VEG_TIPS[v.n], sick = careOf(v).k.map(k => VEG_SICK[k]).filter(Boolean);
+  if (!VEG_CARE[v.n] && !VEG_CARE[v.base]) return `<div class="card muted">肥料・コツ・病気と害虫は、自分の野菜の「似ている野菜」を選ぶと出ます（📖 育て方 → ✏️ 直す）。</div>`;
+  const f = fertOf(v), tips = VEG_TIPS[v.n] || VEG_TIPS[v.base], sick = careOf(v).k.map(k => VEG_SICK[k]).filter(Boolean);
   const lime = f.lime[1] === 0 ? 'まきません（土をアルカリに寄せないため）' : amtText(f.lime, 'g', area);
   return `<details class="more"${open ? ' open' : ''}><summary>🧪 肥料（${esc(f.n)}・土のpH ${esc(f.ph)}）</summary>
       <div class="fl"><b>① 土づくり</b><span>苦土石灰 ${esc(lime)}<br>完熟たい肥 ${esc(amtText(f.compost, 'kg', area))}<br><small>石灰は植える2週間前、たい肥と元肥は1週間前までに混ぜます</small></span></div>

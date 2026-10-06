@@ -3,6 +3,7 @@
      crops: 育てている野菜 [{id, emoji, name, variety, place, plantedAt, status, memo,
                             plan:育て方の予定に使う野菜の名前（VEG_PLANS の n。なければ ''）, as:'seed'（種から）|'nae'（苗から）,
                             area:広さ㎡（肥料の量に使う）, done:{予定の番号: やった日}, fieldId:どの畑か, growShift:育ち具合の絵のずらし（日・なくてもよい）}],
+     myPlans: 自分で足した野菜・品種 [{n:名前, i:絵, from:'種まき'|'植えつけ', sow:まく時期, s:[[作業, 何日目から, 何日目まで]], base:似ている野菜}],
      logs:  作業の記録 [{id, cropId, type, date, memo, amount, unit, hasPhoto, ts}],
      fields: 畑 [{id, name, area:地域, alt:標高m, cold:寒冷地か, loc:天気予報の場所{name, lat, lon}|null}]（地域は畑ごと。予定の日数の補正に使う）,
      settings: {multi:畑ごとに管理するか, cur:いま見ている畑のid（'all' はすべての畑。開いたときは 'all'）}
@@ -43,12 +44,15 @@ function normalize(d) {
   d = d || {};
   d.crops = Array.isArray(d.crops) ? d.crops : [];
   d.logs = Array.isArray(d.logs) ? d.logs : [];
+  d.stock = Array.isArray(d.stock) ? d.stock.filter(s => s && s.id && s.name && STOCK_KINDS[s.kind]) : [];   // 種・資材・費用（share.js）
+  d.myPlans = Array.isArray(d.myPlans) ? d.myPlans.filter(p => p && p.n && Array.isArray(p.s)) : [];   // 自分で足した野菜・品種
   const old = d.settings || {};
-  d.settings = { multi: !!old.multi, cur: old.cur || '' };
+  d.settings = { multi: !!old.multi, cur: old.cur || '', backupAt: +old.backupAt || 0, adj: old.adj && typeof old.adj === 'object' ? old.adj : {} };   // backupAt：前のバックアップ、adj：自分の実績に合わせた日数の倍率
   d.fields = Array.isArray(d.fields) ? d.fields.filter(f => f && f.id) : [];
   // 前のかたちは地域が1つだけ（settings.area）だったので、それを1つめの畑にする
   if (!d.fields.length) d.fields.push({ id: 'f1', name: 'わたしの畑', area: old.area || 'kanto', alt: Number(old.alt) || 0, cold: !!old.cold });
   d.fields.forEach(f => { f.name = String(f.name || '畑'); f.area = f.area || 'kanto'; f.alt = Math.max(0, Number(f.alt) || 0); f.cold = !!f.cold;
+    f.beds = Array.isArray(f.beds) ? f.beds.filter(b => b && b.id && isFinite(b.x) && isFinite(b.y) && b.w > 0 && b.h > 0) : []; f.cols = Math.max(2, Math.min(30, +f.cols || 8)); f.rows = Math.max(2, Math.min(30, +f.rows || 6));
     f.loc = f.loc && isFinite(f.loc.lat) && isFinite(f.loc.lon) ? { name: String(f.loc.name || '畑'), lat: +f.loc.lat, lon: +f.loc.lon } : null; });
   if (d.settings.cur !== 'all' && !d.fields.some(f => f.id === d.settings.cur)) d.settings.cur = 'all';
   d.crops.forEach(c => {
@@ -57,7 +61,8 @@ function normalize(d) {
     if (!(c.area > 0)) c.area = 0;
     if (!c.done || typeof c.done !== 'object') c.done = {};
     if (!d.fields.some(f => f.id === c.fieldId)) c.fieldId = d.fields[0].id;
-    if (c.growShift != null && !isFinite(c.growShift)) delete c.growShift;   // 育ち具合を実物に合わせた日数（grow.js）
+    if (c.growShift != null && !isFinite(c.growShift)) delete c.growShift;
+    if (c.bed && !d.fields.some(f => f.id === c.fieldId && (f.beds || []).some(b => b.id === c.bed))) delete c.bed;   // 畝（配置図）   // 育ち具合を実物に合わせた日数（grow.js）
   });
   return d;
 }
@@ -92,10 +97,11 @@ async function exportData() {
   const name = `菜園ノート_${today()}.json`;
   const file = new File([blob], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.share({ files: [file], title: name }); data.settings.backupAt = Date.now(); await save(); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  data.settings.backupAt = Date.now(); await save();
 }
 async function importData(file) {
   const j = JSON.parse(await file.text());
@@ -114,7 +120,24 @@ async function importData(file) {
    excalc_veg_area（地域・標高・寒冷地・畑の広さ）・excalc_veg_my（自分で足した野菜）。前のデータは消さずに残す */
 const MIG_KEY = 'saien_mig_excalc';
 const xlYmd = s => { const d = new Date(Date.UTC(1899, 11, 30) + Math.round(Number(s)) * 86400000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
+/* 前の道具で「自分で足した野菜」（excalc_veg_my）を、⭐自分の野菜（data.myPlans）として引き継ぐ（v17から。1回だけ）。
+   前に引き継いで「予定のない野菜」になっていた分も、その野菜の予定につなぎ直す */
+async function migrateExcalcMy() {
+  let ls; try { ls = window.localStorage; if (ls.getItem(MIG_KEY + '_my')) return 0; } catch (e) { return 0; }
+  let my = []; try { my = JSON.parse(ls.getItem('excalc_veg_my') || '[]') || []; } catch (e) {}
+  let n = 0;
+  for (const x of my) {
+    if (!x || !x.n || !Array.isArray(x.s) || planByName(x.n)) continue;
+    data.myPlans.push({ n: String(x.n), i: x.i || '🌱', from: x.from === '植えつけ' ? '植えつけ' : '種まき', sow: String(x.sow || ''), s: x.s.map(r => [String(r[0] || ''), Math.max(0, +r[1] || 0), Math.max(+r[1] || 0, +r[2] || 0)]).filter(r => r[0]), base: '' });
+    n++;
+  }
+  data.crops.forEach(c => { if (!c.plan && planByName(c.name) && /^x-/.test(c.id)) { c.plan = c.name; c.memo = String(c.memo || '').replace(/\n?（表電卓で自分で足した野菜）/, '').trim(); } });
+  if (n) await save();
+  try { ls.setItem(MIG_KEY + '_my', String(Date.now())); } catch (e) {}
+  return n;
+}
 async function migrateExcalc() {
+  await migrateExcalcMy();
   let ls; try { ls = window.localStorage; if (ls.getItem(MIG_KEY)) return 0; } catch (e) { return 0; }
   const js = k => { try { return JSON.parse(ls.getItem(k) || 'null'); } catch (e) { return null; } };
   const plots = (js('excalc_veg_plots') || []).filter(p => p && p.n && isFinite(p.s));

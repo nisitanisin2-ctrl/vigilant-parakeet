@@ -31,7 +31,7 @@ srv.listen(0, async () => {
   await page.route('https://api.open-meteo.com/**', r => {
     wxCalls++;
     const time = [...Array(16)].map((_, i) => { const d = new Date(2026, 4, 10 + i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
-    r.fulfill({ contentType: 'application/json', body: JSON.stringify({ daily: { time, weather_code: time.map((_, i) => [0, 3, 63][i % 3]), temperature_2m_max: time.map((_, i) => 25 + (i % 2)), temperature_2m_min: time.map((_, i) => i === 2 ? 2 : 14), precipitation_probability_max: time.map((_, i) => [10, 30, 80][i % 3]) } }) });
+    r.fulfill({ contentType: 'application/json', body: JSON.stringify({ daily: { time, weather_code: time.map((_, i) => [0, 3, 63][i % 3]), temperature_2m_max: time.map((_, i) => 25 + (i % 2)), temperature_2m_min: time.map((_, i) => i === 2 ? 2 : 14), precipitation_probability_max: time.map((_, i) => [10, 30, 80][i % 3]), precipitation_sum: time.map((_, i) => [0, 2, 35][i % 3]), wind_speed_10m_max: time.map((_, i) => i === 1 ? 45 : 12) } }) });
   });
   await page.route('https://geocoding-api.open-meteo.com/**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ results: [{ name: 'つくば市', admin1: '茨城県', latitude: 36.08, longitude: 140.08, country_code: 'JP' }, { name: 'Tsukuba', latitude: 1, longitude: 1, country_code: 'XX' }] }) }));
   const open = async () => { await page.goto(URL); await page.waitForFunction(() => window.APP_READY); };
@@ -160,15 +160,32 @@ srv.listen(0, async () => {
     check('予定の画面の＋は、選んだ日で記録', await page.evaluate(() => $('#lDate').value), '2026-05-15');
     await page.click('#lCancel');
 
+    // ── 書き出し ──
+    await page.evaluate(() => { window.giveFile = async (b, n) => { window.__f = { n, type: b.type, text: b.type.startsWith('image') ? '' : await b.text(), size: b.size, head: [...new Uint8Array(await b.slice(0, 3).arrayBuffer())].join(',') }; }; });
+    await page.click('#exPlan'); await w(150);
+    check('書き出しの窓（5つ）', await page.evaluate(() => document.querySelectorAll('[data-ex]').length + '/' + document.querySelectorAll('[data-ex]:not([disabled])').length), '5/5');
+    await page.click('[data-ex="plancsv"]'); await w(200);
+    check('予定表を Excel（CSV・BOM つき）', await page.evaluate(() => __f.n.replace(/_\d{4}-\d\d-\d\d/, '') + '|' + __f.head + '|' + __f.text.split('\r\n')[0] + '|' + __f.text.split('\r\n')[2]), '菜園ノート_予定表.csv|239,187,191|野菜,畑,場所,植えた日,作業,はじめ,おわり,いま|トマト,,,2026/04/25,花が咲く,2026/05/10,2026/05/25,いま（15日まで）');
+    await page.click('[data-ex="logcsv"]'); await w(200);
+    check('記録を Excel（収穫の量も）', await page.evaluate(() => __f.text.split('\r\n').length > 2 && __f.text.includes('収穫,5,個')), true);
+    await page.click('[data-ex="ics"]'); await w(200);
+    check('スマホのカレンダー（.ics：これからの予定・前の日の知らせ）', await page.evaluate(() => __f.type + '/' + /^BEGIN:VCALENDAR/.test(__f.text) + '/' + (__f.text.match(/BEGIN:VEVENT/g) || []).length + '/' + __f.text.includes('DTSTART;VALUE=DATE:20260510') + '/' + __f.text.includes('TRIGGER:-PT15H')), 'text/calendar/true/' + await page.evaluate(() => { let n = 0; activeCrops().forEach(c => cropRows(c).forEach(r => { if (r.i > 0 && rowState(c, r) !== 'done' && r.to >= today()) n++; })); return n; }) + '/true/true');
+    check('予定表の画像と印刷の中身', await page.evaluate(() => { const cv = scheduleCanvas(activeCrops(), '予定表'); const h = printHtml(activeCrops(), '予定表'); return (cv.width === 1080 && cv.height > 400) + '/' + (h.match(/<table>/g) || []).length; }), 'true/2');
+    await page.click('#exClose'); await w(100);
+
     // ── 記録・集計 ──
     await page.click('nav [data-tab="logs"]'); await w(200);
     check('記録の一覧（観察・収穫・水やり）', await page.evaluate(() => document.querySelectorAll('.log').length), 3);
     await page.click('[data-sub="sum"]'); await w(200);
     check('集計：収穫の表', await page.evaluate(() => [...document.querySelectorAll('table')[0].querySelectorAll('td')].slice(0, 3).map(t => t.textContent).join('/')), '🍅 トマト/1回/5個');
 
+    // ── 今月まけるもの ──
+    check('まく時期を月に（年またぎも）', await page.evaluate(() => [...sowMonths({ sow: '3〜4月・9〜10月' })].join(',') + '/' + [...sowMonths({ sow: '10〜2月' })].join(',')), '3,4,9,10/10,11,12,1,2');
+    check('今月（5月）まける野菜・北海道は4週間おそめ（4月の分）', await page.evaluate(() => { const a = sowList(data.fields[0]); const h = sowList(Object.assign({}, data.fields[0], { area: 'hokkaido' })); return a.mo + ':' + a.list.some(v => v.n === 'オクラ') + '/' + h.mo + ':' + h.list.some(v => v.n === 'オクラ') + ':' + h.list.some(v => v.n === 'ジャガイモ'); }), '5:true/5:false:false');
     // ── 育て方 ──
     await page.click('nav [data-tab="guide"]'); await w(200);
     check('育て方：33種類', await page.evaluate(() => document.querySelectorAll('.vgrid button').length), 33);
+    check('育て方の上に「今月まける・植えるもの」', await page.evaluate(() => $('details.fold[data-fold="sow"] summary h2').textContent.startsWith('🗓 今月まける・植えるもの5月') + '/' + (document.querySelectorAll('[data-sow]').length > 5)), 'true/true');
     await page.fill('#gQ', 'イモ'); await w(150);
     check('名前でさがす', await page.evaluate(() => [...document.querySelectorAll('.vgrid button')].map(b => b.textContent).join(',')), '🥔ジャガイモ,🍠サツマイモ,🥔サトイモ');
     await page.click('[data-v="ジャガイモ"]'); await w(250);
@@ -184,6 +201,118 @@ srv.listen(0, async () => {
     await page.click('nav [data-tab="crops"]'); await w(150); await page.click('#fab'); await w(150);
     await page.click('#cVeg [data-p=""]'); await page.fill('#cName', 'バジル'); await page.click('#emo [data-e="🌿"]'); await page.click('#cSave'); await w(250);
     check('その他の野菜は予定の代わりに案内', await page.evaluate(() => document.querySelector('main').textContent.includes('予定は出ていません') + '/' + data.crops[3].emoji + data.crops[3].plan), 'true/🌿');
+
+    // ── 自分の野菜・品種 ──
+    await page.click('nav [data-tab="guide"]'); await w(200); await page.fill('#gQ', ''); await w(150); await page.click('#gMine'); await w(150);
+    await page.fill('#mpName', 'アイコ'); await page.selectOption('#mpBase', 'トマト'); await page.click('#mpCopy'); await w(100);
+    check('似ている野菜の日数を写す', await page.evaluate(() => document.querySelectorAll('#mpSteps .mpstep').length === planByName('トマト').s.length && document.querySelector('#mpFrom .on').dataset.f), '種まき');
+    await page.fill('#mpSteps [data-i="0"][data-k="1"]', '4'); await page.click('#mpSave'); await w(250);
+    check('⭐自分の野菜を足す（育て方の一覧と、えらんだ所）', await page.evaluate(() => data.myPlans.length + '/' + data.myPlans[0].s[0].join(',') + '/' + document.querySelector('.vgrid .mine').textContent + '/' + !!$('#gEditMine') + '/' + document.querySelectorAll('details.more').length), '1/発芽,4,8/🍅⭐アイコ/true/3');
+    await page.click('#gAdd'); await w(200);
+    check('畑に登録の窓にも出る', await page.evaluate(() => document.querySelector('#cVeg .on').textContent), '🍅⭐アイコ');
+    await page.click('#cSave'); await w(250);
+    check('自分の野菜で予定・絵（トマトの形）', await page.evaluate(() => { const c = data.crops.find(x => x.plan === 'アイコ'); return (cropRows(c).length === planByName('トマト').s.length + 1) + '/' + growShape(c) + '/' + careOf(planByName('アイコ')).k.length; }), 'true/fruit/6');
+    await page.click('#backBtn'); await w(150); await page.click('[data-v="アイコ"]'); await w(150); await page.click('#gEditMine'); await w(150);
+    await page.fill('#mpName', 'アイコ（ミニ）'); await page.click('#mpSave'); await w(200);
+    check('名前を変えると畑の野菜もついてくる', await page.evaluate(() => data.crops.filter(c => c.plan === 'アイコ（ミニ）').length + '/' + planByName('アイコ')), '1/null');
+    await page.click('#gEditMine'); await w(150); await page.click('#mpDel'); await w(250);
+    check('消すと畑の野菜は予定なしに（記録は残る）', await page.evaluate(() => data.myPlans.length + '/' + data.crops.filter(c => c.name === 'アイコ' && !c.plan).length), '0/1');
+    await page.evaluate(async () => { data.crops = data.crops.filter(c => c.name !== 'アイコ'); await save(); });
+    await page.click('nav [data-tab="crops"]'); await w(150);
+
+    // ── 配置図・連作 ──
+    await page.click('nav [data-tab="crops"]'); await w(150); await page.click('[data-csub="map"]'); await w(150);
+    check('配置図：ます目（8×6）', await page.evaluate(() => document.querySelectorAll('.fmsvg .mc').length + '/' + !!$('[data-mapedit]')), '48/true');
+    await page.click('[data-mapedit]'); await w(100);
+    const fid = await page.evaluate(() => curField().id);
+    await page.click(`[data-cell="${fid}:0:0"]`); await w(100); await page.click(`[data-cell="${fid}:1:2"]`); await w(200);
+    check('2つの角を押すと畝ができる', await page.evaluate(() => JSON.stringify(curField().beds.map(b => [b.name, b.x, b.y, b.w, b.h]))), '[["畝1",0,0,2,3]]');
+    await page.click(`[data-cell="${fid}:2:2"]`); await w(50); await page.click(`[data-cell="${fid}:0:4"]`); await w(200);
+    check('重なる畝はつくらない', await page.evaluate(() => curField().beds.length + '/' + $('#toast').textContent), '1/ほかの畝と重なっています');
+    await page.click('[data-mapedit]'); await w(100);
+    await page.click('.fmsvg .bed'); await w(150);
+    await page.fill('#bdName', '南の畝'); await page.click('#bdRename'); await w(200);
+    await page.click('.fmsvg .bed'); await w(150); await page.click('#bdPlant'); await w(150);
+    check('畝から植える：畝と場所が入っている', await page.evaluate(() => $('#cBed').selectedOptions[0].textContent + '/' + $('#cPlace').value), '南の畝/南の畝');
+    // 去年ここにトマト（ナス科）
+    await page.evaluate(async () => { const b = curField().beds[0]; data.crops.push({ id: 'old-t', emoji: '🍅', name: 'トマト', plan: 'トマト', as: 'nae', plantedAt: '2025-05-01', status: 'done', done: {}, fieldId: curField().id, bed: b.id, place: b.name, memo: '', variety: '', area: 0 }); await save(); });
+    await page.click('#cVeg [data-p="ナス"]'); await page.fill('#cDate', '2026-05-01'); await w(150);
+    check('連作の注意（登録の窓）', await page.evaluate(() => !$('#cRot').hidden && $('#cRot').textContent), '⚠️ 連作の注意：1年前に同じナス科のトマト（2025年）を植えた所です。ナス科は4年ほど空けると病気が出にくくなります');
+    await page.click('#cSave'); await w(250);
+    check('野菜の画面にも連作の注意', await page.evaluate(() => !!$('.rotw')), true);
+    await page.click('#backBtn'); await w(200);
+    check('配置図：畝に野菜の絵・連作の畝は赤', await page.evaluate(() => document.querySelector('.fmsvg .bed').textContent.includes('🍆') + '/' + document.querySelector('.fmsvg .bed').classList.contains('warn')), 'true/true');
+    await page.click('[data-csub="list"]'); await w(150);
+    check('一覧のカードに⚠️連作', await page.evaluate(() => [...document.querySelectorAll('.crop')].some(c => c.textContent.includes('ナス') && c.textContent.includes('⚠️連作'))), true);
+    check('仲間と年数（自分の野菜は似ている野菜の仲間）', await page.evaluate(() => [familyOf('キャベツ'), restYears('スイカ'), familyOf('トウモロコシ') + restYears('トウモロコシ')].join('/')), 'アブラナ科/5/イネ科0');
+    await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 'old-t' && c.name !== 'ナス'); curField().beds = []; await save(); render(); });
+
+    // ── アルバム・バックアップの声かけ・収穫のくらべ・実績 ──
+    const PNG1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    await page.evaluate(async png => { const c = data.crops[0], l = { id: 'ph1', cropId: c.id, type: 'observe', date: '2026-05-05', memo: '花が咲いた', amount: '', unit: '個', hasPhoto: true, ts: 1 }; data.logs.push(l); await setPhoto('ph1', png); await save(); go('crops', c.id); }, PNG1); await w(400);
+    check('野菜の画面に写真アルバム（植えてからの日数つき）', await page.evaluate(() => document.querySelectorAll('details.fold[data-fold="album"] .album figure').length + '/' + $('.album figcaption').textContent + '/' + !!$('.album img').src), '1/5/5(火)・10日目👀花が咲いた/true');
+    await page.click('#backBtn'); await w(150); await page.click('nav [data-tab="logs"]'); await w(150); await page.click('[data-sub="photo"]'); await w(300);
+    check('記録のタブの「📷 写真」', await page.evaluate(() => document.querySelectorAll('main .album figure').length + '/' + $('main h2').textContent.startsWith('🍅 トマト')), '1/true');
+    await page.click('[data-sub="list"]'); await w(100);
+    await page.evaluate(async () => { data.settings.backupAt = Date.now() - 40 * 86400000; await save(); }); await page.click('nav [data-tab="crops"]'); await w(200);
+    check('前のバックアップから30日でお知らせ', await page.evaluate(() => $('.bkban b').textContent), '前のバックアップから40日たちました');
+    await page.click('#bkLater'); await w(150);
+    check('「あとで」で7日お休み', await page.evaluate(() => !$('.bkban') && +localStorage.getItem('saien_bk_snooze') > Date.now() + 6 * 86400000), true);
+    await page.evaluate(async () => { localStorage.removeItem('saien_bk_snooze'); await exportData(); });
+    check('保存するとバックアップの日がつく', await page.evaluate(() => Date.now() - data.settings.backupAt < 60000 && backupText()), '前のバックアップ：今日');
+    await page.evaluate(async () => { const c = data.crops[0];
+      data.logs.push({ id: 'h25a', cropId: c.id, type: 'harvest', date: '2025-07-01', memo: '', amount: 4, unit: '個', ts: 2 }, { id: 'h26b', cropId: c.id, type: 'harvest', date: '2026-05-20', memo: '', amount: 2, unit: '個', ts: 3 }); await save(); });
+    await page.click('nav [data-tab="logs"]'); await w(150); await page.click('[data-sub="sum"]'); await w(200);
+    check('野菜ごとの収穫を去年とくらべ', await page.evaluate(() => { const r = document.querySelector('.hvc .hvr'); return r.querySelector('b').textContent + '/' + r.querySelector('small').textContent + '/' + [...r.querySelectorAll('em')].map(e => e.textContent).join(','); }), '🍅 トマト/＋75%/7個,4個');
+    await page.click('[data-sub="list"]'); await w(100);
+    // 自分の実績：去年のトマト（苗から 2025/5/1 → 6/30 に収穫＝60日）
+    await page.evaluate(async () => { data.crops.push({ id: 't25', emoji: '🍅', name: 'トマト', plan: 'トマト', as: 'nae', plantedAt: '2025-05-01', status: 'done', done: {}, fieldId: data.fields[0].id, place: '', memo: '', variety: '', area: 0 });
+      data.logs.push({ id: 'h25t', cropId: 't25', type: 'harvest', date: '2025-06-30', memo: '', amount: 3, unit: '個', ts: 4 }); window.__keep = data.logs.filter(l => l.cropId === data.crops[0].id && l.type === 'harvest'); data.logs = data.logs.filter(l => !window.__keep.includes(l)); await save(); go('crops', data.crops[0].id); }); await w(300);
+    check('自分の実績（平均日数）と予定', await page.evaluate(() => $('.own').textContent.replace(/\s+/g, '').slice(0, 38)), '📈あなたの畑では：植えてから収穫まで平均60日（1回）。予定は45日です。');
+    const before = await page.evaluate(() => cropRows(data.crops[0]).find(r => r.kind.k === 'harvest').d1);
+    await page.click('.own [data-adj]'); await w(250);
+    check('「予定を実績に合わせる」で収穫の日がのびる', await page.evaluate(b => adjFactor('トマト', 'nae') + '/' + (cropRows(data.crops[0]).find(r => r.kind.k === 'harvest').d1 > b), before), '1.35/true');
+    await page.click('.own [data-adj]'); await w(250);
+    check('予定どおりにもどす', await page.evaluate(() => adjFactor('トマト', 'nae')), 1);
+    await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 't25'); data.logs = data.logs.filter(l => !['ph1', 'h25a', 'h26b', 'h25t'].includes(l.id)).concat(window.__keep.filter(l => !['h25a', 'h26b'].includes(l.id))); await save(); });
+    await page.click('#backBtn'); await w(150);
+
+    // ── 種・資材・費用 ──
+    await page.click('nav [data-tab="logs"]'); await w(150); await page.click('[data-sub="stock"]'); await w(150);
+    await page.click('#stAdd'); await w(150); await page.selectOption('#stPlan', 'キュウリ'); await w(50);
+    check('種：野菜を選ぶと名前が入る', await page.evaluate(() => $('#stName').value + '/' + !$('#stExBox').hidden), 'キュウリの種/true');
+    await page.fill('#stDate', '2026-03-01'); await page.fill('#stPrice', '330'); await page.fill('#stEx', '2026-06-30'); await page.click('#stSave'); await w(200);
+    await page.click('#stAdd'); await w(150); await page.click('#stK [data-k="fert"]'); await page.fill('#stName', '化成肥料'); await page.fill('#stDate', '2026-04-01'); await page.fill('#stPrice', '980'); await page.click('#stSave'); await w(200);
+    check('今年かかったお金・残っている種（期限もうすぐ）', await page.evaluate(() => $('.spent b').textContent + '/' + $('.spk').textContent.replace(/\s+/g, '') + '/' + document.querySelectorAll('h2')[1].textContent + '/' + !!document.querySelector('.stl .near')), '1,310円/🌰種330円🧪肥料980円/🌰 残っている種1種類/true');
+    await page.click('[data-sub="list"]'); await w(100); await page.click('nav [data-tab="crops"]'); await w(150); await page.click('#fab'); await w(150);
+    await page.click('#cVeg [data-p="キュウリ"]'); await w(100);
+    check('登録の窓で「種が残っています」', await page.evaluate(() => !$('#cSeed').hidden && $('#cSeed').textContent), '🌰 種が残っています：キュウリの種（期限 6/30(火)）');
+    await page.click('#cCancel'); await w(100);
+    // ── 家族と共有（合わせる） ──
+    const shareJson = await page.evaluate(() => { const c0 = data.crops[0]; return JSON.stringify({ app: 'saien-note', kind: 'share', data: {
+      fields: [{ id: 'famF', name: '実家の畑', area: 'tohoku', alt: 0, cold: false }], myPlans: [], stock: [],
+      crops: [Object.assign({}, c0, { done: Object.assign({}, c0.done, { 9: '2026-05-09' }) }), { id: 'famC', emoji: '🥔', name: 'ジャガイモ', plan: 'ジャガイモ', as: 'seed', plantedAt: '2026-03-10', status: 'growing', done: {}, fieldId: 'famF', place: '', memo: '', variety: '', area: 0 }],
+      logs: [{ id: 'famL', cropId: 'famC', type: 'water', date: '2026-05-09', memo: '母', amount: '', unit: '個', hasPhoto: true, ts: 9 }] },
+      photos: { famL: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' } }); });
+    const before2 = await page.evaluate(() => data.crops.length + '/' + data.logs.length);
+    check('共有ファイルを合わせる（消さずに足す）', await page.evaluate(async j => { const n = await mergeShare(new File([j], 's.json')); return [n.crops, n.logs, n.fields, data.crops.length, data.logs.length, data.crops[0].done[9], data.settings.multi, !!(await getPhoto('famL'))].join('/'); }, shareJson), (() => { const [c, l] = before2.split('/').map(Number); return `1/1/1/${c + 1}/${l + 1}/2026-05-09/true/true`; })());
+    check('もう一度合わせても増えない', await page.evaluate(async j => { const n = await mergeShare(new File([j], 's.json')); return n.crops + n.logs + n.fields; }, shareJson), 0);
+    await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 'famC'); data.logs = data.logs.filter(l => l.id !== 'famL'); data.fields = data.fields.filter(f => f.id !== 'famF'); delete data.crops[0].done[9]; data.settings.multi = false; data.settings.cur = 'all'; data.stock = []; await save(); render(); });
+
+    // ── 🎤 声で記録 ──
+    check('声を読みとる（野菜・作業・量・日）', await page.evaluate(() => [
+      'トマトとダイコンに水やり', 'トマトを五個収穫した', 'きのうダイコンに追肥', 'みんなに水やり', '5月3日 トマトを1.5キロとった', 'ナスに水やり'
+    ].map(t => { const r = voiceParse(t); return r.date.slice(5) + ':' + r.items.map(i => i.c.name + i.type + (i.amount ? i.amount + i.unit : '')).join('+'); }).join(' | ')),
+      '05-10:トマトwater+ダイコンwater | 05-10:トマトharvest5個 | 05-09:ダイコンfertilize | 05-10:' + await page.evaluate(() => activeCrops().map(c => c.name + 'water').join('+')) + ' | 05-03:トマトharvest1.5kg | 05-10:');
+    await page.click('nav [data-tab="crops"]'); await w(150);
+    check('🎤 のボタン', await page.evaluate(() => !$('#micFab').hidden), true);
+    await page.click('#micFab'); await w(150);
+    await page.fill('#vText', 'ダイコンに水やり'); await page.click('#vRead'); await w(100);
+    check('読みとった中身を見せる', await page.evaluate(() => $('.vres .vit').textContent.replace(/\s+/g, '') + '/' + $('#vSave').disabled), '🥬ダイコン：💧水やり/false');
+    const nl = await page.evaluate(() => data.logs.length);
+    await page.click('#vSave'); await w(200);
+    check('記録する', await page.evaluate(n => (data.logs.length - n) + '/' + data.logs[data.logs.length - 1].memo, nl), '1/ダイコンに水やり');
+    await page.evaluate(async () => { data.logs.pop(); await save(); render(); });
 
     // ── バックアップ ──
     const json = await page.evaluate(async () => JSON.stringify({ app: 'saien-note', version: 2, data, photos: {} }));
@@ -265,7 +394,11 @@ srv.listen(0, async () => {
     await page.click('[data-d="2026-05-12"]'); await w(200);
     check('霜と雨の日はひとこと', await page.evaluate(() => [...document.querySelectorAll('.wxday .tip')].map(t => t.textContent.slice(0, 2)).join(',')), '🥶,☔ ');
     check('いちど取ったら3時間は取り直さない・出どころを書く', await page.evaluate(() => $('.calcard').textContent.includes('Open-Meteo.com')) + '/' + wxCalls, 'true/1');
-    await page.click('nav [data-tab="crops"]'); await w(150); await page.click('.crop [data-open]'); await w(300);
+    await page.click('nav [data-tab="crops"]'); await w(300);
+    check('畑の上に天気の注意（霜・大雨・強風、気をつける野菜）', await page.evaluate(() => { return [...document.querySelectorAll('.wxboard .wxa b')].map(b => b.textContent).join(' / '); }), 'あす 5/11(月)：強い風（45km/h） / あさって 5/12(火)：霜（最低2℃） / あさって 5/12(火)：大雨（35mm）');
+    check('霜は夏野菜と小さい苗だけ', await page.evaluate(() => document.querySelectorAll('.wxboard .wxa.frost small.cs')[0].textContent.includes('トマト')), true);
+    check('水やりのひとこと（きのう雨・きょう雨の予報）', await page.evaluate(() => { const w = { days: {} }; w.days[addDays(today(), -1)] = { r: 12 }; const a = waterHint(w).t; w.days[addDays(today(), -1)] = { r: 0 }; w.days[today()] = { pp: 80, hi: 20 }; return a + ' | ' + waterHint(w).t; }), 'きのう雨（12mm）が降ったので、畑は水やり不要かも | きょうは雨の予報（80%）。畑は水やりお休みでよさそう');
+    await page.click('.crop [data-open]'); await w(300);
     check('野菜の画面のカレンダーにも天気', await page.evaluate(() => document.querySelectorAll('.cd .wx').length > 0), true);
     await page.click('#backBtn'); await w(150);
     // ── バージョン・新しくなったこと ──
