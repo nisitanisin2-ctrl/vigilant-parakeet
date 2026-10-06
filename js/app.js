@@ -215,21 +215,23 @@ function renderDetail(m) {
   <div class="row">
     <button class="btn" style="flex:1;background:var(--water-soft);color:var(--water)" id="dWater">💧 今日水やり</button>
     <button class="btn primary" style="flex:1" id="dLog">＋ 記録を追加</button>
-  </div>
-  <h2>📅 育て方の予定${v ? `<small>${v.i} ${esc(v.n)}・${c.as === 'nae' && canNae(v) ? '苗から' : (v.from === '植えつけ' ? '植えつけから' : '種から')}・${esc(areaText(fieldOf(c)))}</small>` : ''}</h2>`;
-  if (!v) h += `<div class="card muted">予定は出ていません。「編集」で<b>育て方の予定に使う野菜</b>を選ぶと、発芽・追肥・収穫などの予定日が出ます。</div>`;
-  else if (!c.plantedAt) h += `<div class="card muted">「編集」で<b>種まき・植付けの日</b>を入れると、予定日が出ます。</div>`;
-  else h += `<div class="card plan">${rows.map(r => { const s = rowState(c, r);
+  </div>`;
+  // 予定があるときは、カレンダー → 育て方の予定（表）→ 病気・害虫 → 肥料・コツ の順
+  const planHead = `<h2>📋 育て方の予定${v ? `<small>${v.i} ${esc(v.n)}・${c.as === 'nae' && canNae(v) ? '苗から' : (v.from === '植えつけ' ? '植えつけから' : '種から')}・${esc(areaText(fieldOf(c)))}</small>` : ''}</h2>`;
+  if (!v) h += planHead + `<div class="card muted">予定は出ていません。「編集」で<b>育て方の予定に使う野菜</b>を選ぶと、発芽・追肥・収穫などの予定日が出ます。</div>`;
+  else if (!c.plantedAt) h += planHead + `<div class="card muted">「編集」で<b>種まき・植付けの日</b>を入れると、予定日が出ます。</div>`;
+  else h += `<h2>📅 ${esc(c.name)}のカレンダー</h2>${calHtml([c], cropCal, false, fieldOf(c).loc)}${dayHtml([c], cropCal.sel, fieldOf(c).loc)}
+      ${planHead}<div class="card plan">${rows.map(r => { const s = rowState(c, r);
       return `<div class="pr ${s}"><span class="dot" style="background:${r.kind.c}"></span><span class="w">${esc(r.what)}</span><span class="d">${fmtRange(r.from, r.to)}</span>
         <span class="s">${esc(stateText(c, r))}</span>${r.i === 0 ? '<span class="b"></span>' : s === 'done' ? `<button class="b undo" data-undo="${r.i}" aria-label="取り消す">↺</button>` : `<button class="b" data-done="${c.id}:${r.i}">✓</button>`}</div>`; }).join('')}
       <div class="muted small">日にちは目安です（${esc(areaText(fieldOf(c)))}で補正 ${esc(factorText(fieldOf(c)))}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div></div>
-      <h2>📅 ${esc(c.name)}のカレンダー</h2>${calHtml([c], cropCal, false, fieldOf(c).loc)}${dayHtml([c], cropCal.sel, fieldOf(c).loc)}
       ${(sk => sk.length ? foldHtml('sickc', `<h2>⚠️ いま気をつけたい病気・害虫<small>${sk.filter(a => a.peak).length ? `注意報 ${sk.filter(a => a.peak).length}・` : ''}${sickMonth(fieldOf(c))}月ごろ・${esc(areaText(fieldOf(c)))}</small></h2>`, `<div class="card skboard">${sk.map(a => sickItemHtml(a, false)).join('')}</div>`) : '')(sickNow(c))}
       ${careHtml(v, c.area || 1)}${c.area ? '' : '<div class="muted small" style="margin:-4px 2px 10px">肥料の量は1㎡あたりです。「編集」で畑の広さを入れると、全体の量も出ます。</div>'}`;
   h += `<h2>📝 記録（${logs.length}件）</h2>
   <div class="card" id="logList">${logs.length ? logs.map(l => logHtml(l, false)).join('') : '<div class="empty" style="padding:16px">まだ記録はありません</div>'}</div>`;
   m.innerHTML = h;
   $('#editCrop').onclick = () => openCropForm(c);
+  if ($('#growAdj')) $('#growAdj').onclick = () => openGrowForm(c);
   $('#dWater').onclick = () => quickWater(c.id);
   $('#dLog').onclick = () => openLogForm({ cropId: c.id });
   m.querySelectorAll('#statusPick button').forEach(b => b.onclick = async () => { c.status = b.dataset.s; await save(); render(); toast(`「${STATUS[c.status]}」にしました`); });
@@ -237,6 +239,35 @@ function renderDetail(m) {
   if (v && c.plantedAt) bindCal(m, cropCal);
   bindTasks(m);
   bindLogList(m);
+}
+
+/* ===== 育ち具合の絵を実物に合わせる窓 =====
+   段階を選ぶか、「小さく・大きく」で少しずつずらす。予定の日（表・カレンダー）はかわらず、絵と病害虫の注意報の時期だけ */
+function openGrowForm(c) {
+  let shift = c.growShift != null && isFinite(c.growShift) ? c.growShift : null;
+  const opts = growOptions(c);
+  const s = openModal(`<h3>✋ 育ち具合を実物に合わせる</h3>
+    <p class="muted" style="margin-top:0">畑の${esc(c.name)}にいちばん近い絵を選んでください。合わせたあとも、日がたつにつれて絵は育っていきます。</p>
+    <div class="gprev" id="gPrev"></div>
+    <div class="pick" id="gSt">${opts.map(o => `<button type="button" data-st="${o.st}">${esc(o.label)}</button>`).join('')}</div>
+    <div class="row" style="margin-top:10px"><button class="btn" style="flex:1" id="gLess">◀ 少し小さく</button><button class="btn" style="flex:1" id="gMore">少し大きく ▶</button></div>
+    <p class="muted small">予定の日（表・カレンダー）はかわりません。かわるのは絵と、病気・害虫の注意報の時期（花が咲いてから など）です。</p>
+    <div class="actions"><button class="btn" id="gAuto">予定どおりにもどす</button><button class="btn primary" id="gSave">保存</button></div>`);
+  const draw = () => {
+    const cc = Object.assign({}, c, { growShift: shift }), g = growStage(cc);
+    $('#gPrev').innerHTML = `${growSvg(cc, g, 120)}<div><b>${esc(g.label)}</b><small>${shift == null || shift === 0 ? '予定どおり' : `予定より${Math.abs(shift)}日${shift > 0 ? 'おくれ' : 'すすみ'}`}${g.pct != null ? `・収穫まで ${Math.round(g.pct * 100)}%` : ''}</small></div>`;
+    s.querySelectorAll('#gSt button').forEach(b => b.classList.toggle('on', b.dataset.st === g.st));
+  };
+  s.querySelectorAll('#gSt button').forEach(b => b.onclick = () => { shift = growShiftFor(c, b.dataset.st, shift || 0); draw(); });
+  $('#gLess').onclick = () => { shift = (shift || 0) + 3; draw(); };
+  $('#gMore').onclick = () => { shift = (shift || 0) - 3; draw(); };
+  $('#gAuto').onclick = () => { shift = null; draw(); };
+  $('#gSave').onclick = async () => {
+    if (shift == null) delete c.growShift; else c.growShift = shift;
+    await save(); closeModal(); render();
+    toast(shift == null ? '予定どおりの絵にもどしました' : `✋ ${c.name}の育ち具合を合わせました`);
+  };
+  draw();
 }
 
 /* ===== 記録の一行 ===== */
@@ -583,7 +614,7 @@ function openCropForm(c, pre) {
     const fieldId = $('#cField') ? $('#cField').value : c.fieldId;
     const moved = !isNew && (c.plantedAt !== $('#cDate').value || c.plan !== plan || c.as !== as);
     Object.assign(c, { emoji, name, plan, as, fieldId, variety: $('#cVar').value.trim(), place: $('#cPlace').value.trim(), plantedAt: $('#cDate').value, area: area > 0 ? Math.min(10000, area) : 0, memo: $('#cMemo').value.trim() });
-    if (moved) c.done = {};   // 予定が変わったら「やった」はつけ直す
+    if (moved) { c.done = {}; delete c.growShift; }   // 予定が変わったら「やった」と育ち具合の合わせはつけ直す
     if (isNew) { c.id = uid(); c.createdAt = Date.now(); data.crops.push(c); }
     await save(); closeModal();
     if (isNew) { cropFilter = 'active'; go('crops', c.id); toast(`${c.emoji} ${c.name} を登録しました${plan ? '。予定が出ています' : ''}`, 2600); } else render();

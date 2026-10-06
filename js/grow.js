@@ -11,16 +11,20 @@ const STAGE_LABEL = { before: 'これから', seed: '種をまいた', nae: '苗
 const KIND_STAGE = { sprout: 'sprout', care: 'grow', feed: 'grow', plant: 'grow', flower: 'flower', harvest: 'harvest' };
 
 /* いまの育ち具合 {st:段階, label:ことば, size:0〜1（育つの中での大きさ）, pct:収穫はじめまでの進み（0〜1。分からなければ null）} */
+/* growShift：実物に合わせた分（日）。＋なら予定よりおくれている（絵は前の段階）、−なら進んでいる。
+   合わせたあとも、その日数ずらしたまま日がたつにつれて育っていく。合わせているときは「✓ やった」で段階を進めない */
 function growStage(c, t = today()) {
   if (!c || !c.plantedAt) return null;
   if (c.status === 'done') return { st: 'end', label: STAGE_LABEL.end, size: 1, pct: 1 };
+  const manual = c.growShift != null && isFinite(c.growShift);
+  if (manual && c.growShift) t = addDays(t, -c.growShift);
   const n = daysBetween(c.plantedAt, t);
   if (n < 0) return { st: 'before', label: `あと${-n}日`, size: 0, pct: 0 };
   const rows = cropRows(c);
   let st = c.as === 'nae' && (rows.length ? canNae(planByName(c.plan)) : true) ? 'nae' : 'seed', label = '', pct = null, size = 0;
   if (rows.length) {
     rows.forEach(r => {
-      if (r.i === 0 || !(c.done[r.i] || r.from <= t)) return;
+      if (r.i === 0 || !((!manual && c.done[r.i]) || r.from <= t)) return;
       const s = KIND_STAGE[r.kind.k] || 'grow';
       if (STAGE_NO[s] >= STAGE_NO[st]) { st = s; label = s === 'flower' ? r.what.replace(/はじめ$|が咲く$/, m => m === 'が咲く' ? 'が咲いた' : '') : ''; }
     });
@@ -32,7 +36,24 @@ function growStage(c, t = today()) {
     size = Math.min(1, n / 60);
   }
   if (c.status === 'harvesting' && st !== 'harvest') { st = 'harvest'; label = ''; }
-  return { st, label: label || STAGE_LABEL[st], size: Math.max(0.3, size), pct };
+  return { st, label: label || STAGE_LABEL[st], size: Math.max(0.3, size), pct, manual };
+}
+/* 合わせられる段階 [{st, label}]（その野菜でありうるもの） */
+function growOptions(c) {
+  const seen = new Map();
+  for (let s = 400; s >= -400; s -= 2) {
+    const g = growStage(Object.assign({}, c, { growShift: s, status: 'growing' }));
+    if (g && !['before', 'end'].includes(g.st) && !seen.has(g.st)) seen.set(g.st, g.label);
+  }
+  return [...seen].map(([st, label]) => ({ st, label })).sort((a, b) => STAGE_NO[a.st] - STAGE_NO[b.st]);
+}
+/* その段階の絵になる、いちばん小さいずらし（日） */
+function growShiftFor(c, st, from = 0) {
+  for (let k = 0; k <= 400; k++) for (const s of [from + k, from - k]) {
+    const g = growStage(Object.assign({}, c, { growShift: s, status: 'growing' }));
+    if (g && g.st === st) return s;
+  }
+  return from;
 }
 
 /* ===== 絵（64×64） ===== */
@@ -101,5 +122,5 @@ function gAllium(h, fallen) {   // ネギ・タマネギ（細長い葉。倒れ
 function growBox(c, big) {
   const g = growStage(c);
   if (!g) return `<div class="emo">${c.emoji}</div>`;
-  return `<div class="emo grow${big ? ' big' : ''}" data-st="${g.st}"><span class="e">${c.emoji}</span>${growSvg(c, g, big ? 84 : 56)}<small>${esc(g.label)}</small>${g.pct != null && g.st !== 'end' && big ? `<i class="gbar"><b style="width:${Math.round(g.pct * 100)}%"></b></i><small>収穫まで ${Math.round(g.pct * 100)}%</small>` : ''}</div>`;
+  return `<div class="emo grow${big ? ' big' : ''}" data-st="${g.st}"><span class="e">${c.emoji}</span>${growSvg(c, g, big ? 84 : 56)}<small>${g.manual && !big ? '✋' : ''}${esc(g.label)}</small>${g.pct != null && g.st !== 'end' && big ? `<i class="gbar"><b style="width:${Math.round(g.pct * 100)}%"></b></i><small>収穫まで ${Math.round(g.pct * 100)}%</small>` : ''}${big && !['before', 'end'].includes(g.st) ? `<button class="gadj" id="growAdj">✋ ${g.manual ? '合わせ中' : '合わせる'}</button>` : ''}</div>`;
 }

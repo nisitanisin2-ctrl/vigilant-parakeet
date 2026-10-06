@@ -310,3 +310,7 @@ body.simple { font-size: 18px; }
 .simple details.sk summary b { font-size: 17px; } .simple details.sk summary small { font-size: 14px; padding-left: 0; }
 .simple .skb { font-size: 15.5px; } .simple .skb span { display: block; width: auto; font-size: 13px; margin-top: 4px; }
 .simple .wxday .ic { font-size: 40px; }
+/* 育ち具合を実物に合わせる */
+.emo.grow .gadj { margin-top: 6px; border: 1px solid var(--acc); background: var(--panel); color: var(--acc); border-radius: 999px; padding: 3px 8px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.gprev { display: flex; align-items: center; gap: 14px; background: var(--acc-soft); border-radius: 14px; padding: 8px 14px; margin-bottom: 10px; }
+.gprev b { display: block; font-size: 18px; color: var(--acc); } .gprev small { color: var(--muted); }
