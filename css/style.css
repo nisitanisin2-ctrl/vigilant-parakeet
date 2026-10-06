@@ -350,3 +350,16 @@ body.simple { font-size: 18px; }
   #printArea table { width: 100%; border-collapse: collapse; break-inside: avoid; } #printArea th, #printArea td { border: 1px solid #999; padding: 3px 6px; text-align: left; }
   #printArea th { background: #e8f5e9; }
 }
+/* 配置図・連作 */
+.fmap { padding: 10px; } .fmh { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; } .fmh b { flex: 1; }
+.btn.mini { padding: 6px 10px; font-size: 13px; }
+.fmsvg { width: 100%; height: auto; display: block; background: #8b6a4c; border-radius: 8px; touch-action: manipulation; }
+.fmsvg .mc { fill: #9b7a5b; stroke: #7a5a3e; stroke-width: .03; cursor: pointer; } .fmsvg .mc.a { fill: #ffd54f; }
+.fmsvg .bed rect { fill: #6f4e37; stroke: #4e3524; stroke-width: .06; cursor: pointer; } .fmsvg .bed.warn rect { stroke: #e53935; stroke-width: .12; }
+.fmsvg .bed .bn { fill: #fff; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.fmsvg .bed text { pointer-events: none; }
+.legend i.lg { width: 16px; height: 10px; border-radius: 2px; display: inline-block; background: #6f4e37; } .legend i.lg.warn { border: 2px solid #e53935; }
+.rotw { background: #fff3e0; border-color: #ffb74d; font-size: 14px; }
+.bedc { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); cursor: pointer; } .bedc span { font-size: 24px; }
+.bedc b { display: block; } .bedc small { color: var(--muted); } .bedc em { color: #e53935; font-style: normal; font-weight: 700; }
+.sheet h4 { margin: 14px 0 4px; font-size: 14px; color: var(--muted); }

@@ -49,7 +49,7 @@ function upcoming(days) {
 
 /* ===== 画面の切りかえ ===== */
 let view = { tab: 'crops', cropId: null };
-let cropFilter = 'active', logTypeFilter = 'all', logSub = 'list';
+let cropFilter = 'active', logTypeFilter = 'all', logSub = 'list', cropSub = 'list';
 let cal = { y: 0, m: 0, sel: '' }, cropCal = { id: '', y: 0, m: 0, sel: '' };
 let guide = { n: '', q: '', date: '', as: 'seed', area: 1 };
 
@@ -122,26 +122,30 @@ async function undoTask(cropId, i) {
 }
 
 /* ===== 🌱 畑 ===== */
+/* 一覧と配置図の切りかえ */
+const cropSegHtml = () => `<div class="seg"><button class="${cropSub === 'list' ? 'on' : ''}" data-csub="list">🗂 一覧</button><button class="${cropSub === 'map' ? 'on' : ''}" data-csub="map">🗺 配置図</button></div>`;
+function bindCropSeg(m) { m.querySelectorAll('[data-csub]').forEach(b => b.onclick = () => { cropSub = b.dataset.csub; mapEdit = null; render(); }); }
 const showFieldName = () => multiOn() && data.settings.cur === 'all';
 function renderCrops(m) {
+  if (cropSub === 'map') return renderMap(m);
   const list = viewCrops().filter(c => cropFilter === 'all' ? true : cropFilter === 'done' ? c.status === 'done' : c.status !== 'done')
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (b.plantedAt || '').localeCompare(a.plantedAt || ''));
   let h = '';
   if (data.crops.length && !viewCrops().length) {
-    m.innerHTML = `<div class="empty"><div class="big">📍</div><p><b>${esc(curField().name)}</b>には、まだ野菜がありません。</p><p>右下の「＋」で登録します。上の 📍 でほかの畑に切りかえられます。</p></div>`;
+    m.innerHTML = cropSegHtml() + `<div class="empty"><div class="big">📍</div><p><b>${esc(curField().name)}</b>には、まだ野菜がありません。</p><p>右下の「＋」で登録します。上の 📍 でほかの畑に切りかえられます。</p></div>`;
     return;
   }
   if (!data.crops.length) {
-    m.innerHTML = installBanner() + `<div class="empty"><div class="big">🌱</div><p><b>菜園ノートへようこそ</b></p></div>
+    m.innerHTML = installBanner() + cropSegHtml() + `<div class="empty"><div class="big">🌱</div><p><b>菜園ノートへようこそ</b></p></div>
       <div class="card steps"><div><span>1</span><p>右下の「＋」で、<b>植えた野菜</b>（または、これから植える野菜）を登録します。種や苗を植えた日を入れると、<b>発芽・追肥・収穫などの予定</b>が出ます。</p></div>
       <div><span>2</span><p>「📅 予定」のカレンダーで、<b>いつ何をするか</b>が分かります。やったら「✓ やった」。</p></div>
       <div><span>3</span><p>水やりは 💧 を押すだけ。収穫や手入れは ✏️ で写真といっしょに残せます。</p></div>
       <div><span>📲</span><p>「⚙ 設定」の<b>アプリとして入れる</b>で、表電卓とは別のアプリとしてホーム画面に入れられます。</p></div>
       <div><span>💡</span><p>はじめに「⚙ 設定」で<b>住んでいる地域</b>を選ぶと、予定の日がその地域に合います（いま：${esc(areaText())}）。畑がいくつかあるときは「⚙ 設定」の<b>畑ごとに管理する</b>で分けられます。何を植えるか迷ったら「📖 育て方」へ。</p></div></div>`;
-    bindInstall();
+    bindInstall(); bindCropSeg(m);
     return;
   }
-  h += installBanner();
+  h += installBanner() + cropSegHtml();
   const wxh = wxBoardHtml(activeCrops(), true); h += wxh;
   const up = upcoming(7);
   const nt = simpleOn() ? 3 : 6;
@@ -161,6 +165,7 @@ function renderCrops(m) {
       else badges.push(`<span class="badge warn">💧記録なし</span>`);
     }
     if (tot) badges.push(`<span class="badge acc">🧺${tot}</span>`);
+    if (c.status !== 'done' && rotationWarn(c)) badges.push(`<span class="badge sick lo">⚠️連作</span>`);
     const sk = sickNow(c);
     if (sk.length) badges.push(`<span class="badge ${sk.some(x => x.peak) ? 'sick' : 'sick lo'}">⚠️${esc(sk[0].d.n.replace(/（.*/, ''))}${sk.length > 1 ? ` ほか${sk.length - 1}` : ''}</span>`);
     h += `<div class="card crop">
@@ -177,7 +182,7 @@ function renderCrops(m) {
     </div>`;
   });
   m.innerHTML = h;
-  bindTasks(m); bindInstall(); bindSow(m);
+  bindTasks(m); bindInstall(); bindSow(m); bindCropSeg(m);
   if ($('#moreTasks')) $('#moreTasks').onclick = () => go('plan');
   m.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { cropFilter = b.dataset.f; render(); });
   m.querySelectorAll('[data-log]').forEach(b => b.onclick = () => openLogForm({ cropId: b.dataset.log }));
@@ -215,6 +220,7 @@ function renderDetail(m) {
     <div class="pick" id="statusPick">${Object.entries(STATUS).map(([k, l]) => `<button data-s="${k}" class="${c.status === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${c.memo ? `<p class="memo" style="white-space:pre-wrap;margin:12px 0 0">${esc(c.memo)}</p>` : ''}
   </div>
+  ${(w => w ? `<div class="card rotw">⚠️ <b>連作の注意</b><br>${esc(rotationText(w))}</div>` : '')(c.status !== 'done' && rotationWarn(c))}
   <div class="row">
     <button class="btn" style="flex:1;background:var(--water-soft);color:var(--water)" id="dWater">💧 今日水やり</button>
     <button class="btn primary" style="flex:1" id="dLog">＋ 記録を追加</button>
@@ -625,14 +631,31 @@ function openCropForm(c, pre) {
     <label class="f">名前</label><input type="text" id="cName" value="${esc(c.name)}" placeholder="例：トマト">
     <label class="f">品種（なくてもよい）</label><input type="text" id="cVar" value="${esc(c.variety)}" placeholder="例：桃太郎">
     ${multiOn() ? `<label class="f">畑</label><select id="cField">${data.fields.map(f => `<option value="${f.id}" ${f.id === c.fieldId ? 'selected' : ''}>📍${esc(f.name)}（${esc(areaText(f))}）</option>`).join('')}</select>` : ''}
+    <div id="cBedBox"></div>
     <label class="f">${multiOn() ? '畑の中の場所' : '場所'}（なくてもよい）</label><input type="text" id="cPlace" value="${esc(c.place)}" placeholder="例：南の畝・プランター1">
+    <div id="cRot" class="tip warn" hidden></div>
     <div id="cAsBox"><label class="f">どこから育てる？</label><div class="pick" id="cAs"><button type="button" data-a="seed">種から</button><button type="button" data-a="nae">苗から</button></div></div>
     <label class="f" id="cDateLb">種まき・植付けの日</label><input type="date" id="cDate" value="${esc(c.plantedAt)}">
     <label class="f">畑の広さ（㎡・なくてもよい。肥料の量に使います）</label><input type="number" id="cArea" inputmode="decimal" min="0" step="any" value="${c.area || ''}" placeholder="例：3">
     <label class="f">メモ（なくてもよい）</label><textarea id="cMemo" placeholder="苗を買った店、株間など">${esc(c.memo)}</textarea>
     <div class="actions"><button class="btn" id="cCancel">やめる</button><button class="btn primary" id="cSave">${isNew ? '登録' : '保存'}</button></div>
     ${isNew ? '' : '<div style="margin-top:16px"><button class="btn danger block" id="cDel">この野菜を削除</button></div>'}`);
-  let emoji = c.emoji, plan = c.plan, as = c.as;
+  let emoji = c.emoji, plan = c.plan, as = c.as, bed = c.bed || '';
+  /* 畝（配置図）を選ぶ欄と、連作の注意 */
+  const curFid = () => ($('#cField') ? $('#cField').value : c.fieldId);
+  const drawBed = () => {
+    const f = fieldById(curFid()) || data.fields[0], beds = bedsOf(f);
+    if (!beds.some(b => b.id === bed)) bed = '';
+    $('#cBedBox').innerHTML = beds.length ? `<label class="f">畝（🗺 配置図）</label><select id="cBed"><option value="">えらばない</option>${beds.map(b => `<option value="${b.id}" ${b.id === bed ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : '';
+    if ($('#cBed')) $('#cBed').onchange = e => { const old = bedById(f, bed); bed = e.target.value; const nb = bedById(f, bed); const pl = $('#cPlace'); if (nb && (!pl.value.trim() || (old && pl.value === old.name))) pl.value = nb.name; rot(); };
+  };
+  const rot = () => {
+    const w = rotationWarn(Object.assign({}, c, { plan, bed, fieldId: curFid(), place: $('#cPlace').value.trim(), plantedAt: $('#cDate').value }));
+    $('#cRot').hidden = !w; if (w) $('#cRot').textContent = '⚠️ 連作の注意：' + rotationText(w);
+  };
+  drawBed();
+  if ($('#cField')) $('#cField').addEventListener('change', () => { drawBed(); rot(); });
+  $('#cPlace').addEventListener('input', rot); $('#cDate').addEventListener('change', rot);
   const sync = () => {
     const v = planByName(plan);
     $('#cEmoBox').hidden = !!plan;
@@ -640,6 +663,7 @@ function openCropForm(c, pre) {
     if (!canNae(v)) as = 'seed';
     s.querySelectorAll('#cAs button').forEach(b => b.classList.toggle('on', b.dataset.a === as));
     $('#cDateLb').textContent = v ? `${startLabel(v, as)}の日` : '種まき・植付けの日';
+    rot();
   };
   sync();
   s.querySelectorAll('#cVeg button').forEach(b => b.onclick = () => {
@@ -659,6 +683,7 @@ function openCropForm(c, pre) {
     const area = Number($('#cArea').value);
     const fieldId = $('#cField') ? $('#cField').value : c.fieldId;
     const moved = !isNew && (c.plantedAt !== $('#cDate').value || c.plan !== plan || c.as !== as);
+    if (bed) c.bed = bed; else delete c.bed;
     Object.assign(c, { emoji, name, plan, as, fieldId, variety: $('#cVar').value.trim(), place: $('#cPlace').value.trim(), plantedAt: $('#cDate').value, area: area > 0 ? Math.min(10000, area) : 0, memo: $('#cMemo').value.trim() });
     if (moved) { c.done = {}; delete c.growShift; }   // 予定が変わったら「やった」と育ち具合の合わせはつけ直す
     if (isNew) { c.id = uid(); c.createdAt = Date.now(); data.crops.push(c); }

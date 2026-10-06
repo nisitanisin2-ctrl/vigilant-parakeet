@@ -220,6 +220,33 @@ srv.listen(0, async () => {
     await page.evaluate(async () => { data.crops = data.crops.filter(c => c.name !== 'アイコ'); await save(); });
     await page.click('nav [data-tab="crops"]'); await w(150);
 
+    // ── 配置図・連作 ──
+    await page.click('nav [data-tab="crops"]'); await w(150); await page.click('[data-csub="map"]'); await w(150);
+    check('配置図：ます目（8×6）', await page.evaluate(() => document.querySelectorAll('.fmsvg .mc').length + '/' + !!$('[data-mapedit]')), '48/true');
+    await page.click('[data-mapedit]'); await w(100);
+    const fid = await page.evaluate(() => curField().id);
+    await page.click(`[data-cell="${fid}:0:0"]`); await w(100); await page.click(`[data-cell="${fid}:1:2"]`); await w(200);
+    check('2つの角を押すと畝ができる', await page.evaluate(() => JSON.stringify(curField().beds.map(b => [b.name, b.x, b.y, b.w, b.h]))), '[["畝1",0,0,2,3]]');
+    await page.click(`[data-cell="${fid}:2:2"]`); await w(50); await page.click(`[data-cell="${fid}:0:4"]`); await w(200);
+    check('重なる畝はつくらない', await page.evaluate(() => curField().beds.length + '/' + $('#toast').textContent), '1/ほかの畝と重なっています');
+    await page.click('[data-mapedit]'); await w(100);
+    await page.click('.fmsvg .bed'); await w(150);
+    await page.fill('#bdName', '南の畝'); await page.click('#bdRename'); await w(200);
+    await page.click('.fmsvg .bed'); await w(150); await page.click('#bdPlant'); await w(150);
+    check('畝から植える：畝と場所が入っている', await page.evaluate(() => $('#cBed').selectedOptions[0].textContent + '/' + $('#cPlace').value), '南の畝/南の畝');
+    // 去年ここにトマト（ナス科）
+    await page.evaluate(async () => { const b = curField().beds[0]; data.crops.push({ id: 'old-t', emoji: '🍅', name: 'トマト', plan: 'トマト', as: 'nae', plantedAt: '2025-05-01', status: 'done', done: {}, fieldId: curField().id, bed: b.id, place: b.name, memo: '', variety: '', area: 0 }); await save(); });
+    await page.click('#cVeg [data-p="ナス"]'); await page.fill('#cDate', '2026-05-01'); await w(150);
+    check('連作の注意（登録の窓）', await page.evaluate(() => !$('#cRot').hidden && $('#cRot').textContent), '⚠️ 連作の注意：1年前に同じナス科のトマト（2025年）を植えた所です。ナス科は4年ほど空けると病気が出にくくなります');
+    await page.click('#cSave'); await w(250);
+    check('野菜の画面にも連作の注意', await page.evaluate(() => !!$('.rotw')), true);
+    await page.click('#backBtn'); await w(200);
+    check('配置図：畝に野菜の絵・連作の畝は赤', await page.evaluate(() => document.querySelector('.fmsvg .bed').textContent.includes('🍆') + '/' + document.querySelector('.fmsvg .bed').classList.contains('warn')), 'true/true');
+    await page.click('[data-csub="list"]'); await w(150);
+    check('一覧のカードに⚠️連作', await page.evaluate(() => [...document.querySelectorAll('.crop')].some(c => c.textContent.includes('ナス') && c.textContent.includes('⚠️連作'))), true);
+    check('仲間と年数（自分の野菜は似ている野菜の仲間）', await page.evaluate(() => [familyOf('キャベツ'), restYears('スイカ'), familyOf('トウモロコシ') + restYears('トウモロコシ')].join('/')), 'アブラナ科/5/イネ科0');
+    await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 'old-t' && c.name !== 'ナス'); curField().beds = []; await save(); render(); });
+
     // ── バックアップ ──
     const json = await page.evaluate(async () => JSON.stringify({ app: 'saien-note', version: 2, data, photos: {} }));
     await page.evaluate(async () => { data.crops = []; data.logs = []; await save(); });

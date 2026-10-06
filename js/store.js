@@ -51,6 +51,7 @@ function normalize(d) {
   // 前のかたちは地域が1つだけ（settings.area）だったので、それを1つめの畑にする
   if (!d.fields.length) d.fields.push({ id: 'f1', name: 'わたしの畑', area: old.area || 'kanto', alt: Number(old.alt) || 0, cold: !!old.cold });
   d.fields.forEach(f => { f.name = String(f.name || '畑'); f.area = f.area || 'kanto'; f.alt = Math.max(0, Number(f.alt) || 0); f.cold = !!f.cold;
+    f.beds = Array.isArray(f.beds) ? f.beds.filter(b => b && b.id && isFinite(b.x) && isFinite(b.y) && b.w > 0 && b.h > 0) : []; f.cols = Math.max(2, Math.min(30, +f.cols || 8)); f.rows = Math.max(2, Math.min(30, +f.rows || 6));
     f.loc = f.loc && isFinite(f.loc.lat) && isFinite(f.loc.lon) ? { name: String(f.loc.name || '畑'), lat: +f.loc.lat, lon: +f.loc.lon } : null; });
   if (d.settings.cur !== 'all' && !d.fields.some(f => f.id === d.settings.cur)) d.settings.cur = 'all';
   d.crops.forEach(c => {
@@ -59,7 +60,8 @@ function normalize(d) {
     if (!(c.area > 0)) c.area = 0;
     if (!c.done || typeof c.done !== 'object') c.done = {};
     if (!d.fields.some(f => f.id === c.fieldId)) c.fieldId = d.fields[0].id;
-    if (c.growShift != null && !isFinite(c.growShift)) delete c.growShift;   // 育ち具合を実物に合わせた日数（grow.js）
+    if (c.growShift != null && !isFinite(c.growShift)) delete c.growShift;
+    if (c.bed && !d.fields.some(f => f.id === c.fieldId && (f.beds || []).some(b => b.id === c.bed))) delete c.bed;   // 畝（配置図）   // 育ち具合を実物に合わせた日数（grow.js）
   });
   return d;
 }
