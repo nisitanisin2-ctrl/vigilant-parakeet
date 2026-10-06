@@ -1,6 +1,7 @@
 /* 育て方の予定の計算（表電卓の「🌱 野菜」と同じ考え方）。
    まいた・植えた日に、野菜ごとの日数（VEG_PLANS）を足して、発芽・間引き・追肥・収穫などの日を出す。
-   寒い地域・標高が高い畑・寒冷地では育ちがゆっくりなので、日数に倍率（areaFactor）をかける。 */
+   寒い地域・標高が高い畑・寒冷地では育ちがゆっくりなので、日数に倍率（areaFactor）をかける。
+   地域は畑ごと（st は畑。data.fields の1つ）。 */
 'use strict';
 
 /* ===== 野菜をさがす ===== */
@@ -14,27 +15,27 @@ function guessPlan(name) {
 }
 
 /* ===== 地域の補正 ===== */
-function areaDef(st = data.settings) { return VEG_AREAS.find(a => a.id === st.area) || VEG_AREAS[3]; }
-function areaFactor(st = data.settings) {
+function areaDef(st = curField()) { return VEG_AREAS.find(a => a.id === st.area) || VEG_AREAS[3]; }
+function areaFactor(st = curField()) {
   const alt = Math.max(0, Math.min(2000, Number(st.alt) || 0));
   let f = areaDef(st).f * (1 + alt / 100 * 0.02);   // 標高100mごとに約2%おそく（気温が約0.6℃下がる目安）
   if (st.cold) f *= 1.05;                           // 霜がおりる畑はさらに少しおそく
   return Math.round(f * 100) / 100;
 }
-function areaText(st = data.settings) {
+function areaText(st = curField()) {
   let t = areaDef(st).n.replace('（標準）', '');
   const alt = Math.max(0, Math.round(Number(st.alt) || 0));
   if (alt > 0) t += '・標高' + alt + 'm';
   if (st.cold) t += '・寒冷地';
   return t;
 }
-function factorText(st = data.settings) {
+function factorText(st = curField()) {
   const f = areaFactor(st); if (f === 1) return 'なし（そのままの日数）';
   const pct = Math.round((f - 1) * 100);
   return (pct > 0 ? '＋' : '−') + Math.abs(pct) + '%（日数を' + f.toFixed(2) + '倍）';
 }
 /* 春まきの時期をどれだけずらすとよいか（「2週間おそめ」） */
-function shiftText(st = data.settings) { const w = areaDef(st).w; return w ? Math.abs(w) + '週間' + (w > 0 ? 'おそめ' : 'はやめ') : ''; }
+function shiftText(st = curField()) { const w = areaDef(st).w; return w ? Math.abs(w) + '週間' + (w > 0 ? 'おそめ' : 'はやめ') : ''; }
 
 /* ===== 種から／苗から ===== */
 /* 苗から植えられる野菜なら、種まきから「畑に植える」までの日数。できないなら -1 */
@@ -59,9 +60,9 @@ function kindOf(label) {
 
 /* ===== 予定表 =====
    [{i:番号, what:作業, from:はじめの日, to:おわりの日, d1, d2:何日後, kind}]。i=0 は種まき（植えた日）そのもの */
-function planRows(v, start, as) {
+function planRows(v, start, as, st = curField()) {
   if (!v || !start) return [];
-  const f = areaFactor(), base = as === 'nae' && canNae(v) ? transplantDay(v) : 0, bf = Math.round(base * f);
+  const f = areaFactor(st), base = as === 'nae' && canNae(v) ? transplantDay(v) : 0, bf = Math.round(base * f);
   const rows = [{ i: 0, what: startLabel(v, as), from: start, to: start, d1: 0, d2: 0, kind: kindOf('植える') }];
   (v.s || []).forEach(([what, a, b], k) => {
     const b1 = Math.max(0, Math.round(Number(a) || 0)), b2 = Math.max(b1, Math.round(Number(b) || b1));
@@ -71,7 +72,7 @@ function planRows(v, start, as) {
   });
   return rows;
 }
-function cropRows(c) { return c && c.plan && c.plantedAt ? planRows(planByName(c.plan), c.plantedAt, c.as) : []; }
+function cropRows(c) { return c && c.plan && c.plantedAt ? planRows(planByName(c.plan), c.plantedAt, c.as, fieldOf(c)) : []; }
 /* その予定は今どうか：done（やった）・now（いまの時期）・soon（7日以内）・later・past（時期を過ぎた） */
 function rowState(c, r, t = today()) {
   if (c.done && c.done[r.i]) return 'done';

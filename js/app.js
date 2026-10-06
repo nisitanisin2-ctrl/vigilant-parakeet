@@ -26,7 +26,9 @@ const TITLES = { crops: '菜園ノート', plan: '予定', logs: '記録', guide
 
 /* ===== データを引く ===== */
 const cropById = id => data.crops.find(c => c.id === id);
-const activeCrops = () => data.crops.filter(c => c.status !== 'done');
+const viewCrops = () => data.crops.filter(inView);   // いま見ている畑の野菜（畑ごとに管理していなければ全部）
+const activeCrops = () => viewCrops().filter(c => c.status !== 'done');
+const viewLog = l => { const c = cropById(l.cropId); return !!c && inView(c); };
 const logsOf = id => data.logs.filter(l => l.cropId === id).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
 const lastOf = (id, type) => logsOf(id).find(l => l.type === type);
 function harvestTotals(logs) {
@@ -84,6 +86,9 @@ function render() {
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === view.tab));
   $('#backBtn').hidden = !view.cropId;
   $('#fab').hidden = !['crops', 'logs', 'plan'].includes(view.tab) || (view.tab === 'logs' && logSub === 'sum');
+  const fs = $('#fieldSel'), showFs = multiOn() && !view.cropId && ['crops', 'plan', 'logs'].includes(view.tab);
+  fs.hidden = !showFs;
+  if (showFs) fs.innerHTML = data.fields.map(f => `<option value="${f.id}">📍${esc(f.name)}</option>`).join('') + `<option value="all">📍すべての畑</option>`, fs.value = data.settings.cur;
   const m = $('#main');
   if (view.cropId && cropById(view.cropId)) { if (cropCal.id !== view.cropId) cropCal = { id: view.cropId, y: 0, m: 0, sel: '' }; return renderDetail(m); }
   view.cropId = null;
@@ -116,18 +121,26 @@ async function undoTask(cropId, i) {
 }
 
 /* ===== 🌱 畑 ===== */
+const showFieldName = () => multiOn() && data.settings.cur === 'all';
 function renderCrops(m) {
-  const list = data.crops.filter(c => cropFilter === 'all' ? true : cropFilter === 'done' ? c.status === 'done' : c.status !== 'done')
+  const list = viewCrops().filter(c => cropFilter === 'all' ? true : cropFilter === 'done' ? c.status === 'done' : c.status !== 'done')
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (b.plantedAt || '').localeCompare(a.plantedAt || ''));
   let h = '';
+  if (data.crops.length && !viewCrops().length) {
+    m.innerHTML = `<div class="empty"><div class="big">📍</div><p><b>${esc(curField().name)}</b>には、まだ野菜がありません。</p><p>右下の「＋」で登録します。上の 📍 でほかの畑に切りかえられます。</p></div>`;
+    return;
+  }
   if (!data.crops.length) {
-    m.innerHTML = `<div class="empty"><div class="big">🌱</div><p><b>菜園ノートへようこそ</b></p></div>
+    m.innerHTML = installBanner() + `<div class="empty"><div class="big">🌱</div><p><b>菜園ノートへようこそ</b></p></div>
       <div class="card steps"><div><span>1</span><p>右下の「＋」で、<b>植えた野菜</b>（または、これから植える野菜）を登録します。種や苗を植えた日を入れると、<b>発芽・追肥・収穫などの予定</b>が出ます。</p></div>
       <div><span>2</span><p>「📅 予定」のカレンダーで、<b>いつ何をするか</b>が分かります。やったら「✓ やった」。</p></div>
       <div><span>3</span><p>水やりは 💧 を押すだけ。収穫や手入れは ✏️ で写真といっしょに残せます。</p></div>
-      <div><span>💡</span><p>はじめに「⚙ 設定」で<b>住んでいる地域</b>を選ぶと、予定の日がその地域に合います（いま：${esc(areaText())}）。何を植えるか迷ったら「📖 育て方」へ。</p></div></div>`;
+      <div><span>📲</span><p>「⚙ 設定」の<b>アプリとして入れる</b>で、表電卓とは別のアプリとしてホーム画面に入れられます。</p></div>
+      <div><span>💡</span><p>はじめに「⚙ 設定」で<b>住んでいる地域</b>を選ぶと、予定の日がその地域に合います（いま：${esc(areaText())}）。畑がいくつかあるときは「⚙ 設定」の<b>畑ごとに管理する</b>で分けられます。何を植えるか迷ったら「📖 育て方」へ。</p></div></div>`;
+    bindInstall();
     return;
   }
+  h += installBanner();
   const up = upcoming(7);
   if (up.length) h += `<h2 class="first">📋 近いうちにやること</h2><div class="card">${up.slice(0, 6).map(taskHtml).join('')}${up.length > 6 ? `<button class="link" id="moreTasks">ほか ${up.length - 6}件 → 📅 予定へ</button>` : ''}</div>`;
   const f = [['active', '育てている'], ['done', '終了'], ['all', 'すべて']];
@@ -147,7 +160,7 @@ function renderCrops(m) {
       <div class="emo">${c.emoji}</div>
       <div class="info" data-open="${c.id}">
         <div class="name">${esc(c.name)}${c.variety ? `<small>${esc(c.variety)}</small>` : ''}</div>
-        ${c.place ? `<div class="muted">📍${esc(c.place)}</div>` : ''}
+        ${c.place || showFieldName() ? `<div class="muted">📍${showFieldName() ? esc(fieldOf(c).name) + (c.place ? '・' : '') : ''}${esc(c.place)}</div>` : ''}
         <div class="badges">${badges.join('')}</div>
       </div>
       ${c.status !== 'done' ? `<div class="quick">
@@ -157,7 +170,7 @@ function renderCrops(m) {
     </div>`;
   });
   m.innerHTML = h;
-  bindTasks(m);
+  bindTasks(m); bindInstall();
   if ($('#moreTasks')) $('#moreTasks').onclick = () => go('plan');
   m.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { cropFilter = b.dataset.f; render(); });
   m.querySelectorAll('[data-log]').forEach(b => b.onclick = () => openLogForm({ cropId: b.dataset.log }));
@@ -182,7 +195,7 @@ function renderDetail(m) {
       <div style="flex:1;min-width:0">
         <div class="name" style="font-size:20px;font-weight:700">${esc(c.name)}</div>
         ${c.variety ? `<div class="muted">品種：${esc(c.variety)}</div>` : ''}
-        ${c.place ? `<div class="muted">📍${esc(c.place)}</div>` : ''}
+        ${c.place || multiOn() ? `<div class="muted">📍${multiOn() ? esc(fieldOf(c).name) + (c.place ? '・' : '') : ''}${esc(c.place)}</div>` : ''}
         ${c.plantedAt ? `<div class="muted">${v ? esc(startLabel(v, c.as)) : '植付'}：${fmtDateLong(c.plantedAt)}</div>` : ''}
       </div>
       <button class="btn" id="editCrop">編集</button>
@@ -199,13 +212,13 @@ function renderDetail(m) {
     <button class="btn" style="flex:1;background:var(--water-soft);color:var(--water)" id="dWater">💧 今日水やり</button>
     <button class="btn primary" style="flex:1" id="dLog">＋ 記録を追加</button>
   </div>
-  <h2>📅 育て方の予定${v ? `<small>${v.i} ${esc(v.n)}・${c.as === 'nae' && canNae(v) ? '苗から' : (v.from === '植えつけ' ? '植えつけから' : '種から')}・${esc(areaText())}</small>` : ''}</h2>`;
+  <h2>📅 育て方の予定${v ? `<small>${v.i} ${esc(v.n)}・${c.as === 'nae' && canNae(v) ? '苗から' : (v.from === '植えつけ' ? '植えつけから' : '種から')}・${esc(areaText(fieldOf(c)))}</small>` : ''}</h2>`;
   if (!v) h += `<div class="card muted">予定は出ていません。「編集」で<b>育て方の予定に使う野菜</b>を選ぶと、発芽・追肥・収穫などの予定日が出ます。</div>`;
   else if (!c.plantedAt) h += `<div class="card muted">「編集」で<b>種まき・植付けの日</b>を入れると、予定日が出ます。</div>`;
   else h += `<div class="card plan">${rows.map(r => { const s = rowState(c, r);
       return `<div class="pr ${s}"><span class="dot" style="background:${r.kind.c}"></span><span class="w">${esc(r.what)}</span><span class="d">${fmtRange(r.from, r.to)}</span>
         <span class="s">${esc(stateText(c, r))}</span>${r.i === 0 ? '<span class="b"></span>' : s === 'done' ? `<button class="b undo" data-undo="${r.i}" aria-label="取り消す">↺</button>` : `<button class="b" data-done="${c.id}:${r.i}">✓</button>`}</div>`; }).join('')}
-      <div class="muted small">日にちは目安です（${esc(areaText())}で補正 ${esc(factorText())}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div></div>
+      <div class="muted small">日にちは目安です（${esc(areaText(fieldOf(c)))}で補正 ${esc(factorText(fieldOf(c)))}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div></div>
       <h2>📅 ${esc(c.name)}のカレンダー</h2>${calHtml([c], cropCal, false)}${dayHtml([c], cropCal.sel)}
       ${careHtml(v, c.area || 1)}${c.area ? '' : '<div class="muted small" style="margin:-4px 2px 10px">肥料の量は1㎡あたりです。「編集」で畑の広さを入れると、全体の量も出ます。</div>'}`;
   h += `<h2>📝 記録（${logs.length}件）</h2>
@@ -317,7 +330,7 @@ function renderPlan(m) {
 function renderLogs(m) {
   let h = `<div class="seg"><button class="${logSub === 'list' ? 'on' : ''}" data-sub="list">📝 記録の一覧</button><button class="${logSub === 'sum' ? 'on' : ''}" data-sub="sum">📊 集計</button></div>`;
   if (logSub === 'sum') { m.innerHTML = h + summaryHtml(); bindSub(m); m.querySelectorAll('[data-y]').forEach(b => b.onclick = () => { summaryHtml.year = b.dataset.y; render(); }); return; }
-  const logs = data.logs.filter(l => cropById(l.cropId) && (logTypeFilter === 'all' || l.type === logTypeFilter)).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+  const logs = data.logs.filter(l => viewLog(l) && (logTypeFilter === 'all' || l.type === logTypeFilter)).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
   h += `<div class="filters"><button class="chip ${logTypeFilter === 'all' ? 'on' : ''}" data-t="all">すべて</button>${Object.entries(TYPES).map(([k, t]) => `<button class="chip ${logTypeFilter === k ? 'on' : ''}" data-t="${k}">${t.icon}${t.label}</button>`).join('')}</div>`;
   if (!logs.length) h += `<div class="empty"><div class="big">📝</div><p>記録はまだありません</p></div>`;
   let day = null, open = false;
@@ -334,12 +347,12 @@ function renderLogs(m) {
 }
 function bindSub(m) { m.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { logSub = b.dataset.sub; render(); }); }
 function summaryHtml() {
-  const years = [...new Set(data.logs.map(l => l.date.slice(0, 4)))].sort().reverse();
+  const years = [...new Set(data.logs.filter(viewLog).map(l => l.date.slice(0, 4)))].sort().reverse();
   if (!summaryHtml.year || !years.includes(summaryHtml.year)) summaryHtml.year = years[0] || today().slice(0, 4);
-  const y = summaryHtml.year, ylogs = data.logs.filter(l => l.date.startsWith(y) && cropById(l.cropId));
+  const y = summaryHtml.year, ylogs = data.logs.filter(l => l.date.startsWith(y) && viewLog(l));
   let h = years.length > 1 ? `<div class="filters">${years.map(v => `<button class="chip ${v === y ? 'on' : ''}" data-y="${v}">${v}年</button>`).join('')}</div>` : '';
   h += `<h2>${y}年の収穫</h2><div class="card">`;
-  const rows = data.crops.map(c => {
+  const rows = viewCrops().map(c => {
     const ls = ylogs.filter(l => l.cropId === c.id), hv = ls.filter(l => l.type === 'harvest');
     return { c, tot: harvestTotals(ls), times: hv.length, first: hv.map(l => l.date).sort()[0], last: hv.map(l => l.date).sort().pop() };
   }).filter(r => r.times);
@@ -381,50 +394,136 @@ function renderGuide(m) {
   if ($('#gAdd')) $('#gAdd').onclick = () => openCropForm(null, { plan: v.n, name: v.n, emoji: v.i, plantedAt: guide.date, as: guide.as, area: guide.area > 1 ? guide.area : 0 });
 }
 
+/* ===== 📲 アプリとして入れる（ホーム画面に追加） =====
+   菜園ノートは表電卓とは別のアプリ（manifest の id が別）。入れると別のアイコンで開き、データも別に残る */
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (window.APP_READY && ['crops', 'settings'].includes(view.tab) && !view.cropId) render(); });
+addEventListener('appinstalled', () => { installEvt = null; toast('🌱 菜園ノートをホーム画面に入れました'); if (window.APP_READY) render(); });
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+async function doInstall() {
+  if (!installEvt) return;
+  installEvt.prompt();
+  try { await installEvt.userChoice; } catch (e) {}
+  installEvt = null; render();
+}
+function installHtml() {
+  if (isStandalone()) return `<p style="margin:0">✅ いまはアプリとして開いています。表電卓とは別のアプリです。</p>`;
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return `<p style="margin-top:0">菜園ノートは<b>表電卓とは別のアプリ</b>です。ホーム画面に入れると、表電卓とは別の 🌱 アイコンで開けます（データも別に残ります）。電波がなくても使えます。</p>
+    ${installEvt ? `<button class="btn primary block" id="instBtn">📲 ホーム画面に入れる（インストール）</button>`
+      : ios ? `<p class="muted">iPhone・iPad：<b>Safari</b> で開き、下の共有ボタン（□に↑）→「<b>ホーム画面に追加</b>」→「追加」。</p>`
+      : `<p class="muted">Android：<b>Chrome</b> で開き、右上の「⋮」→「<b>アプリをインストール</b>」（または「ホーム画面に追加」）。<br>パソコン：アドレス欄の右にある「インストール」のしるし。</p>`}`;
+}
+function installBanner() {
+  let hide = false; try { hide = localStorage.getItem('saien-install-hide') === '1'; } catch (e) {}
+  if (!installEvt || isStandalone() || hide) return '';
+  return `<div class="card inst"><span>📲</span><p><b>菜園ノートをアプリとして入れる</b><br><small>表電卓とは別のアイコンで、すぐ開けます</small></p><button class="btn primary" id="instBtn">入れる</button><button class="x" id="instHide" aria-label="出さない">×</button></div>`;
+}
+function bindInstall() {
+  if ($('#instBtn')) $('#instBtn').onclick = doInstall;
+  if ($('#instHide')) $('#instHide').onclick = () => { try { localStorage.setItem('saien-install-hide', '1'); } catch (e) {} render(); };
+}
+
 /* ===== ⚙ 設定 ===== */
+/* 地域の入力欄（畑1つぶん） */
+function areaFormHtml(f) {
+  return `<label class="f">地域</label><select id="sArea">${VEG_AREAS.map(a => `<option value="${a.id}" ${a.id === f.area ? 'selected' : ''}>${esc(a.n)}</option>`).join('')}</select>
+      <div class="row" style="margin-top:8px"><label class="f" style="margin:0;flex:1">畑の標高（m）</label><input type="number" id="sAlt" inputmode="numeric" min="0" max="2000" value="${f.alt}" style="width:110px"></div>
+      <label class="sw"><input type="checkbox" id="sCold" ${f.cold ? 'checked' : ''}> 霜がおりやすい寒冷地</label>
+      <p class="muted" id="sFix">補正 <b>${esc(factorText(f))}</b>${shiftText(f) ? `／種まきの時期は標準より <b>${esc(shiftText(f))}</b>` : ''}</p>`;
+}
+function readAreaForm(f) {
+  let a = parseInt($('#sAlt').value, 10); if (!(a >= 0)) a = 0; if (a > 2000) a = 2000;
+  Object.assign(f, { area: $('#sArea').value, alt: a, cold: $('#sCold').checked });
+}
 async function renderSettings(m) {
-  const st = data.settings;
+  const multi = multiOn(), f0 = data.fields[0];
   let est = '';
   try { if (navigator.storage?.estimate) { const e = await navigator.storage.estimate(); est = `使用容量：約${(e.usage / 1048576).toFixed(1)}MB`; } } catch (e) {}
-  m.innerHTML = `<h2 class="first">🌡 住んでいる地域（予定の日の補正）</h2><div class="card">
-      <label class="f">地域</label><select id="sArea">${VEG_AREAS.map(a => `<option value="${a.id}" ${a.id === st.area ? 'selected' : ''}>${esc(a.n)}</option>`).join('')}</select>
-      <div class="row" style="margin-top:8px"><label class="f" style="margin:0;flex:1">畑の標高（m）</label><input type="number" id="sAlt" inputmode="numeric" min="0" max="2000" value="${st.alt}" style="width:110px"></div>
-      <label class="sw"><input type="checkbox" id="sCold" ${st.cold ? 'checked' : ''}> 霜がおりやすい寒冷地</label>
-      <p class="muted" id="sFix">補正 <b>${esc(factorText())}</b>${shiftText() ? `／種まきの時期は標準より <b>${esc(shiftText())}</b>` : ''}</p>
-      <p class="muted small">寒いところほど育ちがゆっくりなので、予定の日数をのばして出します（標高100mごとに約2%）。</p></div>
+  const cnt = f => data.crops.filter(c => c.fieldId === f.id).length;
+  m.innerHTML = `<h2 class="first">📲 アプリとして入れる</h2><div class="card">${installHtml()}</div>
+    <h2>📍 畑</h2><div class="card">
+      <label class="sw" style="margin-top:0"><input type="checkbox" id="sMulti" ${multi ? 'checked' : ''}> <b>畑ごとに管理する</b></label>
+      <p class="muted small">畑がいくつかあるときに入れます。畑ごとに野菜・予定・記録を分けて見られ、地域（予定の日の補正）も畑ごとに決められます。上の 📍 で畑を切りかえます。</p>
+      ${multi ? `<div class="flist">${data.fields.map(f => `<div class="fitem"><div><b>📍${esc(f.name)}</b><small>${esc(areaText(f))}・補正 ${esc(factorText(f).replace(/（.*/, ''))}・野菜 ${cnt(f)}件</small></div><button class="btn" data-fedit="${f.id}">直す</button></div>`).join('')}</div>
+        <button class="btn block" id="fAdd">＋ 畑を足す</button>` : ''}
+    </div>
+    ${multi ? '' : `<h2>🌡 住んでいる地域（予定の日の補正）</h2><div class="card">${areaFormHtml(f0)}
+      <p class="muted small">寒いところほど育ちがゆっくりなので、予定の日数をのばして出します（標高100mごとに約2%）。</p></div>`}
     <h2>💾 データ</h2><div class="card">
-      <p style="margin-top:0">野菜 ${data.crops.length}件・記録 ${data.logs.length}件・写真 ${data.logs.filter(l => l.hasPhoto).length}枚</p>
+      <p style="margin-top:0">${multi ? `畑 ${data.fields.length}つ・` : ''}野菜 ${data.crops.length}件・記録 ${data.logs.length}件・写真 ${data.logs.filter(l => l.hasPhoto).length}枚</p>
       <p class="muted">${est}<br>データはこの端末のブラウザの中だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきバックアップしてください。</p>
       <button class="btn primary block" id="exp">📤 バックアップを保存（写真ごと）</button>
       <div style="height:8px"></div>
       <button class="btn block" id="imp">📥 バックアップから戻す</button></div>
     <h2>📘 使い方</h2><div class="card help">
-      <p><b>🌱 畑</b>：育てている野菜の一覧。上に「近いうちにやること」。💧で今日の水やり、✏️で記録。野菜を押すと、予定・肥料・コツ・記録が見られます。</p>
-      <p><b>📅 予定</b>：すべての野菜の予定をカレンダーで。色の点が予定（はじめの日は濃く）、絵が記録です。日を押すとその日の予定と記録。</p>
+      <p><b>🌱 畑</b>：育てている野菜の一覧。上に「近いうちにやること」。💧で今日の水やり、✏️で記録。野菜を押すと、予定の表とカレンダー・肥料・コツ・記録が見られます。</p>
+      <p><b>📅 予定</b>：すべての野菜の予定をカレンダーで。作業が始まる日に「🍅追肥」の札、時期が続く日に色の線、記録した日に絵。日を押すとその日の予定と記録。</p>
       <p><b>📝 記録</b>：作業の記録と、年ごとの収穫・作業の集計。</p>
       <p><b>📖 育て方</b>：${VEG_PLANS.length}種類の野菜の、まく時期・予定・肥料・コツ・病気と害虫。「この内容で畑に登録する」で畑に入れられます。</p>
+      <p><b>📍 畑ごとに管理</b>：ここ（設定）で入れると、畑を足して、畑ごとに野菜・予定・記録・地域を分けられます。「すべての畑」でまとめても見られます。</p>
+      <p><b>↩ 戻る</b>：スマホの「戻る」で1つ前の画面に戻ります。畑の一覧でもう一度押すとアプリを閉じます。</p>
       <p class="muted small">予定の日数は家庭菜園のふつうの目安です。天気や育ち方を見て決めてください。農薬は、ラベルで「使ってよい作物」と「収穫の何日前まで」を必ず確かめてください。</p></div>`;
-  const upd = async () => {
-    let a = parseInt($('#sAlt').value, 10); if (!(a >= 0)) a = 0; if (a > 2000) a = 2000;
-    data.settings = { area: $('#sArea').value, alt: a, cold: $('#sCold').checked };
-    await save(); render(); toast(`地域を「${areaText()}」にしました`);
+  bindInstall();
+  $('#sMulti').onchange = async e => {
+    data.settings.multi = e.target.checked;
+    if (data.settings.cur !== 'all' && !fieldById(data.settings.cur)) data.settings.cur = f0.id;
+    await save(); render();
+    toast(e.target.checked ? '畑ごとに管理します。「＋ 畑を足す」で畑を足せます' : '畑を分けずに、すべての野菜を出します');
   };
-  $('#sArea').onchange = upd; $('#sAlt').onchange = upd; $('#sCold').onchange = upd;
+  if (!multi) {
+    const upd = async () => { readAreaForm(f0); await save(); render(); toast(`地域を「${areaText(f0)}」にしました`); };
+    $('#sArea').onchange = upd; $('#sAlt').onchange = upd; $('#sCold').onchange = upd;
+  } else {
+    m.querySelectorAll('[data-fedit]').forEach(b => b.onclick = () => openFieldForm(fieldById(b.dataset.fedit)));
+    $('#fAdd').onclick = () => openFieldForm(null);
+  }
   $('#exp').onclick = exportData;
   $('#imp').onclick = () => $('#importFile').click();
+}
+/* 畑を足す・直す窓 */
+function openFieldForm(f) {
+  const isNew = !f, base = curField();
+  f = f || { name: '', area: base.area, alt: base.alt, cold: base.cold };
+  const others = data.fields.filter(x => x.id !== f.id), n = isNew ? 0 : data.crops.filter(c => c.fieldId === f.id).length;
+  const s = openModal(`<h3>${isNew ? '📍 畑を足す' : '畑を直す'}</h3>
+    <label class="f">畑の名前</label><input type="text" id="fName" value="${esc(f.name)}" placeholder="例：家の畑・市民農園・ベランダ">
+    <div id="fArea">${areaFormHtml(f)}</div>
+    <div class="actions"><button class="btn" id="fCancel">やめる</button><button class="btn primary" id="fSave">${isNew ? '足す' : '保存'}</button></div>
+    ${!isNew && others.length ? `<div style="margin-top:16px"><button class="btn danger block" id="fDel">この畑を消す</button>
+      ${n ? `<p class="muted small">この畑の野菜${n}件は「${esc(others[0].name)}」に移ります（野菜と記録は消えません）。</p>` : ''}</div>` : ''}`);
+  const prev = () => { const t = { ...f }; readAreaForm(t); $('#sFix').innerHTML = `補正 <b>${esc(factorText(t))}</b>${shiftText(t) ? `／種まきの時期は標準より <b>${esc(shiftText(t))}</b>` : ''}`; };
+  ['#sArea', '#sAlt', '#sCold'].forEach(k => s.querySelector(k).onchange = prev);
+  $('#fCancel').onclick = closeModal;
+  $('#fSave').onclick = async () => {
+    const name = $('#fName').value.trim();
+    if (!name) { $('#fName').focus(); toast('畑の名前を入れてください'); return; }
+    f.name = name; readAreaForm(f);
+    if (isNew) { f.id = uid(); data.fields.push(f); data.settings.cur = f.id; }
+    await save(); closeModal(); render();
+    toast(isNew ? `📍${name} を足しました。上の 📍 で切りかえられます` : '保存しました');
+  };
+  if ($('#fDel')) $('#fDel').onclick = async () => {
+    if (!confirm(`畑「${f.name}」を消しますか？${n ? `\n野菜${n}件は「${others[0].name}」に移ります。` : ''}`)) return;
+    data.crops.forEach(c => { if (c.fieldId === f.id) c.fieldId = others[0].id; });
+    data.fields = others;
+    if (data.settings.cur === f.id) data.settings.cur = others[0].id;
+    await save(); closeModal(); render(); toast('消しました');
+  };
 }
 
 /* ===== 野菜を登録・直す窓 ===== */
 function openCropForm(c, pre) {
   const isNew = !c;
-  c = c || Object.assign({ emoji: '🌱', name: '', variety: '', place: '', plantedAt: today(), status: 'growing', memo: '', plan: '', as: 'seed', area: 0, done: {} }, pre || {});
+  c = c || Object.assign({ emoji: '🌱', name: '', variety: '', place: '', plantedAt: today(), status: 'growing', memo: '', plan: '', as: 'seed', area: 0, done: {}, fieldId: curField().id }, pre || {});
   const s = openModal(`<h3>${isNew ? '🌱 野菜を登録' : '野菜を直す'}</h3>
     <label class="f">野菜（押すと名前と予定が入ります）</label>
     <div class="pick veg" id="cVeg">${VEG_PLANS.map(v => `<button type="button" data-p="${esc(v.n)}" class="${c.plan === v.n ? 'on' : ''}">${v.i}${esc(v.n)}</button>`).join('')}<button type="button" data-p="" class="${!c.plan ? 'on' : ''}">🌱その他</button></div>
     <div id="cEmoBox" ${c.plan ? 'hidden' : ''}><label class="f">絵</label><div class="pick emoji" id="emo">${PRESETS.map(([e, n]) => `<button type="button" data-e="${e}" title="${n}" class="${c.emoji === e ? 'on' : ''}">${e}</button>`).join('')}</div></div>
     <label class="f">名前</label><input type="text" id="cName" value="${esc(c.name)}" placeholder="例：トマト">
     <label class="f">品種（なくてもよい）</label><input type="text" id="cVar" value="${esc(c.variety)}" placeholder="例：桃太郎">
-    <label class="f">場所（なくてもよい）</label><input type="text" id="cPlace" value="${esc(c.place)}" placeholder="例：南の畝・プランター1">
+    ${multiOn() ? `<label class="f">畑</label><select id="cField">${data.fields.map(f => `<option value="${f.id}" ${f.id === c.fieldId ? 'selected' : ''}>📍${esc(f.name)}（${esc(areaText(f))}）</option>`).join('')}</select>` : ''}
+    <label class="f">${multiOn() ? '畑の中の場所' : '場所'}（なくてもよい）</label><input type="text" id="cPlace" value="${esc(c.place)}" placeholder="例：南の畝・プランター1">
     <div id="cAsBox"><label class="f">どこから育てる？</label><div class="pick" id="cAs"><button type="button" data-a="seed">種から</button><button type="button" data-a="nae">苗から</button></div></div>
     <label class="f" id="cDateLb">種まき・植付けの日</label><input type="date" id="cDate" value="${esc(c.plantedAt)}">
     <label class="f">畑の広さ（㎡・なくてもよい。肥料の量に使います）</label><input type="number" id="cArea" inputmode="decimal" min="0" step="any" value="${c.area || ''}" placeholder="例：3">
@@ -456,8 +555,9 @@ function openCropForm(c, pre) {
     const name = $('#cName').value.trim();
     if (!name) { $('#cName').focus(); toast('名前を入れてください'); return; }
     const area = Number($('#cArea').value);
+    const fieldId = $('#cField') ? $('#cField').value : c.fieldId;
     const moved = !isNew && (c.plantedAt !== $('#cDate').value || c.plan !== plan || c.as !== as);
-    Object.assign(c, { emoji, name, plan, as, variety: $('#cVar').value.trim(), place: $('#cPlace').value.trim(), plantedAt: $('#cDate').value, area: area > 0 ? Math.min(10000, area) : 0, memo: $('#cMemo').value.trim() });
+    Object.assign(c, { emoji, name, plan, as, fieldId, variety: $('#cVar').value.trim(), place: $('#cPlace').value.trim(), plantedAt: $('#cDate').value, area: area > 0 ? Math.min(10000, area) : 0, memo: $('#cMemo').value.trim() });
     if (moved) c.done = {};   // 予定が変わったら「やった」はつけ直す
     if (isNew) { c.id = uid(); c.createdAt = Date.now(); data.crops.push(c); }
     await save(); closeModal();
@@ -475,14 +575,14 @@ function openCropForm(c, pre) {
 
 /* ===== 記録を入れる・直す窓。onSaved は保存したあとに呼ぶ（予定を「やった」にするときなど） ===== */
 async function openLogForm(l, onSaved) {
-  const active = data.crops.filter(c => c.status !== 'done' || c.id === l.cropId);
+  const active = data.crops.filter(c => (c.status !== 'done' && inView(c)) || c.id === l.cropId);
   if (!active.length) { toast('先に野菜を登録してください'); go('crops'); openCropForm(); return; }
   const isNew = !l.id;
   l = Object.assign({ type: 'water', date: (view.cropId ? cropCal.sel : view.tab === 'plan' ? cal.sel : '') || today(), memo: '', amount: '', unit: '個', cropId: active[0].id }, l);
   let photo = l.hasPhoto ? await getPhoto(l.id) : null, photoChanged = false;
   const s = openModal(`<h3>${isNew ? '📝 記録を入れる' : '記録を直す'}</h3>
     <label class="f">野菜</label>
-    <select id="lCrop">${active.map(c => `<option value="${c.id}" ${c.id === l.cropId ? 'selected' : ''}>${c.emoji} ${esc(c.name)}${c.variety ? '（' + esc(c.variety) + '）' : ''}</option>`).join('')}</select>
+    <select id="lCrop">${active.map(c => `<option value="${c.id}" ${c.id === l.cropId ? 'selected' : ''}>${c.emoji} ${esc(c.name)}${c.variety ? '（' + esc(c.variety) + '）' : ''}${showFieldName() ? '・' + esc(fieldOf(c).name) : ''}</option>`).join('')}</select>
     <label class="f">作業</label>
     <div class="pick" id="lType">${Object.entries(TYPES).map(([k, t]) => `<button type="button" data-t="${k}" class="${l.type === k ? 'on' : ''}">${t.icon}${t.label}</button>`).join('')}</div>
     <div id="hvBox"><label class="f">収穫量（なくてもよい）</label>
@@ -531,6 +631,7 @@ async function openLogForm(l, onSaved) {
 /* ===== はじめに ===== */
 function start() {
   $('#backBtn').onclick = goBack;
+  $('#fieldSel').onchange = async e => { data.settings.cur = e.target.value; await save(); render(); };
   document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
   history.replaceState({ base: 1 }, ''); history.pushState({ v: view, d: 1 }, '');
   addEventListener('popstate', onPop);

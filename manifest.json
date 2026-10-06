@@ -4,6 +4,7 @@
   "description": "家庭菜園の育て方の予定（種まき・追肥・収穫の日）と、水やり・収穫などの記録をつけるアプリ",
   "id": "/saien-note",
   "start_url": "./index.html",
+  "lang": "ja",
   "scope": "./",
   "display": "standalone",
   "background_color": "#2e7d32",
