@@ -4,7 +4,7 @@
                             plan:育て方の予定に使う野菜の名前（VEG_PLANS の n。なければ ''）, as:'seed'（種から）|'nae'（苗から）,
                             area:広さ㎡（肥料の量に使う）, done:{予定の番号: やった日}, fieldId:どの畑か}],
      logs:  作業の記録 [{id, cropId, type, date, memo, amount, unit, hasPhoto, ts}],
-     fields: 畑 [{id, name, area:地域, alt:標高m, cold:寒冷地か}]（地域は畑ごと。予定の日数の補正に使う）,
+     fields: 畑 [{id, name, area:地域, alt:標高m, cold:寒冷地か, loc:天気予報の場所{name, lat, lon}|null}]（地域は畑ごと。予定の日数の補正に使う）,
      settings: {multi:畑ごとに管理するか, cur:いま見ている畑のid（'all' はすべての畑。開いたときは 'all'）}
    }
    写真は大きいので data とは別に 'photo:記録のid' で入れている。 */
@@ -48,7 +48,8 @@ function normalize(d) {
   d.fields = Array.isArray(d.fields) ? d.fields.filter(f => f && f.id) : [];
   // 前のかたちは地域が1つだけ（settings.area）だったので、それを1つめの畑にする
   if (!d.fields.length) d.fields.push({ id: 'f1', name: 'わたしの畑', area: old.area || 'kanto', alt: Number(old.alt) || 0, cold: !!old.cold });
-  d.fields.forEach(f => { f.name = String(f.name || '畑'); f.area = f.area || 'kanto'; f.alt = Math.max(0, Number(f.alt) || 0); f.cold = !!f.cold; });
+  d.fields.forEach(f => { f.name = String(f.name || '畑'); f.area = f.area || 'kanto'; f.alt = Math.max(0, Number(f.alt) || 0); f.cold = !!f.cold;
+    f.loc = f.loc && isFinite(f.loc.lat) && isFinite(f.loc.lon) ? { name: String(f.loc.name || '畑'), lat: +f.loc.lat, lon: +f.loc.lon } : null; });
   if (d.settings.cur !== 'all' && !d.fields.some(f => f.id === d.settings.cur)) d.settings.cur = 'all';
   d.crops.forEach(c => {
     if (c.plan === undefined) c.plan = guessPlan(c.name);   // 名前から育て方の予定をさがす（トマト→トマト）

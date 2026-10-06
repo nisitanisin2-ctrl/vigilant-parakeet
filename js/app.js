@@ -143,6 +143,7 @@ function renderCrops(m) {
   h += installBanner();
   const up = upcoming(7);
   if (up.length) h += `<h2 class="first">📋 近いうちにやること</h2><div class="card">${up.slice(0, 6).map(taskHtml).join('')}${up.length > 6 ? `<button class="link" id="moreTasks">ほか ${up.length - 6}件 → 📅 予定へ</button>` : ''}</div>`;
+  h += sickBoardHtml(activeCrops(), !up.length);
   const f = [['active', '育てている'], ['done', '終了'], ['all', 'すべて']];
   h += `<div class="filters">${f.map(([k, l]) => `<button class="chip ${cropFilter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>`;
   if (!list.length) h += `<div class="empty">該当する野菜はありません</div>`;
@@ -156,6 +157,8 @@ function renderCrops(m) {
       else badges.push(`<span class="badge warn">💧記録なし</span>`);
     }
     if (tot) badges.push(`<span class="badge acc">🧺${tot}</span>`);
+    const sk = sickNow(c);
+    if (sk.length) badges.push(`<span class="badge ${sk.some(x => x.peak) ? 'sick' : 'sick lo'}">⚠️${esc(sk[0].d.n.replace(/（.*/, ''))}${sk.length > 1 ? ` ほか${sk.length - 1}` : ''}</span>`);
     h += `<div class="card crop">
       ${growBox(c)}
       <div class="info" data-open="${c.id}">
@@ -219,7 +222,8 @@ function renderDetail(m) {
       return `<div class="pr ${s}"><span class="dot" style="background:${r.kind.c}"></span><span class="w">${esc(r.what)}</span><span class="d">${fmtRange(r.from, r.to)}</span>
         <span class="s">${esc(stateText(c, r))}</span>${r.i === 0 ? '<span class="b"></span>' : s === 'done' ? `<button class="b undo" data-undo="${r.i}" aria-label="取り消す">↺</button>` : `<button class="b" data-done="${c.id}:${r.i}">✓</button>`}</div>`; }).join('')}
       <div class="muted small">日にちは目安です（${esc(areaText(fieldOf(c)))}で補正 ${esc(factorText(fieldOf(c)))}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div></div>
-      <h2>📅 ${esc(c.name)}のカレンダー</h2>${calHtml([c], cropCal, false)}${dayHtml([c], cropCal.sel)}
+      <h2>📅 ${esc(c.name)}のカレンダー</h2>${calHtml([c], cropCal, false, fieldOf(c).loc)}${dayHtml([c], cropCal.sel, fieldOf(c).loc)}
+      ${(sk => sk.length ? `<h2>⚠️ いま気をつけたい病気・害虫<small>${sickMonth(fieldOf(c))}月ごろ・${esc(areaText(fieldOf(c)))}</small></h2><div class="card skboard">${sk.map(a => sickItemHtml(a, false)).join('')}</div>` : '')(sickNow(c))}
       ${careHtml(v, c.area || 1)}${c.area ? '' : '<div class="muted small" style="margin:-4px 2px 10px">肥料の量は1㎡あたりです。「編集」で畑の広さを入れると、全体の量も出ます。</div>'}`;
   h += `<h2>📝 記録（${logs.length}件）</h2>
   <div class="card" id="logList">${logs.length ? logs.map(l => logHtml(l, false)).join('') : '<div class="empty" style="padding:16px">まだ記録はありません</div>'}</div>`;
@@ -261,8 +265,8 @@ function bindLogList(m) {
    予定がはじまる日に「🍅追肥」のような札、その作業の時期が続く日に細い線、記録した日に絵（💧🧺）。
    many=true はいろいろな野菜（札に野菜の絵を出す）、false は1つの野菜（札に作業の名前を出す） */
 const KIND_LABEL = { harvest: '収穫', feed: '追肥', care: '手入れ', sprout: '発芽', flower: '花', plant: '植える' };
-function calHtml(crops, st, many) {
-  const t = today();
+function calHtml(crops, st, many, loc) {
+  const t = today(), wx = wxFor(loc, () => { if (window.APP_READY && !$('#modalRoot').firstElementChild) render(); });
   if (!st.y) { const b = st.sel || t; st.y = +b.slice(0, 4); st.m = +b.slice(5, 7); if (!st.sel) st.sel = t; }
   const ym = `${st.y}-${String(st.m).padStart(2, '0')}`, first = ym + '-01', days = new Date(st.y, st.m, 0).getDate(), last = ym + '-' + String(days).padStart(2, '0');
   const startW = new Date(first + 'T00:00').getDay(), ids = new Set(crops.map(c => c.id));
@@ -281,7 +285,7 @@ function calHtml(crops, st, many) {
     const icons = [...new Set(ls.map(l => (TYPES[l.type] || TYPES.other).icon))].slice(0, 3).join('');
     const show = mk.slice(0, 3), rest = mk.length - show.length;
     const cls = ['cd', ds === t ? 'today' : '', ds === st.sel ? 'sel' : '', ds < t ? 'pastday' : '', wd === 0 ? 'sun' : wd === 6 ? 'sat' : ''].filter(Boolean).join(' ');
-    cells += `<button class="${cls}" data-d="${ds}"><span class="n">${d}</span>${show.map(x => x.start
+    cells += `<button class="${cls}" data-d="${ds}"><span class="n">${d}</span>${wxCellHtml(wx, ds)}${show.map(x => x.start
         ? `<span class="ev ${x.s}" style="--k:${x.r.kind.c}">${many ? x.c.emoji + KIND_LABEL[x.r.kind.k] : esc(x.r.what)}</span>`
         : `<span class="bar ${x.s}" style="--k:${x.r.kind.c}"></span>`).join('')}${rest > 0 ? `<span class="more">ほか${rest}</span>` : ''}${icons ? `<span class="lg">${icons}</span>` : ''}</button>`;
   }
@@ -290,7 +294,7 @@ function calHtml(crops, st, many) {
     <div class="legend">${[['sprout', '芽・根づく'], ['care', '手入れ'], ['feed', '追肥'], ['flower', '花など'], ['harvest', '収穫'], ['plant', '植える']].map(([k, lb]) =>
       `<span><i class="ev" style="--k:${kindOf({ sprout: '発芽', care: '間引き', feed: '追肥', flower: '花', harvest: '収穫', plant: '植える' }[k]).c}"></i>${lb}</span>`).join('')}
       <span><i class="bar" style="--k:#888"></i>その作業の時期が続く日</span><span>💧🧺 記録した日</span><span class="dim">うすい色＝やった・すぎた</span></div>
-    <div class="muted small" style="margin-top:4px">日を押すと、その日の予定と記録が下に出ます。左右になぞると月がかわります。</div></div>`;
+    <div class="muted small" style="margin-top:4px">日を押すと、その日の予定と記録が下に出ます。左右になぞると月がかわります。</div>${wxNoteHtml(wx, loc)}</div>`;
 }
 function bindCal(m, st) {
   const mv = d => { const x = st.y * 12 + st.m - 1 + d; st.y = Math.floor(x / 12); st.m = x % 12 + 1; render(); };
@@ -305,22 +309,26 @@ function bindCal(m, st) {
   });
 }
 /* えらんだ日の予定と記録 */
-function dayHtml(crops, sel) {
+function dayHtml(crops, sel, loc) {
   const ids = new Set(crops.map(c => c.id)), mk = [];
   crops.forEach(c => cropRows(c).forEach(r => { if (r.i > 0 && sel >= r.from && sel <= r.to) mk.push({ c, r, s: rowState(c, r) }); }));
   const ls = data.logs.filter(l => l.date === sel && ids.has(l.cropId));
-  return `<h2>${fmtDateLong(sel)}</h2>
+  return `<h2>${fmtDateLong(sel)}</h2>${wxDayHtml(loc && wxCached(loc), sel, loc)}
     <div class="card">${mk.length ? mk.map(taskHtml).join('') : '<div class="muted">この日の予定はありません</div>'}</div>
     <div class="card">${ls.length ? ls.map(l => logHtml(l, crops.length > 1)).join('') : '<div class="muted">この日の記録はありません。右下の「＋」で入れられます</div>'}</div>`;
 }
+
+/* 予定のタブの天気：いま見ている畑の場所（すべての畑のときは、場所を決めてある最初の畑） */
+const wxLoc = () => curField().loc || (multiOn() && data.settings.cur === 'all' ? (data.fields.find(f => f.loc) || {}).loc : null) || null;
 
 /* ===== 📅 予定（カレンダー） ===== */
 function renderPlan(m) {
   const up = upcoming(14);
   let h = `<h2 class="first">📋 これから2週間にやること</h2><div class="card">${up.length ? up.map(taskHtml).join('')
     : `<div class="muted">${activeCrops().some(c => c.plan && c.plantedAt) ? 'この2週間にやる予定はありません 🌤' : '野菜を登録すると、ここにやることが出ます（「🌱 畑」の ＋ から）'}</div>`}</div>`;
-  h += calHtml(activeCrops(), cal, true);
-  h += dayHtml(activeCrops(), cal.sel);
+  const loc = wxLoc();
+  h += calHtml(activeCrops(), cal, true, loc);
+  h += dayHtml(activeCrops(), cal.sel, loc);
   m.innerHTML = h;
   bindCal(m, cal);
   bindTasks(m); bindLogList(m);
@@ -445,11 +453,12 @@ async function renderSettings(m) {
     <h2>📍 畑</h2><div class="card">
       <label class="sw" style="margin-top:0"><input type="checkbox" id="sMulti" ${multi ? 'checked' : ''}> <b>畑ごとに管理する</b></label>
       <p class="muted small">畑がいくつかあるときに入れます。畑ごとに野菜・予定・記録を分けて見られ、地域（予定の日の補正）も畑ごとに決められます。上の 📍 で畑を切りかえます。</p>
-      ${multi ? `<div class="flist">${data.fields.map(f => `<div class="fitem"><div><b>📍${esc(f.name)}</b><small>${esc(areaText(f))}・補正 ${esc(factorText(f).replace(/（.*/, ''))}・野菜 ${cnt(f)}件</small></div><button class="btn" data-fedit="${f.id}">直す</button></div>`).join('')}</div>
+      ${multi ? `<div class="flist">${data.fields.map(f => `<div class="fitem"><div><b>📍${esc(f.name)}</b><small>${esc(areaText(f))}・補正 ${esc(factorText(f).replace(/（.*/, ''))}・野菜 ${cnt(f)}件<br>🌤 ${f.loc ? esc(f.loc.name) : '天気予報の場所なし'}</small></div><button class="btn" data-fedit="${f.id}">直す</button></div>`).join('')}</div>
         <button class="btn block" id="fAdd">＋ 畑を足す</button>` : ''}
     </div>
     ${multi ? '' : `<h2>🌡 住んでいる地域（予定の日の補正）</h2><div class="card">${areaFormHtml(f0)}
-      <p class="muted small">寒いところほど育ちがゆっくりなので、予定の日数をのばして出します（標高100mごとに約2%）。</p></div>`}
+      <p class="muted small">寒いところほど育ちがゆっくりなので、予定の日数をのばして出します（標高100mごとに約2%）。</p></div>
+    <h2>🌤 天気予報の場所</h2><div class="card"><p class="muted small" style="margin-top:0">決めると、📅 予定と野菜の画面のカレンダーに<b>16日先までの天気予報</b>（天気・最高/最低気温・雨の確率）が出ます。霜や大雨の日はひとことも出ます。</p><div id="sLoc"></div></div>`}
     <h2>💾 データ</h2><div class="card">
       <p style="margin-top:0">${multi ? `畑 ${data.fields.length}つ・` : ''}野菜 ${data.crops.length}件・記録 ${data.logs.length}件・写真 ${data.logs.filter(l => l.hasPhoto).length}枚</p>
       <p class="muted">${est}<br>データはこの端末のブラウザの中だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきバックアップしてください。</p>
@@ -481,6 +490,7 @@ async function renderSettings(m) {
   if (!multi) {
     const upd = async () => { readAreaForm(f0); await save(); render(); toast(`地域を「${areaText(f0)}」にしました`); };
     $('#sArea').onchange = upd; $('#sAlt').onchange = upd; $('#sCold').onchange = upd;
+    bindLocPicker($('#sLoc'), () => f0.loc, async loc => { f0.loc = loc; await save(); toast(loc ? `🌤 ${loc.name}の天気予報を出します（📅 予定のカレンダー）` : '天気予報を出さないようにしました'); });
   } else {
     m.querySelectorAll('[data-fedit]').forEach(b => b.onclick = () => openFieldForm(fieldById(b.dataset.fedit)));
     $('#fAdd').onclick = () => openFieldForm(null);
@@ -496,16 +506,19 @@ function openFieldForm(f) {
   const s = openModal(`<h3>${isNew ? '📍 畑を足す' : '畑を直す'}</h3>
     <label class="f">畑の名前</label><input type="text" id="fName" value="${esc(f.name)}" placeholder="例：家の畑・市民農園・ベランダ">
     <div id="fArea">${areaFormHtml(f)}</div>
+    <label class="f" style="margin-top:12px"><b>🌤 天気予報の場所</b>（カレンダーに出す）</label><div id="fLoc"></div>
     <div class="actions"><button class="btn" id="fCancel">やめる</button><button class="btn primary" id="fSave">${isNew ? '足す' : '保存'}</button></div>
     ${!isNew && others.length ? `<div style="margin-top:16px"><button class="btn danger block" id="fDel">この畑を消す</button>
       ${n ? `<p class="muted small">この畑の野菜${n}件は「${esc(others[0].name)}」に移ります（野菜と記録は消えません）。</p>` : ''}</div>` : ''}`);
   const prev = () => { const t = { ...f }; readAreaForm(t); $('#sFix').innerHTML = `補正 <b>${esc(factorText(t))}</b>${shiftText(t) ? `／種まきの時期は標準より <b>${esc(shiftText(t))}</b>` : ''}`; };
   ['#sArea', '#sAlt', '#sCold'].forEach(k => s.querySelector(k).onchange = prev);
+  let loc = f.loc || null;
+  bindLocPicker(s.querySelector('#fLoc'), () => loc, v => { loc = v; });
   $('#fCancel').onclick = closeModal;
   $('#fSave').onclick = async () => {
     const name = $('#fName').value.trim();
     if (!name) { $('#fName').focus(); toast('畑の名前を入れてください'); return; }
-    f.name = name; readAreaForm(f);
+    f.name = name; readAreaForm(f); f.loc = loc;
     if (isNew) { f.id = uid(); data.fields.push(f); data.settings.cur = f.id; }
     await save(); closeModal(); render();
     toast(isNew ? `📍${name} を足しました。上の 📍 で切りかえられます` : '保存しました');

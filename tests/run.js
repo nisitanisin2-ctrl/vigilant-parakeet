@@ -26,6 +26,14 @@ srv.listen(0, async () => {
   // 「新しくなりました」のお知らせは、たしかめるところ以外では出さない（見たことにしておく）
   await page.addInitScript(v => { window.APP_TODAY = '2026-05-10'; try { if (!sessionStorage.getItem('keepSeen')) localStorage.setItem('saien_seen_ver', v); } catch (e) {} }, VER);
   const w = ms => page.waitForTimeout(ms);
+  // 天気予報（Open-Meteo）はテストではにせの答えを返す
+  let wxCalls = 0;
+  await page.route('https://api.open-meteo.com/**', r => {
+    wxCalls++;
+    const time = [...Array(16)].map((_, i) => { const d = new Date(2026, 4, 10 + i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+    r.fulfill({ contentType: 'application/json', body: JSON.stringify({ daily: { time, weather_code: time.map((_, i) => [0, 3, 63][i % 3]), temperature_2m_max: time.map((_, i) => 25 + (i % 2)), temperature_2m_min: time.map((_, i) => i === 2 ? 2 : 14), precipitation_probability_max: time.map((_, i) => [10, 30, 80][i % 3]) } }) });
+  });
+  await page.route('https://geocoding-api.open-meteo.com/**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ results: [{ name: 'つくば市', admin1: '茨城県', latitude: 36.08, longitude: 140.08, country_code: 'JP' }, { name: 'Tsukuba', latitude: 1, longitude: 1, country_code: 'XX' }] }) }));
   const open = async () => { await page.goto(URL); await page.waitForFunction(() => window.APP_READY); };
   try {
     // ── 前の菜園ノート（v1）のデータを引き継ぐ ──
@@ -49,6 +57,7 @@ srv.listen(0, async () => {
     await page.click('#cSave'); await w(250);
     const prs = () => page.evaluate(() => [...document.querySelectorAll('.plan .pr')].map(r => r.querySelector('.w').textContent + ' ' + r.querySelector('.d').textContent + ' ' + r.querySelector('.s').textContent));
     check('登録すると詳しい画面：苗から（植えるまでの作業は出さない）の予定', await prs(), ['苗を植える 4/25(土) 済', '花が咲く 5/10(日)〜5/25(月) いま（15日まで）', '追肥 5/25(月)〜6/4(木) あと15日', '収穫はじめ 6/9(火)〜6/24(水) あと30日', '収穫おわり 7/29(水)〜8/23(日) あと80日']);
+    check('野菜の画面に「いま気をつけたい病気・害虫」', await page.evaluate(() => [...document.querySelectorAll('main h2')].some(h => h.textContent.startsWith('⚠️ いま気をつけたい病気・害虫5月ごろ')) + '/' + [...document.querySelectorAll('.skboard details.sk b')].map(b => b.textContent).join(',')), 'true/🦠 灰色かび病,🐛 アブラムシ,🦠 疫病');
     check('肥料・コツ・病気（広さ3㎡で全体の量）', await page.evaluate(() => [...document.querySelectorAll('details.more summary')].map(s => s.textContent.replace(/（.*/, '')).join(',') + '/' + document.querySelector('details.more').textContent.includes('3㎡で 360〜450g')), '🧪 肥料,💡 育て方のコツ,🐛 出やすい病気・害虫/true');
 
     check('野菜の画面に育ち具合の絵（苗から15日・花が咲いた）', await page.evaluate(() => { const g = $('.detail-top .emo.grow'); return g.dataset.st + '/' + g.querySelector('.e').textContent + '/' + !!g.querySelector('svg.growpic') + '/' + g.querySelector('small').textContent; }), 'flower/🍅/true/花が咲いた');
@@ -84,6 +93,17 @@ srv.listen(0, async () => {
     check('種からしかない野菜は「どこから育てる」を出さない', await page.evaluate(() => $('#cAsBox').hidden), true);
     await page.click('#cSave'); await w(250); await page.click('#backBtn'); await w(200);
     check('畑のカードに小さい野菜の絵と育ち具合', await page.evaluate(() => [...document.querySelectorAll('.crop .emo.grow')].map(g => g.querySelector('.e').textContent + g.querySelector('small').textContent).join(',')), '🍅収穫できる,🥬育っている');
+    check('病気・害虫の注意報：畑の上に（多い時期が先・5つ＋ほか）', await page.evaluate(() => [...document.querySelectorAll('.skboard > details.sk:not(.more) > summary')].map(x => x.querySelector('.lv').textContent + ':' + x.querySelector('b').textContent + ':' + x.querySelector('small').textContent).join(' / ') + '/' + $('.skboard details.more summary').textContent),
+      '注意報:🦠 灰色かび病:🍅トマト / 注意報:🐛 アブラムシ:🍅トマト / 注意報:🐛 アオムシ・コナガ:🥬ダイコン / 注意報:🐛 ヨトウムシ:🥬ダイコン / 注意:🦠 疫病:🍅トマト/ほか 1つ');
+    check('カードに⚠️のしるし', await page.evaluate(() => [...document.querySelectorAll('.crop .badge.sick')].map(b => b.textContent).join(',')), '⚠️灰色かび病 ほか2,⚠️アオムシ・コナガ ほか2');
+    check('注意報を押すと見分け方・手当て', await page.evaluate(() => { const d = document.querySelector('.skboard details.sk'); d.open = true; return d.querySelector('.skb').textContent.includes('見分け方') && d.querySelector('.skb').textContent.includes('涼しくてじめじめ'); }), true);
+    check('育ち具合と地域で変わる', await page.evaluate(() => {
+      const mk = (plan, d, as) => ({ plan, plantedAt: d, as, status: 'growing', done: {}, emoji: '🌱', fieldId: data.fields[0].id });
+      const ks = c => sickNow(c).map(x => x.k + (x.peak ? '!' : '')).join(',');
+      const a = ks(mk('ニンジン', '2026-05-01', 'seed')), b = ks(mk('ニンジン', '2026-03-01', 'seed'));
+      data.fields[0].area = 'hokkaido'; const h = ks(mk('ニンジン', '2026-05-01', 'seed')) + ' ' + sickMonth(data.fields[0]); data.fields[0].area = 'kanto';
+      return [a, b, h, ks(mk('ニンジン', '2026-05-20', 'seed')), ks(Object.assign(mk('ニンジン', '2026-05-01', 'seed'), { status: 'done' }))].join(' | ');
+    }), 'tachigare!,yotou!,abura! | yotou!,abura! | tachigare!,yotou,abura 4 |  | ');
     check('一覧に「つぎの予定」のしるし', await page.evaluate(() => [...document.querySelectorAll('.crop')].map(c => c.querySelector('.name').textContent + ':' + (c.querySelector('.badge.next') || {}).textContent).join(' / ')), 'トマト:📅 花が咲く：いま（15日まで） / ダイコン:📅 2回目の間引き：あと5日');
     check('上に「近いうちにやること」（時期を過ぎたものも）', await page.evaluate(() => [...document.querySelectorAll('.task .tx b')].map(b => b.textContent).join(',')), '🥬 ダイコン：1回目の間引き,🍅 トマト：花が咲く,🥬 ダイコン：2回目の間引き');
     await page.click('.crop [data-water]'); await w(200);
@@ -188,6 +208,25 @@ srv.listen(0, async () => {
     check('畑を消すと野菜はほかの畑へ', await page.evaluate(() => data.fields.length + '/' + data.crops.filter(c => c.fieldId === data.fields[0].id).length), '1/5');
     await page.click('#sMulti'); await w(150);
     check('畑ごとに管理を切る', await page.evaluate(() => data.settings.multi + '/' + !!$('#sArea')), 'false/true');
+    // ── 天気予報 ──
+    await page.click('nav [data-tab="plan"]'); await w(200);
+    check('場所を決めていないときは案内だけ（取りにいかない）', await page.evaluate(() => document.querySelectorAll('.cd .wx').length + '/' + $('.calcard').textContent.includes('設定で場所を決めると')) + '/' + wxCalls, '0/true/0');
+    await page.click('nav [data-tab="settings"]'); await w(200);
+    await page.selectOption('#sLoc [data-loc-pref]', '8'); await w(200);
+    check('県から選ぶ', await page.evaluate(() => JSON.stringify(data.fields[0].loc) + '/' + $('#sLoc .locnow b').textContent), '{"name":"栃木 宇都宮","lat":36.57,"lon":139.88}/栃木 宇都宮');
+    await page.fill('#sLoc [data-loc-q]', 'つくば'); await page.click('#sLoc [data-loc-find]'); await w(300);
+    check('名前でさがす（日本だけ）', await page.evaluate(() => [...document.querySelectorAll('#sLoc [data-loc-i]')].map(b => b.textContent).join(',')), '茨城県 つくば市');
+    await page.click('#sLoc [data-loc-i="0"]'); await w(200);
+    check('さがした場所にする', await page.evaluate(() => data.fields[0].loc.name + '/' + data.fields[0].loc.lat), '茨城県 つくば市/36.08');
+    await page.click('nav [data-tab="plan"]'); await w(200); await page.click('#calToday'); await w(500);
+    check('カレンダーに16日ぶんの天気（絵と最高/最低）', await page.evaluate(() => document.querySelectorAll('.cd .wx').length + '/' + $('[data-d="2026-05-10"] .wx').textContent + '/' + $('[data-d="2026-05-12"] .wx').textContent + '/' + !document.querySelector('[data-d="2026-05-09"] .wx')), '16/☀️25/14/🌧️25/2/true');
+    check('えらんだ日の天気', await page.evaluate(() => $('.wxday').textContent.replace(/\s+/g, '')), '☀️晴れ茨城県つくば市の天気予報25℃/14℃☂10%');
+    await page.click('[data-d="2026-05-12"]'); await w(200);
+    check('霜と雨の日はひとこと', await page.evaluate(() => [...document.querySelectorAll('.wxday .tip')].map(t => t.textContent.slice(0, 2)).join(',')), '🥶,☔ ');
+    check('いちど取ったら3時間は取り直さない・出どころを書く', await page.evaluate(() => $('.calcard').textContent.includes('Open-Meteo.com')) + '/' + wxCalls, 'true/1');
+    await page.click('nav [data-tab="crops"]'); await w(150); await page.click('.crop [data-open]'); await w(300);
+    check('野菜の画面のカレンダーにも天気', await page.evaluate(() => document.querySelectorAll('.cd .wx').length > 0), true);
+    await page.click('#backBtn'); await w(150);
     // ── バージョン・新しくなったこと ──
     const verJs = fs.readFileSync(path.join(ROOT, 'js/version.js'), 'utf8').match(/APP_VERSION = '(v\d+)'/)[1];
     const swJs = fs.readFileSync(path.join(ROOT, 'service-worker.js'), 'utf8');

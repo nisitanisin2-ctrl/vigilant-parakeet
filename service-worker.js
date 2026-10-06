@@ -1,9 +1,9 @@
 // 版を上げたら、ここも js/version.js の APP_VERSION と同じにする（テストでたしかめている）
-const CACHE = 'saien-note-v7';
+const CACHE = 'saien-note-v9';
 const CACHE_PREFIX = 'saien-note-';
 // 以前ここにあった「写真メモ」アプリの古いキャッシュも片付ける
 const OLD_PREFIXES = ['photomemo-'];
-const ASSETS = ['./', './index.html', './css/style.css', './js/version.js', './js/veg-data.js', './js/util.js', './js/plan.js', './js/grow.js', './js/store.js', './js/app.js', './manifest.json', './icon-192.png', './icon-512.png'];
+const ASSETS = ['./', './index.html', './css/style.css', './js/version.js', './js/veg-data.js', './js/util.js', './js/plan.js', './js/grow.js', './js/sick.js', './js/weather.js', './js/store.js', './js/app.js', './manifest.json', './icon-192.png', './icon-512.png'];
 // v6 までの画面には「いま更新」のボタンがない（新しい版が来ると勝手に読み込み直す作り）。
 // その版から来たときだけは待たずに入れ替わる。次からは「いま更新」で入れ替わる
 const NO_ASK = k => /^saien-note-v[1-6]$/.test(k) || OLD_PREFIXES.some(p => k.startsWith(p));
@@ -33,6 +33,7 @@ function netFetch(req) {
 // ネットワーク優先：オンライン時は最新版を取得、オフライン時だけキャッシュから返す
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  if (new URL(e.request.url).origin !== self.location.origin) return;   // 天気予報など、ほかのサイトはそのまま（とっておかない）
   e.respondWith(
     netFetch(e.request).then(res => {
       if (res && res.ok) {

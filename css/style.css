@@ -253,3 +253,25 @@ label.sw { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-
 .ver { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; } .ver > span { font-size: 30px; }
 .ver b { display: block; font-size: 17px; } .ver small { color: var(--muted); }
 details.wn ul { margin: 6px 0 10px; padding-left: 1.2em; } details.wn li { margin: 4px 0; font-size: 14px; line-height: 1.6; }
+/* 病気・害虫の注意報 */
+.skboard { padding: 6px 12px 10px; }
+details.sk { border-bottom: 1px solid var(--line); }
+details.sk summary { list-style: none; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 9px 0; cursor: pointer; }
+details.sk summary::-webkit-details-marker { display: none; }
+details.sk summary b { font-size: 15px; } details.sk summary small { flex-basis: 100%; color: var(--muted); font-size: 12.5px; padding-left: 52px; }
+details.sk .lv { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: #fff3c4; color: #8a6100; min-width: 38px; text-align: center; }
+details.sk.peak .lv { background: #e53935; color: #fff; }
+details.sk.more summary small { padding-left: 0; }
+.skb { padding: 0 0 10px; font-size: 13.5px; } .skb div { margin: 3px 0; }
+.skb span { display: inline-block; width: 5.5em; color: var(--muted); font-size: 12px; }
+.badge.sick { background: #fde3e1; color: #c62828; } .badge.sick.lo { background: #fff3c4; color: #8a6100; }
+/* 天気予報 */
+.cd .wx { display: flex; flex-direction: column; align-items: center; font-size: 14px; line-height: 1.05; margin-top: -1px; }
+.cd .wx small { font-size: 9.5px; color: var(--muted); letter-spacing: -.3px; white-space: nowrap; }
+.wxday .wxt { display: flex; align-items: center; gap: 10px; } .wxday .ic { font-size: 34px; }
+.wxday .wxt > div { flex: 1; } .wxday .wxt small { display: block; color: var(--muted); font-size: 12px; }
+.wxday .tt { text-align: right; } .wxday .tt small { display: block; color: var(--water); }
+.wxday .hi { color: #e53935; } .wxday .lo { color: #1e88e5; }
+.wxday .tip { margin: 8px 0 0; }
+.locnow { margin-bottom: 4px; } .locnow small { color: var(--muted); }
+.locres { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
