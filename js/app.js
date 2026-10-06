@@ -145,7 +145,7 @@ function renderCrops(m) {
     bindInstall(); bindCropSeg(m);
     return;
   }
-  h += installBanner() + cropSegHtml();
+  h += installBanner() + backupBannerHtml() + cropSegHtml();
   const wxh = wxBoardHtml(activeCrops(), true); h += wxh;
   const up = upcoming(7);
   const nt = simpleOn() ? 3 : 6;
@@ -182,7 +182,7 @@ function renderCrops(m) {
     </div>`;
   });
   m.innerHTML = h;
-  bindTasks(m); bindInstall(); bindSow(m); bindCropSeg(m);
+  bindTasks(m); bindInstall(); bindSow(m); bindCropSeg(m); bindBackupBanner();
   if ($('#moreTasks')) $('#moreTasks').onclick = () => go('plan');
   m.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { cropFilter = b.dataset.f; render(); });
   m.querySelectorAll('[data-log]').forEach(b => b.onclick = () => openLogForm({ cropId: b.dataset.log }));
@@ -234,9 +234,12 @@ function renderDetail(m) {
       return `<div class="pr ${s}"><span class="dot" style="background:${r.kind.c}"></span><span class="w">${esc(r.what)}</span><span class="d">${fmtRange(r.from, r.to)}</span>
         <span class="s">${esc(stateText(c, r))}</span>${r.i === 0 ? '<span class="b"></span>' : s === 'done' ? `<button class="b undo" data-undo="${r.i}" aria-label="取り消す">↺</button>` : `<button class="b" data-done="${c.id}:${r.i}">✓</button>`}</div>`; }).join('')}
       <div class="muted small">日にちは目安です（${esc(areaText(fieldOf(c)))}で補正 ${esc(factorText(fieldOf(c)))}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div>
+      ${ownHtml(v, c.as)}
       <button class="btn block exbtn" id="exCrop" style="margin-top:10px">📤 この野菜の予定・記録を書き出す</button></div>
       ${(sk => sk.length ? foldHtml('sickc', `<h2>⚠️ いま気をつけたい病気・害虫<small>${sk.filter(a => a.peak).length ? `注意報 ${sk.filter(a => a.peak).length}・` : ''}${sickMonth(fieldOf(c))}月ごろ・${esc(areaText(fieldOf(c)))}</small></h2>`, `<div class="card skboard">${sk.map(a => sickItemHtml(a, false)).join('')}</div>`) : '')(sickNow(c))}
       ${careHtml(v, c.area || 1)}${c.area ? '' : '<div class="muted small" style="margin:-4px 2px 10px">肥料の量は1㎡あたりです。「編集」で畑の広さを入れると、全体の量も出ます。</div>'}`;
+  const pl = photoLogs([c]);
+  if (pl.length) h += foldHtml('album', `<h2>📷 写真アルバム<small>${pl.length}枚・${c.plantedAt ? '植えてからの日数つき' : ''}</small></h2>`, `<div class="card">${albumGrid(pl, false)}</div>`);
   h += `<h2>📝 記録（${logs.length}件）</h2>
   <div class="card" id="logList">${logs.length ? logs.map(l => logHtml(l, false)).join('') : '<div class="empty" style="padding:16px">まだ記録はありません</div>'}</div>`;
   m.innerHTML = h;
@@ -248,7 +251,7 @@ function renderDetail(m) {
   m.querySelectorAll('#statusPick button').forEach(b => b.onclick = async () => { c.status = b.dataset.s; await save(); render(); toast(`「${STATUS[c.status]}」にしました`); });
   m.querySelectorAll('[data-undo]').forEach(b => b.onclick = () => undoTask(c.id, +b.dataset.undo));
   if (v && c.plantedAt) bindCal(m, cropCal);
-  bindTasks(m);
+  bindTasks(m); bindOwn(m);
   bindLogList(m);
 }
 
@@ -385,7 +388,8 @@ function renderPlan(m) {
 
 /* ===== 📝 記録・📊 集計 ===== */
 function renderLogs(m) {
-  let h = `<div class="seg"><button class="${logSub === 'list' ? 'on' : ''}" data-sub="list">📝 記録の一覧</button><button class="${logSub === 'sum' ? 'on' : ''}" data-sub="sum">📊 集計</button></div>`;
+  let h = `<div class="seg"><button class="${logSub === 'list' ? 'on' : ''}" data-sub="list">📝 一覧</button><button class="${logSub === 'photo' ? 'on' : ''}" data-sub="photo">📷 写真</button><button class="${logSub === 'sum' ? 'on' : ''}" data-sub="sum">📊 集計</button></div>`;
+  if (logSub === 'photo') { m.innerHTML = h + albumTabHtml(); bindSub(m); bindLogList(m); return; }
   if (logSub === 'sum') { m.innerHTML = h + summaryHtml(); bindSub(m); m.querySelectorAll('[data-y]').forEach(b => b.onclick = () => { summaryHtml.year = b.dataset.y; render(); }); return; }
   const logs = data.logs.filter(l => viewLog(l) && (logTypeFilter === 'all' || l.type === logTypeFilter)).sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
   h += `<div class="filters"><button class="chip ${logTypeFilter === 'all' ? 'on' : ''}" data-t="all">すべて</button>${Object.entries(TYPES).map(([k, t]) => `<button class="chip ${logTypeFilter === k ? 'on' : ''}" data-t="${k}">${t.icon}${t.label}</button>`).join('')}</div>`;
@@ -415,7 +419,7 @@ function summaryHtml() {
   }).filter(r => r.times);
   h += rows.length ? `<table><tr><th>野菜</th><th class="num">回数</th><th class="num">合計</th><th class="num">期間</th></tr>${rows.map(r => `<tr><td>${r.c.emoji} ${esc(r.c.name)}</td><td class="num">${r.times}回</td><td class="num">${r.tot || '-'}</td><td class="num">${fmtDate(r.first).replace(/\(.\)/, '')}〜${fmtDate(r.last).replace(/\(.\)/, '')}</td></tr>`).join('')}</table>`
     : `<div class="empty" style="padding:16px">収穫の記録はまだありません</div>`;
-  h += `</div><h2>${y}年の作業回数</h2><div class="card"><table><tr><th>作業</th><th class="num">回数</th></tr>${Object.entries(TYPES).map(([k, t]) => `<tr><td>${t.icon} ${t.label}</td><td class="num">${ylogs.filter(l => l.type === k).length}回</td></tr>`).join('')}</table></div>`;
+  h += `</div>` + harvestCompareHtml(y) + `<h2>${y}年の作業回数</h2><div class="card"><table><tr><th>作業</th><th class="num">回数</th></tr>${Object.entries(TYPES).map(([k, t]) => `<tr><td>${t.icon} ${t.label}</td><td class="num">${ylogs.filter(l => l.type === k).length}回</td></tr>`).join('')}</table></div>`;
   const months = Array.from({ length: 12 }, (_, i) => ylogs.filter(l => l.type === 'harvest' && Number(l.date.slice(5, 7)) === i + 1).length), mx = Math.max(1, ...months);
   h += `<h2>月ごとの収穫回数</h2><div class="card"><div class="bars">${months.map((n, i) => `<div><small>${n || ''}</small><i style="height:${Math.round(n / mx * 70)}px"></i><span>${i + 1}</span></div>`).join('')}</div></div>`;
   return h;
@@ -439,13 +443,14 @@ function renderGuide(m) {
         <span>${esc(startLabel(v, guide.as))}の日</span><input type="date" id="gDate" value="${guide.date}"></label></div>
       ${harv ? `<div class="gbig">${esc(harv.what)}は <b>${harv.d1 === harv.d2 ? harv.d1 : harv.d1 + '〜' + harv.d2}日後</b>（${fmtRange(harv.from, harv.to)}）</div>` : ''}
       <div class="plan">${rows.map(r => `<div class="pr"><span class="dot" style="background:${r.kind.c}"></span><span class="w">${esc(r.what)}</span><span class="d">${fmtRange(r.from, r.to)}</span><span class="s">${r.d1 === r.d2 ? r.d1 : r.d1 + '〜' + r.d2}日</span></div>`).join('')}</div>
+      ${ownHtml(v, guide.as)}
       <button class="btn primary block" id="gAdd">🌱 この内容で畑に登録する</button>
       <div class="gform"><label><span>肥料の量を出す広さ</span><input type="number" id="gArea" inputmode="decimal" min="0.1" step="any" value="${guide.area}" style="width:90px">㎡</label></div></div>
       ${careHtml(v, guide.area, true)}`;
   }
   m.innerHTML = h;
   bindSow(m);
-  $('#gMine').onclick = () => openMyPlanForm(null);
+  $('#gMine').onclick = () => openMyPlanForm(null); bindOwn(m);
   if ($('#gEditMine')) $('#gEditMine').onclick = () => openMyPlanForm(v);
   const qi = $('#gQ'); qi.oninput = () => { guide.q = qi.value; const pos = qi.selectionStart; render(); const e = $('#gQ'); e.focus(); e.setSelectionRange(pos, pos); };
   m.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { guide.n = b.dataset.v; render(); setTimeout(() => { const s = $('#gSel'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
@@ -547,7 +552,7 @@ async function renderSettings(m) {
     <h2>🌤 天気予報の場所</h2><div class="card"><p class="muted small" style="margin-top:0">決めると、📅 予定と野菜の画面のカレンダーに<b>16日先までの天気予報</b>（天気・最高/最低気温・雨の確率）が出ます。霜や大雨の日はひとことも出ます。</p><div id="sLoc"></div></div>`}
     <h2>💾 データ</h2><div class="card">
       <p style="margin-top:0">${multi ? `畑 ${data.fields.length}つ・` : ''}野菜 ${data.crops.length}件・記録 ${data.logs.length}件・写真 ${data.logs.filter(l => l.hasPhoto).length}枚</p>
-      <p class="muted">${est}<br>データはこの端末のブラウザの中だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきバックアップしてください。</p>
+      <p class="muted">${est}<br><b>${esc(backupText())}</b><br>データはこの端末のブラウザの中だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきバックアップしてください。</p>
       <button class="btn primary block" id="exp">📤 バックアップを保存（写真ごと）</button>
       <div style="height:8px"></div>
       <button class="btn block" id="imp">📥 バックアップから戻す</button></div>

@@ -46,7 +46,7 @@ function normalize(d) {
   d.logs = Array.isArray(d.logs) ? d.logs : [];
   d.myPlans = Array.isArray(d.myPlans) ? d.myPlans.filter(p => p && p.n && Array.isArray(p.s)) : [];   // 自分で足した野菜・品種
   const old = d.settings || {};
-  d.settings = { multi: !!old.multi, cur: old.cur || '' };
+  d.settings = { multi: !!old.multi, cur: old.cur || '', backupAt: +old.backupAt || 0, adj: old.adj && typeof old.adj === 'object' ? old.adj : {} };   // backupAt：前のバックアップ、adj：自分の実績に合わせた日数の倍率
   d.fields = Array.isArray(d.fields) ? d.fields.filter(f => f && f.id) : [];
   // 前のかたちは地域が1つだけ（settings.area）だったので、それを1つめの畑にする
   if (!d.fields.length) d.fields.push({ id: 'f1', name: 'わたしの畑', area: old.area || 'kanto', alt: Number(old.alt) || 0, cold: !!old.cold });
@@ -96,10 +96,11 @@ async function exportData() {
   const name = `菜園ノート_${today()}.json`;
   const file = new File([blob], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.share({ files: [file], title: name }); data.settings.backupAt = Date.now(); await save(); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  data.settings.backupAt = Date.now(); await save();
 }
 async function importData(file) {
   const j = JSON.parse(await file.text());

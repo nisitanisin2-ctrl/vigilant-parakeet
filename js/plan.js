@@ -64,7 +64,8 @@ function kindOf(label) {
    [{i:番号, what:作業, from:はじめの日, to:おわりの日, d1, d2:何日後, kind}]。i=0 は種まき（植えた日）そのもの */
 function planRows(v, start, as, st = curField()) {
   if (!v || !start) return [];
-  const f = areaFactor(st), base = as === 'nae' && canNae(v) ? transplantDay(v) : 0, bf = Math.round(base * f);
+  const f = areaFactor(st) * (typeof adjFactor === 'function' ? adjFactor(v.n, as) : 1), base =   // 地域の補正 × 自分の実績に合わせた分（records.js）
+    as === 'nae' && canNae(v) ? transplantDay(v) : 0, bf = Math.round(base * f);
   const rows = [{ i: 0, what: startLabel(v, as), from: start, to: start, d1: 0, d2: 0, kind: kindOf('植える') }];
   (v.s || []).forEach(([what, a, b], k) => {
     const b1 = Math.max(0, Math.round(Number(a) || 0)), b2 = Math.max(b1, Math.round(Number(b) || b1));

@@ -247,6 +247,36 @@ srv.listen(0, async () => {
     check('仲間と年数（自分の野菜は似ている野菜の仲間）', await page.evaluate(() => [familyOf('キャベツ'), restYears('スイカ'), familyOf('トウモロコシ') + restYears('トウモロコシ')].join('/')), 'アブラナ科/5/イネ科0');
     await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 'old-t' && c.name !== 'ナス'); curField().beds = []; await save(); render(); });
 
+    // ── アルバム・バックアップの声かけ・収穫のくらべ・実績 ──
+    const PNG1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    await page.evaluate(async png => { const c = data.crops[0], l = { id: 'ph1', cropId: c.id, type: 'observe', date: '2026-05-05', memo: '花が咲いた', amount: '', unit: '個', hasPhoto: true, ts: 1 }; data.logs.push(l); await setPhoto('ph1', png); await save(); go('crops', c.id); }, PNG1); await w(400);
+    check('野菜の画面に写真アルバム（植えてからの日数つき）', await page.evaluate(() => document.querySelectorAll('details.fold[data-fold="album"] .album figure').length + '/' + $('.album figcaption').textContent + '/' + !!$('.album img').src), '1/5/5(火)・10日目👀花が咲いた/true');
+    await page.click('#backBtn'); await w(150); await page.click('nav [data-tab="logs"]'); await w(150); await page.click('[data-sub="photo"]'); await w(300);
+    check('記録のタブの「📷 写真」', await page.evaluate(() => document.querySelectorAll('main .album figure').length + '/' + $('main h2').textContent.startsWith('🍅 トマト')), '1/true');
+    await page.click('[data-sub="list"]'); await w(100);
+    await page.evaluate(async () => { data.settings.backupAt = Date.now() - 40 * 86400000; await save(); }); await page.click('nav [data-tab="crops"]'); await w(200);
+    check('前のバックアップから30日でお知らせ', await page.evaluate(() => $('.bkban b').textContent), '前のバックアップから40日たちました');
+    await page.click('#bkLater'); await w(150);
+    check('「あとで」で7日お休み', await page.evaluate(() => !$('.bkban') && +localStorage.getItem('saien_bk_snooze') > Date.now() + 6 * 86400000), true);
+    await page.evaluate(async () => { localStorage.removeItem('saien_bk_snooze'); await exportData(); });
+    check('保存するとバックアップの日がつく', await page.evaluate(() => Date.now() - data.settings.backupAt < 60000 && backupText()), '前のバックアップ：今日');
+    await page.evaluate(async () => { const c = data.crops[0];
+      data.logs.push({ id: 'h25a', cropId: c.id, type: 'harvest', date: '2025-07-01', memo: '', amount: 4, unit: '個', ts: 2 }, { id: 'h26b', cropId: c.id, type: 'harvest', date: '2026-05-20', memo: '', amount: 2, unit: '個', ts: 3 }); await save(); });
+    await page.click('nav [data-tab="logs"]'); await w(150); await page.click('[data-sub="sum"]'); await w(200);
+    check('野菜ごとの収穫を去年とくらべ', await page.evaluate(() => { const r = document.querySelector('.hvc .hvr'); return r.querySelector('b').textContent + '/' + r.querySelector('small').textContent + '/' + [...r.querySelectorAll('em')].map(e => e.textContent).join(','); }), '🍅 トマト/＋75%/7個,4個');
+    await page.click('[data-sub="list"]'); await w(100);
+    // 自分の実績：去年のトマト（苗から 2025/5/1 → 6/30 に収穫＝60日）
+    await page.evaluate(async () => { data.crops.push({ id: 't25', emoji: '🍅', name: 'トマト', plan: 'トマト', as: 'nae', plantedAt: '2025-05-01', status: 'done', done: {}, fieldId: data.fields[0].id, place: '', memo: '', variety: '', area: 0 });
+      data.logs.push({ id: 'h25t', cropId: 't25', type: 'harvest', date: '2025-06-30', memo: '', amount: 3, unit: '個', ts: 4 }); window.__keep = data.logs.filter(l => l.cropId === data.crops[0].id && l.type === 'harvest'); data.logs = data.logs.filter(l => !window.__keep.includes(l)); await save(); go('crops', data.crops[0].id); }); await w(300);
+    check('自分の実績（平均日数）と予定', await page.evaluate(() => $('.own').textContent.replace(/\s+/g, '').slice(0, 38)), '📈あなたの畑では：植えてから収穫まで平均60日（1回）。予定は45日です。');
+    const before = await page.evaluate(() => cropRows(data.crops[0]).find(r => r.kind.k === 'harvest').d1);
+    await page.click('.own [data-adj]'); await w(250);
+    check('「予定を実績に合わせる」で収穫の日がのびる', await page.evaluate(b => adjFactor('トマト', 'nae') + '/' + (cropRows(data.crops[0]).find(r => r.kind.k === 'harvest').d1 > b), before), '1.35/true');
+    await page.click('.own [data-adj]'); await w(250);
+    check('予定どおりにもどす', await page.evaluate(() => adjFactor('トマト', 'nae')), 1);
+    await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 't25'); data.logs = data.logs.filter(l => !['ph1', 'h25a', 'h26b', 'h25t'].includes(l.id)).concat(window.__keep.filter(l => !['h25a', 'h26b'].includes(l.id))); await save(); });
+    await page.click('#backBtn'); await w(150);
+
     // ── バックアップ ──
     const json = await page.evaluate(async () => JSON.stringify({ app: 'saien-note', version: 2, data, photos: {} }));
     await page.evaluate(async () => { data.crops = []; data.logs = []; await save(); });
