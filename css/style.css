@@ -275,3 +275,38 @@ details.sk.more summary small { padding-left: 0; }
 .wxday .tip { margin: 8px 0 0; }
 .locnow { margin-bottom: 4px; } .locnow small { color: var(--muted); }
 .locres { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+/* 折りたたみ（病気・害虫の注意報） */
+details.fold > summary { list-style: none; cursor: pointer; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary h2 { position: relative; padding-right: 28px; }
+details.fold > summary h2::after { content: '▾'; position: absolute; right: 4px; top: 0; font-size: 18px; color: var(--muted); transition: transform .2s; }
+details.fold:not([open]) > summary h2::after { transform: rotate(-90deg); }
+details.fold:not([open]) > summary h2 { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 34px 10px 12px; }
+details.fold:not([open]) > summary h2::after { right: 12px; top: 10px; }
+/* ===== シンプルモード（画面の小さいスマホ用） ===== */
+body.simple { font-size: 18px; }
+.simple header h1 { font-size: 21px; }
+.simple h2 { font-size: 19px; } .simple h2 small { font-size: 14px; }
+.simple .btn { font-size: 17px; padding: 12px 18px; }
+.simple .muted { font-size: 15px; }
+.simple nav.tabs button { font-size: 14px; } .simple nav.tabs button .i { font-size: 26px; }
+/* カード：名前・つぎの予定・水やり・注意だけ */
+.simple .crop .name { font-size: 20px; } .simple .crop .name small, .simple .crop .info .muted { display: none; }
+.simple .crop .badge { font-size: 15px; padding: 3px 10px; }
+.simple .crop .badges .badge:not(.next):not(.sick):not(.warn) { display: none; }
+.simple .crop .quick button { width: 52px; height: 52px; font-size: 24px; }
+.simple .emo.grow .e { display: none; } .simple .emo.grow small { font-size: 12px; }
+/* やること */
+.simple .task .tx b { font-size: 17px; } .simple .task .tx small { font-size: 15px; }
+.simple .task .ok { font-size: 15px; padding: 9px 12px; }
+/* カレンダー：色の帯と天気の絵だけ（字は出さない） */
+.simple .cd { min-height: 60px; }
+.simple .cd .n { font-size: 17px; }
+.simple .cd .ev { font-size: 0; height: 8px; line-height: 8px; padding: 0; }
+.simple .cd .wx { font-size: 17px; } .simple .cd .wx small, .simple .cd .more, .simple .legend, .simple .calcard .muted.small { display: none; }
+.simple .calhead b { font-size: 20px; }
+/* 野菜の画面・注意報 */
+.simple .stat span { font-size: 13px; }
+.simple details.sk summary b { font-size: 17px; } .simple details.sk summary small { font-size: 14px; padding-left: 0; }
+.simple .skb { font-size: 15.5px; } .simple .skb span { display: block; width: auto; font-size: 13px; margin-top: 4px; }
+.simple .wxday .ic { font-size: 40px; }

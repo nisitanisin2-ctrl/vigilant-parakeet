@@ -63,3 +63,6 @@ function shrinkImage(file, max = 1280, q = 0.75) {
     img.src = url;
   });
 }
+
+/* シンプルモード（画面の小さいスマホ用。文字を大きく、出すものを少なく）か。この端末だけ */
+function simpleOn() { try { return localStorage.getItem('saien_simple') === '1'; } catch (e) { return false; } }
