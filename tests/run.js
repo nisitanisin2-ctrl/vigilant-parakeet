@@ -160,6 +160,19 @@ srv.listen(0, async () => {
     check('予定の画面の＋は、選んだ日で記録', await page.evaluate(() => $('#lDate').value), '2026-05-15');
     await page.click('#lCancel');
 
+    // ── 書き出し ──
+    await page.evaluate(() => { window.giveFile = async (b, n) => { window.__f = { n, type: b.type, text: b.type.startsWith('image') ? '' : await b.text(), size: b.size, head: [...new Uint8Array(await b.slice(0, 3).arrayBuffer())].join(',') }; }; });
+    await page.click('#exPlan'); await w(150);
+    check('書き出しの窓（5つ）', await page.evaluate(() => document.querySelectorAll('[data-ex]').length + '/' + document.querySelectorAll('[data-ex]:not([disabled])').length), '5/5');
+    await page.click('[data-ex="plancsv"]'); await w(200);
+    check('予定表を Excel（CSV・BOM つき）', await page.evaluate(() => __f.n.replace(/_\d{4}-\d\d-\d\d/, '') + '|' + __f.head + '|' + __f.text.split('\r\n')[0] + '|' + __f.text.split('\r\n')[2]), '菜園ノート_予定表.csv|239,187,191|野菜,畑,場所,植えた日,作業,はじめ,おわり,いま|トマト,,,2026/04/25,花が咲く,2026/05/10,2026/05/25,いま（15日まで）');
+    await page.click('[data-ex="logcsv"]'); await w(200);
+    check('記録を Excel（収穫の量も）', await page.evaluate(() => __f.text.split('\r\n').length > 2 && __f.text.includes('収穫,5,個')), true);
+    await page.click('[data-ex="ics"]'); await w(200);
+    check('スマホのカレンダー（.ics：これからの予定・前の日の知らせ）', await page.evaluate(() => __f.type + '/' + /^BEGIN:VCALENDAR/.test(__f.text) + '/' + (__f.text.match(/BEGIN:VEVENT/g) || []).length + '/' + __f.text.includes('DTSTART;VALUE=DATE:20260510') + '/' + __f.text.includes('TRIGGER:-PT15H')), 'text/calendar/true/' + await page.evaluate(() => { let n = 0; activeCrops().forEach(c => cropRows(c).forEach(r => { if (r.i > 0 && rowState(c, r) !== 'done' && r.to >= today()) n++; })); return n; }) + '/true/true');
+    check('予定表の画像と印刷の中身', await page.evaluate(() => { const cv = scheduleCanvas(activeCrops(), '予定表'); const h = printHtml(activeCrops(), '予定表'); return (cv.width === 1080 && cv.height > 400) + '/' + (h.match(/<table>/g) || []).length; }), 'true/2');
+    await page.click('#exClose'); await w(100);
+
     // ── 記録・集計 ──
     await page.click('nav [data-tab="logs"]'); await w(200);
     check('記録の一覧（観察・収穫・水やり）', await page.evaluate(() => document.querySelectorAll('.log').length), 3);

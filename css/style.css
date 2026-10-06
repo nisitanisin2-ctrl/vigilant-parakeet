@@ -337,3 +337,16 @@ body.simple { font-size: 18px; }
 .mpstep { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
 .mpstep input[type=text] { flex: 1; min-width: 0; } .mpstep input[type=number] { width: 58px; padding: 8px 4px; text-align: center; }
 .mpstep span { font-size: 13px; color: var(--muted); } .mpstep .x { border: 0; background: none; color: var(--muted); font-size: 18px; padding: 4px; }
+/* 書き出し */
+.exbtn { margin-top: 12px; } .exbtn small, .exlist small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.exlist { display: flex; flex-direction: column; gap: 8px; } .exlist .btn { text-align: left; } .exlist .btn[disabled] { opacity: .45; }
+#printArea { display: none; }
+@media print {
+  body.printing > *:not(#printArea) { display: none !important; }
+  body.printing { padding: 0; background: #fff; color: #000; }
+  body.printing #printArea { display: block; font-size: 11pt; }
+  #printArea h1 { font-size: 18pt; margin: 0 0 4px; color: #2e7d32; } #printArea .pm { margin: 0 0 10px; color: #555; }
+  #printArea h2 { font-size: 13pt; margin: 14px 0 4px; break-after: avoid; } #printArea h2 small { font-weight: 400; color: #555; margin-left: 8px; font-size: 10pt; }
+  #printArea table { width: 100%; border-collapse: collapse; break-inside: avoid; } #printArea th, #printArea td { border: 1px solid #999; padding: 3px 6px; text-align: left; }
+  #printArea th { background: #e8f5e9; }
+}

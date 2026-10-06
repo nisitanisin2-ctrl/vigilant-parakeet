@@ -227,13 +227,15 @@ function renderDetail(m) {
       ${planHead}<div class="card plan">${rows.map(r => { const s = rowState(c, r);
       return `<div class="pr ${s}"><span class="dot" style="background:${r.kind.c}"></span><span class="w">${esc(r.what)}</span><span class="d">${fmtRange(r.from, r.to)}</span>
         <span class="s">${esc(stateText(c, r))}</span>${r.i === 0 ? '<span class="b"></span>' : s === 'done' ? `<button class="b undo" data-undo="${r.i}" aria-label="取り消す">↺</button>` : `<button class="b" data-done="${c.id}:${r.i}">✓</button>`}</div>`; }).join('')}
-      <div class="muted small">日にちは目安です（${esc(areaText(fieldOf(c)))}で補正 ${esc(factorText(fieldOf(c)))}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div></div>
+      <div class="muted small">日にちは目安です（${esc(areaText(fieldOf(c)))}で補正 ${esc(factorText(fieldOf(c)))}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div>
+      <button class="btn block exbtn" id="exCrop" style="margin-top:10px">📤 この野菜の予定・記録を書き出す</button></div>
       ${(sk => sk.length ? foldHtml('sickc', `<h2>⚠️ いま気をつけたい病気・害虫<small>${sk.filter(a => a.peak).length ? `注意報 ${sk.filter(a => a.peak).length}・` : ''}${sickMonth(fieldOf(c))}月ごろ・${esc(areaText(fieldOf(c)))}</small></h2>`, `<div class="card skboard">${sk.map(a => sickItemHtml(a, false)).join('')}</div>`) : '')(sickNow(c))}
       ${careHtml(v, c.area || 1)}${c.area ? '' : '<div class="muted small" style="margin:-4px 2px 10px">肥料の量は1㎡あたりです。「編集」で畑の広さを入れると、全体の量も出ます。</div>'}`;
   h += `<h2>📝 記録（${logs.length}件）</h2>
   <div class="card" id="logList">${logs.length ? logs.map(l => logHtml(l, false)).join('') : '<div class="empty" style="padding:16px">まだ記録はありません</div>'}</div>`;
   m.innerHTML = h;
   $('#editCrop').onclick = () => openCropForm(c);
+  if ($('#exCrop')) $('#exCrop').onclick = () => openExport([c], c.name + 'の予定');
   if ($('#growAdj')) $('#growAdj').onclick = () => openGrowForm(c);
   $('#dWater').onclick = () => quickWater(c.id);
   $('#dLog').onclick = () => openLogForm({ cropId: c.id });
@@ -368,8 +370,10 @@ function renderPlan(m) {
   const loc = wxLoc();
   h += calHtml(activeCrops(), cal, true, loc);
   h += dayHtml(activeCrops(), cal.sel, loc);
+  h += `<button class="btn block exbtn" id="exPlan">📤 予定・記録を書き出す<small>印刷・PDF・画像・Excel・スマホのカレンダー</small></button>`;
   m.innerHTML = h;
   bindCal(m, cal);
+  $('#exPlan').onclick = () => openExport(activeCrops(), multiOn() && data.settings.cur !== 'all' ? curField().name + 'の予定表' : '予定表');
   bindTasks(m); bindLogList(m);
 }
 
