@@ -240,6 +240,12 @@ srv.listen(0, async () => {
     await page.click('nav [data-tab="settings"]'); await w(150); await page.click('#sSimple'); await w(150);
     check('シンプルモードを切る', await page.evaluate(() => document.body.classList.contains('simple')), false);
 
+    // ── アドレスのQRコード ──
+    await page.click('nav [data-tab="settings"]'); await w(150); await page.click('#qrBtn'); await w(200);
+    check('アドレスのQRコード（この端末だけのアドレスのときは公開しているアドレス）', await page.evaluate(() => { const c = $('#qrCv'); return $('#qrUrl').textContent + '/' + (c.width > 200 && c.width === c.height); }), 'https://nisitanisin2-ctrl.github.io/vigilant-parakeet//true');
+    check('QRコードの中身（型番・読み取りの目印）', await page.evaluate(() => { const q = qrEncode(SAIEN_URL, 'M'); const m = q.modules; return q.size + '/' + [m[0][0], m[0][6], m[6][6], m[1][1], m[2][2]].map(v => v ? 1 : 0).join(''); }), '33/11101');
+    await page.click('#qrClose'); await w(100);
+
     // ── 天気予報 ──
     await page.click('nav [data-tab="plan"]'); await w(200);
     check('場所を決めていないときは案内だけ（取りにいかない）', await page.evaluate(() => document.querySelectorAll('.cd .wx').length + '/' + $('.calcard').textContent.includes('設定で場所を決めると')) + '/' + wxCalls, '0/true/0');
