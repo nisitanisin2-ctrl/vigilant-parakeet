@@ -108,3 +108,36 @@ async function importData(file) {
   await save();
   return true;
 }
+
+/* ===== 表電卓の前の「🌱 野菜」の記録を引き継ぐ（表電卓の中で、はじめて開いたときに1回だけ） =====
+   前の道具は localStorage に入れていた：excalc_veg_plots（育てている野菜）・excalc_veg_diary（育成日記・写真）・
+   excalc_veg_area（地域・標高・寒冷地・畑の広さ）・excalc_veg_my（自分で足した野菜）。前のデータは消さずに残す */
+const MIG_KEY = 'saien_mig_excalc';
+const xlYmd = s => { const d = new Date(Date.UTC(1899, 11, 30) + Math.round(Number(s)) * 86400000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
+async function migrateExcalc() {
+  let ls; try { ls = window.localStorage; if (ls.getItem(MIG_KEY)) return 0; } catch (e) { return 0; }
+  const js = k => { try { return JSON.parse(ls.getItem(k) || 'null'); } catch (e) { return null; } };
+  const plots = (js('excalc_veg_plots') || []).filter(p => p && p.n && isFinite(p.s));
+  const diary = js('excalc_veg_diary') || {}, area = js('excalc_veg_area'), my = js('excalc_veg_my') || [];
+  let n = 0, nl = 0;
+  if (area && typeof area === 'object' && !data.crops.length && VEG_AREAS.some(a => a.id === area.id)) {
+    Object.assign(data.fields[0], { area: area.id, alt: Math.max(0, Math.min(2000, Number(area.alt) || 0)), cold: !!area.cold });
+  }
+  for (const p of plots) {
+    const id = 'x-' + p.id; if (cropById(id)) continue;
+    const v = planByName(p.n), mine = my.find(x => x && x.n === p.n);
+    data.crops.push({ id, emoji: (v && v.i) || (mine && mine.i) || '🌱', name: p.n, variety: '', place: '', plantedAt: xlYmd(p.s), status: 'growing',
+      memo: [p.memo || '', v ? '' : '（表電卓で自分で足した野菜）'].filter(Boolean).join('\n'), plan: v ? v.n : '', as: p.as === 'nae' ? 'nae' : 'seed',
+      area: area && Number(area.plot) > 1 ? Math.min(10000, Number(area.plot)) : 0, done: {}, fieldId: data.fields[0].id, createdAt: Date.now() });
+    n++;
+    for (const e of (Array.isArray(diary[p.id]) ? diary[p.id] : [])) {
+      if (!e || !isFinite(e.d)) continue;
+      const l = { id: uid(), cropId: id, type: 'observe', date: xlYmd(e.d), memo: String(e.t || ''), amount: '', unit: '個', hasPhoto: !!e.p, ts: Date.now() + nl };
+      if (l.hasPhoto) { try { await setPhoto(l.id, e.p); } catch (err) { l.hasPhoto = false; } }
+      data.logs.push(l); nl++;
+    }
+  }
+  if (n) { await save(); toast(`表電卓の前の「野菜」から、野菜${n}件・日記${nl}件を引き継ぎました`, 3500); }
+  try { ls.setItem(MIG_KEY, String(Date.now())); } catch (e) {}
+  return n;
+}
