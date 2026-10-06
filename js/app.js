@@ -143,6 +143,7 @@ function renderCrops(m) {
   h += installBanner();
   const up = upcoming(7);
   if (up.length) h += `<h2 class="first">📋 近いうちにやること</h2><div class="card">${up.slice(0, 6).map(taskHtml).join('')}${up.length > 6 ? `<button class="link" id="moreTasks">ほか ${up.length - 6}件 → 📅 予定へ</button>` : ''}</div>`;
+  h += sickBoardHtml(activeCrops(), !up.length);
   const f = [['active', '育てている'], ['done', '終了'], ['all', 'すべて']];
   h += `<div class="filters">${f.map(([k, l]) => `<button class="chip ${cropFilter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>`;
   if (!list.length) h += `<div class="empty">該当する野菜はありません</div>`;
@@ -156,6 +157,8 @@ function renderCrops(m) {
       else badges.push(`<span class="badge warn">💧記録なし</span>`);
     }
     if (tot) badges.push(`<span class="badge acc">🧺${tot}</span>`);
+    const sk = sickNow(c);
+    if (sk.length) badges.push(`<span class="badge ${sk.some(x => x.peak) ? 'sick' : 'sick lo'}">⚠️${esc(sk[0].d.n.replace(/（.*/, ''))}${sk.length > 1 ? ` ほか${sk.length - 1}` : ''}</span>`);
     h += `<div class="card crop">
       ${growBox(c)}
       <div class="info" data-open="${c.id}">
@@ -220,6 +223,7 @@ function renderDetail(m) {
         <span class="s">${esc(stateText(c, r))}</span>${r.i === 0 ? '<span class="b"></span>' : s === 'done' ? `<button class="b undo" data-undo="${r.i}" aria-label="取り消す">↺</button>` : `<button class="b" data-done="${c.id}:${r.i}">✓</button>`}</div>`; }).join('')}
       <div class="muted small">日にちは目安です（${esc(areaText(fieldOf(c)))}で補正 ${esc(factorText(fieldOf(c)))}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div></div>
       <h2>📅 ${esc(c.name)}のカレンダー</h2>${calHtml([c], cropCal, false)}${dayHtml([c], cropCal.sel)}
+      ${(sk => sk.length ? `<h2>⚠️ いま気をつけたい病気・害虫<small>${sickMonth(fieldOf(c))}月ごろ・${esc(areaText(fieldOf(c)))}</small></h2><div class="card skboard">${sk.map(a => sickItemHtml(a, false)).join('')}</div>` : '')(sickNow(c))}
       ${careHtml(v, c.area || 1)}${c.area ? '' : '<div class="muted small" style="margin:-4px 2px 10px">肥料の量は1㎡あたりです。「編集」で畑の広さを入れると、全体の量も出ます。</div>'}`;
   h += `<h2>📝 記録（${logs.length}件）</h2>
   <div class="card" id="logList">${logs.length ? logs.map(l => logHtml(l, false)).join('') : '<div class="empty" style="padding:16px">まだ記録はありません</div>'}</div>`;

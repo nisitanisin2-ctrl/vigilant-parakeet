@@ -49,6 +49,7 @@ srv.listen(0, async () => {
     await page.click('#cSave'); await w(250);
     const prs = () => page.evaluate(() => [...document.querySelectorAll('.plan .pr')].map(r => r.querySelector('.w').textContent + ' ' + r.querySelector('.d').textContent + ' ' + r.querySelector('.s').textContent));
     check('登録すると詳しい画面：苗から（植えるまでの作業は出さない）の予定', await prs(), ['苗を植える 4/25(土) 済', '花が咲く 5/10(日)〜5/25(月) いま（15日まで）', '追肥 5/25(月)〜6/4(木) あと15日', '収穫はじめ 6/9(火)〜6/24(水) あと30日', '収穫おわり 7/29(水)〜8/23(日) あと80日']);
+    check('野菜の画面に「いま気をつけたい病気・害虫」', await page.evaluate(() => [...document.querySelectorAll('main h2')].some(h => h.textContent.startsWith('⚠️ いま気をつけたい病気・害虫5月ごろ')) + '/' + [...document.querySelectorAll('.skboard details.sk b')].map(b => b.textContent).join(',')), 'true/🦠 灰色かび病,🐛 アブラムシ,🦠 疫病');
     check('肥料・コツ・病気（広さ3㎡で全体の量）', await page.evaluate(() => [...document.querySelectorAll('details.more summary')].map(s => s.textContent.replace(/（.*/, '')).join(',') + '/' + document.querySelector('details.more').textContent.includes('3㎡で 360〜450g')), '🧪 肥料,💡 育て方のコツ,🐛 出やすい病気・害虫/true');
 
     check('野菜の画面に育ち具合の絵（苗から15日・花が咲いた）', await page.evaluate(() => { const g = $('.detail-top .emo.grow'); return g.dataset.st + '/' + g.querySelector('.e').textContent + '/' + !!g.querySelector('svg.growpic') + '/' + g.querySelector('small').textContent; }), 'flower/🍅/true/花が咲いた');
@@ -84,6 +85,17 @@ srv.listen(0, async () => {
     check('種からしかない野菜は「どこから育てる」を出さない', await page.evaluate(() => $('#cAsBox').hidden), true);
     await page.click('#cSave'); await w(250); await page.click('#backBtn'); await w(200);
     check('畑のカードに小さい野菜の絵と育ち具合', await page.evaluate(() => [...document.querySelectorAll('.crop .emo.grow')].map(g => g.querySelector('.e').textContent + g.querySelector('small').textContent).join(',')), '🍅収穫できる,🥬育っている');
+    check('病気・害虫の注意報：畑の上に（多い時期が先・5つ＋ほか）', await page.evaluate(() => [...document.querySelectorAll('.skboard > details.sk:not(.more) > summary')].map(x => x.querySelector('.lv').textContent + ':' + x.querySelector('b').textContent + ':' + x.querySelector('small').textContent).join(' / ') + '/' + $('.skboard details.more summary').textContent),
+      '注意報:🦠 灰色かび病:🍅トマト / 注意報:🐛 アブラムシ:🍅トマト / 注意報:🐛 アオムシ・コナガ:🥬ダイコン / 注意報:🐛 ヨトウムシ:🥬ダイコン / 注意:🦠 疫病:🍅トマト/ほか 1つ');
+    check('カードに⚠️のしるし', await page.evaluate(() => [...document.querySelectorAll('.crop .badge.sick')].map(b => b.textContent).join(',')), '⚠️灰色かび病 ほか2,⚠️アオムシ・コナガ ほか2');
+    check('注意報を押すと見分け方・手当て', await page.evaluate(() => { const d = document.querySelector('.skboard details.sk'); d.open = true; return d.querySelector('.skb').textContent.includes('見分け方') && d.querySelector('.skb').textContent.includes('涼しくてじめじめ'); }), true);
+    check('育ち具合と地域で変わる', await page.evaluate(() => {
+      const mk = (plan, d, as) => ({ plan, plantedAt: d, as, status: 'growing', done: {}, emoji: '🌱', fieldId: data.fields[0].id });
+      const ks = c => sickNow(c).map(x => x.k + (x.peak ? '!' : '')).join(',');
+      const a = ks(mk('ニンジン', '2026-05-01', 'seed')), b = ks(mk('ニンジン', '2026-03-01', 'seed'));
+      data.fields[0].area = 'hokkaido'; const h = ks(mk('ニンジン', '2026-05-01', 'seed')) + ' ' + sickMonth(data.fields[0]); data.fields[0].area = 'kanto';
+      return [a, b, h, ks(mk('ニンジン', '2026-05-20', 'seed')), ks(Object.assign(mk('ニンジン', '2026-05-01', 'seed'), { status: 'done' }))].join(' | ');
+    }), 'tachigare!,yotou!,abura! | yotou!,abura! | tachigare!,yotou,abura 4 |  | ');
     check('一覧に「つぎの予定」のしるし', await page.evaluate(() => [...document.querySelectorAll('.crop')].map(c => c.querySelector('.name').textContent + ':' + (c.querySelector('.badge.next') || {}).textContent).join(' / ')), 'トマト:📅 花が咲く：いま（15日まで） / ダイコン:📅 2回目の間引き：あと5日');
     check('上に「近いうちにやること」（時期を過ぎたものも）', await page.evaluate(() => [...document.querySelectorAll('.task .tx b')].map(b => b.textContent).join(',')), '🥬 ダイコン：1回目の間引き,🍅 トマト：花が咲く,🥬 ダイコン：2回目の間引き');
     await page.click('.crop [data-water]'); await w(200);
