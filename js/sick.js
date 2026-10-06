@@ -75,12 +75,16 @@ function sickItemHtml(a, withCrops) {
       ${withCrops ? `<small>${a.crops.map(c => c.emoji + esc(c.name)).join('・')}</small>` : `<small>${a.peak ? 'いまがいちばん多い時期' : '出やすい時期'}</small>`}</summary>
     <div class="skb"><div><span>気をつける</span>${esc(a.s.w)}</div><div><span>見分け方</span>${esc(a.d.sign)}</div><div><span>手当て</span>${esc(a.d.care)}</div><div><span>薬の例</span>${esc(a.d.med)}</div></div></details>`;
 }
+/* 折りたたみ（見出しを押すと開け閉め。閉じたか開いたかは端末におぼえる。はじめは開く・シンプルモードでは閉じる） */
+function foldOpen(key) { let v = null; try { v = localStorage.getItem('saien_fold_' + key); } catch (e) {} return v == null ? !simpleOn() : v === '1'; }
+function foldHtml(key, head, body) { return `<details class="fold" data-fold="${key}"${foldOpen(key) ? ' open' : ''}><summary>${head}</summary>${body}</details>`; }
+document.addEventListener('toggle', e => { const k = e.target.dataset && e.target.dataset.fold; if (k) try { localStorage.setItem('saien_fold_' + k, e.target.open ? '1' : '0'); } catch (x) {} }, true);
 /* 畑の一覧の上の注意報 */
 function sickBoardHtml(crops, first) {
   const al = sickAlerts(crops); if (!al.length) return '';
-  const peak = al.filter(a => a.peak).length, show = al.slice(0, 5);
-  return `<h2${first ? ' class="first"' : ''}>⚠️ 病気・害虫の注意報<small>${peak ? `いま多い時期 ${peak}つ・` : ''}${today().slice(5, 7).replace(/^0/, '')}月</small></h2>
-    <div class="card skboard">${show.map(a => sickItemHtml(a, true)).join('')}
-      ${al.length > show.length ? `<details class="sk more"><summary><small>ほか ${al.length - show.length}つ</small></summary>${al.slice(5).map(a => sickItemHtml(a, true)).join('')}</details>` : ''}
-      <div class="muted small">押すと見分け方と手当て。毎朝、葉の裏まで見ると早く気づけます。時期は${esc(areaText(curField()))}の目安です。</div></div>`;
+  const peak = al.filter(a => a.peak).length, n = simpleOn() ? 3 : 5, show = al.slice(0, n);
+  return foldHtml('sick', `<h2${first ? ' class="first"' : ''}>⚠️ 病気・害虫の注意報<small>${peak ? `注意報 ${peak}・` : ''}${al.length - peak ? `注意 ${al.length - peak}・` : ''}${today().slice(5, 7).replace(/^0/, '')}月</small></h2>`,
+    `<div class="card skboard">${show.map(a => sickItemHtml(a, true)).join('')}
+      ${al.length > show.length ? `<details class="sk more"><summary><small>ほか ${al.length - show.length}つ</small></summary>${al.slice(n).map(a => sickItemHtml(a, true)).join('')}</details>` : ''}
+      <div class="muted small">押すと見分け方と手当て。毎朝、葉の裏まで見ると早く気づけます。時期は${esc(areaText(curField()))}の目安です。</div></div>`);
 }

@@ -57,7 +57,7 @@ srv.listen(0, async () => {
     await page.click('#cSave'); await w(250);
     const prs = () => page.evaluate(() => [...document.querySelectorAll('.plan .pr')].map(r => r.querySelector('.w').textContent + ' ' + r.querySelector('.d').textContent + ' ' + r.querySelector('.s').textContent));
     check('登録すると詳しい画面：苗から（植えるまでの作業は出さない）の予定', await prs(), ['苗を植える 4/25(土) 済', '花が咲く 5/10(日)〜5/25(月) いま（15日まで）', '追肥 5/25(月)〜6/4(木) あと15日', '収穫はじめ 6/9(火)〜6/24(水) あと30日', '収穫おわり 7/29(水)〜8/23(日) あと80日']);
-    check('野菜の画面に「いま気をつけたい病気・害虫」', await page.evaluate(() => [...document.querySelectorAll('main h2')].some(h => h.textContent.startsWith('⚠️ いま気をつけたい病気・害虫5月ごろ')) + '/' + [...document.querySelectorAll('.skboard details.sk b')].map(b => b.textContent).join(',')), 'true/🦠 灰色かび病,🐛 アブラムシ,🦠 疫病');
+    check('野菜の画面に「いま気をつけたい病気・害虫」', await page.evaluate(() => [...document.querySelectorAll('main h2')].some(h => h.textContent.startsWith('⚠️ いま気をつけたい病気・害虫注意報 2・5月ごろ')) + '/' + [...document.querySelectorAll('.skboard details.sk b')].map(b => b.textContent).join(',')), 'true/🦠 灰色かび病,🐛 アブラムシ,🦠 疫病');
     check('肥料・コツ・病気（広さ3㎡で全体の量）', await page.evaluate(() => [...document.querySelectorAll('details.more summary')].map(s => s.textContent.replace(/（.*/, '')).join(',') + '/' + document.querySelector('details.more').textContent.includes('3㎡で 360〜450g')), '🧪 肥料,💡 育て方のコツ,🐛 出やすい病気・害虫/true');
 
     check('野菜の画面に育ち具合の絵（苗から15日・花が咲いた）', await page.evaluate(() => { const g = $('.detail-top .emo.grow'); return g.dataset.st + '/' + g.querySelector('.e').textContent + '/' + !!g.querySelector('svg.growpic') + '/' + g.querySelector('small').textContent; }), 'flower/🍅/true/花が咲いた');
@@ -97,6 +97,12 @@ srv.listen(0, async () => {
       '注意報:🦠 灰色かび病:🍅トマト / 注意報:🐛 アブラムシ:🍅トマト / 注意報:🐛 アオムシ・コナガ:🥬ダイコン / 注意報:🐛 ヨトウムシ:🥬ダイコン / 注意:🦠 疫病:🍅トマト/ほか 1つ');
     check('カードに⚠️のしるし', await page.evaluate(() => [...document.querySelectorAll('.crop .badge.sick')].map(b => b.textContent).join(',')), '⚠️灰色かび病 ほか2,⚠️アオムシ・コナガ ほか2');
     check('注意報を押すと見分け方・手当て', await page.evaluate(() => { const d = document.querySelector('.skboard details.sk'); d.open = true; return d.querySelector('.skb').textContent.includes('見分け方') && d.querySelector('.skb').textContent.includes('涼しくてじめじめ'); }), true);
+    check('注意報の見出し（数）', await page.evaluate(() => $('details.fold[data-fold="sick"] > summary h2').textContent + '/' + $('details.fold[data-fold="sick"]').open), '⚠️ 病気・害虫の注意報注意報 4・注意 2・5月/true');
+    await page.click('details.fold[data-fold="sick"] > summary'); await w(150);
+    check('見出しを押すと折りたたむ・おぼえる', await page.evaluate(() => $('details.fold[data-fold="sick"]').open + '/' + localStorage.getItem('saien_fold_sick')), 'false/0');
+    await page.evaluate(() => render()); await w(100);
+    check('描き直しても閉じたまま', await page.evaluate(() => $('details.fold[data-fold="sick"]').open), false);
+    await page.click('details.fold[data-fold="sick"] > summary'); await w(150);
     check('育ち具合と地域で変わる', await page.evaluate(() => {
       const mk = (plan, d, as) => ({ plan, plantedAt: d, as, status: 'growing', done: {}, emoji: '🌱', fieldId: data.fields[0].id });
       const ks = c => sickNow(c).map(x => x.k + (x.peak ? '!' : '')).join(',');
@@ -208,14 +214,29 @@ srv.listen(0, async () => {
     check('畑を消すと野菜はほかの畑へ', await page.evaluate(() => data.fields.length + '/' + data.crops.filter(c => c.fieldId === data.fields[0].id).length), '1/5');
     await page.click('#sMulti'); await w(150);
     check('畑ごとに管理を切る', await page.evaluate(() => data.settings.multi + '/' + !!$('#sArea')), 'false/true');
+    // ── シンプルモード ──
+    await page.click('nav [data-tab="settings"]'); await w(150);
+    await page.click('#sSimple'); await w(150);
+    check('シンプルモードにする（この端末だけ）', await page.evaluate(() => document.body.classList.contains('simple') + '/' + localStorage.getItem('saien_simple')), 'true/1');
+    await page.click('nav [data-tab="crops"]'); await w(200);
+    check('シンプル：文字が大きい・カードは名前とつぎの予定など', await page.evaluate(() => getComputedStyle(document.body).fontSize + '/' + [...document.querySelectorAll('.crop')][0].querySelectorAll('.badge').length + '>' + [...[...document.querySelectorAll('.crop')][0].querySelectorAll('.badge')].filter(b => getComputedStyle(b).display !== 'none').length), '18px/' + await page.evaluate(() => [...document.querySelectorAll('.crop')][0].querySelectorAll('.badge').length) + '>' + await page.evaluate(() => [...[...document.querySelectorAll('.crop')][0].querySelectorAll('.badge')].filter(b => /next|sick|warn/.test(b.className)).length));
+    check('シンプル：やることは3つまで', await page.evaluate(() => document.querySelectorAll('.task').length <= 3), true);
+    await open(); await w(200);
+    check('開き直してもシンプルモード', await page.evaluate(() => document.body.classList.contains('simple')), true);
+    await page.click('nav [data-tab="plan"]'); await w(200);
+    check('シンプル：カレンダーの札は字を出さない', await page.evaluate(() => { const e = document.querySelector('.cd .ev'); return !e || getComputedStyle(e).fontSize === '0px'; }), true);
+    await page.click('nav [data-tab="settings"]'); await w(150); await page.click('#sSimple'); await w(150);
+    check('シンプルモードを切る', await page.evaluate(() => document.body.classList.contains('simple')), false);
+
     // ── 天気予報 ──
     await page.click('nav [data-tab="plan"]'); await w(200);
     check('場所を決めていないときは案内だけ（取りにいかない）', await page.evaluate(() => document.querySelectorAll('.cd .wx').length + '/' + $('.calcard').textContent.includes('設定で場所を決めると')) + '/' + wxCalls, '0/true/0');
     await page.click('nav [data-tab="settings"]'); await w(200);
-    await page.selectOption('#sLoc [data-loc-pref]', '8'); await w(200);
-    check('県から選ぶ', await page.evaluate(() => JSON.stringify(data.fields[0].loc) + '/' + $('#sLoc .locnow b').textContent), '{"name":"栃木 宇都宮","lat":36.57,"lon":139.88}/栃木 宇都宮');
-    await page.selectOption('#sLoc [data-loc-pref]', { label: '兵庫北部（豊岡）' }); await w(200);
-    check('県の一覧に兵庫北部', await page.evaluate(() => JSON.stringify(data.fields[0].loc)), '{"name":"兵庫北部 豊岡","lat":35.54,"lon":134.82}');
+    await page.selectOption('#sLoc [data-loc-pref]', '8-0'); await w(200);
+    check('県から選ぶ', await page.evaluate(() => JSON.stringify(data.fields[0].loc) + '/' + $('#sLoc .locnow b').textContent), '{"name":"栃木 南部 宇都宮","lat":36.57,"lon":139.88}/栃木 南部 宇都宮');
+    check('県と地域：47県・地域ごと（気象庁の分け方）', await page.evaluate(() => document.querySelectorAll('#sLoc optgroup').length + '/' + [...document.querySelectorAll('#sLoc optgroup[label="兵庫"] option')].map(o => o.textContent.replace('兵庫・', '')).slice(0, 6).join(',') + '/' + wxPrefName('大阪', '大阪（大阪）')), '47/南部（神戸）,南部（姫路）,南部（三田）,南部（洲本・淡路）,北部（豊岡）,北部（香美）/大阪');
+    await page.selectOption('#sLoc [data-loc-pref]', { label: '兵庫・北部（豊岡）' }); await w(200);
+    check('兵庫の北部（豊岡）', await page.evaluate(() => JSON.stringify(data.fields[0].loc)), '{"name":"兵庫 北部 豊岡","lat":35.54,"lon":134.82}');
     await page.fill('#sLoc [data-loc-q]', 'つくば'); await page.click('#sLoc [data-loc-find]'); await w(300);
     check('名前でさがす（日本だけ）', await page.evaluate(() => [...document.querySelectorAll('#sLoc [data-loc-i]')].map(b => b.textContent).join(',')), '茨城県 つくば市');
     await page.click('#sLoc [data-loc-i="0"]'); await w(200);

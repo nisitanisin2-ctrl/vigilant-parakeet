@@ -142,7 +142,8 @@ function renderCrops(m) {
   }
   h += installBanner();
   const up = upcoming(7);
-  if (up.length) h += `<h2 class="first">📋 近いうちにやること</h2><div class="card">${up.slice(0, 6).map(taskHtml).join('')}${up.length > 6 ? `<button class="link" id="moreTasks">ほか ${up.length - 6}件 → 📅 予定へ</button>` : ''}</div>`;
+  const nt = simpleOn() ? 3 : 6;
+  if (up.length) h += `<h2 class="first">📋 近いうちにやること</h2><div class="card">${up.slice(0, nt).map(taskHtml).join('')}${up.length > nt ? `<button class="link" id="moreTasks">ほか ${up.length - nt}件 → 📅 予定へ</button>` : ''}</div>`;
   h += sickBoardHtml(activeCrops(), !up.length);
   const f = [['active', '育てている'], ['done', '終了'], ['all', 'すべて']];
   h += `<div class="filters">${f.map(([k, l]) => `<button class="chip ${cropFilter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>`;
@@ -223,7 +224,7 @@ function renderDetail(m) {
         <span class="s">${esc(stateText(c, r))}</span>${r.i === 0 ? '<span class="b"></span>' : s === 'done' ? `<button class="b undo" data-undo="${r.i}" aria-label="取り消す">↺</button>` : `<button class="b" data-done="${c.id}:${r.i}">✓</button>`}</div>`; }).join('')}
       <div class="muted small">日にちは目安です（${esc(areaText(fieldOf(c)))}で補正 ${esc(factorText(fieldOf(c)))}）。天気や育ち方を見て決めてください。やったら ✓ を押すと、記録にも残ります。</div></div>
       <h2>📅 ${esc(c.name)}のカレンダー</h2>${calHtml([c], cropCal, false, fieldOf(c).loc)}${dayHtml([c], cropCal.sel, fieldOf(c).loc)}
-      ${(sk => sk.length ? `<h2>⚠️ いま気をつけたい病気・害虫<small>${sickMonth(fieldOf(c))}月ごろ・${esc(areaText(fieldOf(c)))}</small></h2><div class="card skboard">${sk.map(a => sickItemHtml(a, false)).join('')}</div>` : '')(sickNow(c))}
+      ${(sk => sk.length ? foldHtml('sickc', `<h2>⚠️ いま気をつけたい病気・害虫<small>${sk.filter(a => a.peak).length ? `注意報 ${sk.filter(a => a.peak).length}・` : ''}${sickMonth(fieldOf(c))}月ごろ・${esc(areaText(fieldOf(c)))}</small></h2>`, `<div class="card skboard">${sk.map(a => sickItemHtml(a, false)).join('')}</div>`) : '')(sickNow(c))}
       ${careHtml(v, c.area || 1)}${c.area ? '' : '<div class="muted small" style="margin:-4px 2px 10px">肥料の量は1㎡あたりです。「編集」で畑の広さを入れると、全体の量も出ます。</div>'}`;
   h += `<h2>📝 記録（${logs.length}件）</h2>
   <div class="card" id="logList">${logs.length ? logs.map(l => logHtml(l, false)).join('') : '<div class="empty" style="padding:16px">まだ記録はありません</div>'}</div>`;
@@ -450,6 +451,9 @@ async function renderSettings(m) {
   try { if (navigator.storage?.estimate) { const e = await navigator.storage.estimate(); est = `使用容量：約${(e.usage / 1048576).toFixed(1)}MB`; } } catch (e) {}
   const cnt = f => data.crops.filter(c => c.fieldId === f.id).length;
   m.innerHTML = `<h2 class="first">📲 アプリとして入れる</h2><div class="card">${installHtml()}</div>
+    <h2>👀 見やすさ</h2><div class="card">
+      <label class="sw" style="margin-top:0"><input type="checkbox" id="sSimple" ${simpleOn() ? 'checked' : ''}> <b>シンプルモード</b></label>
+      <p class="muted small">画面の小さいスマホ用。文字とボタンを大きくして、出すものを少なくします（カードは名前・つぎの予定・水やり・注意だけ、カレンダーは色の帯と天気の絵だけ）。この端末だけの設定です。</p></div>
     <h2>📍 畑</h2><div class="card">
       <label class="sw" style="margin-top:0"><input type="checkbox" id="sMulti" ${multi ? 'checked' : ''}> <b>畑ごとに管理する</b></label>
       <p class="muted small">畑がいくつかあるときに入れます。畑ごとに野菜・予定・記録を分けて見られ、地域（予定の日の補正）も畑ごとに決められます。上の 📍 で畑を切りかえます。</p>
@@ -479,6 +483,7 @@ async function renderSettings(m) {
       <button class="btn block" id="updBtn">🔄 更新をたしかめる</button>
       <p class="muted small">新しい版が届くと、下に「新しい版が用意できました」と出ます。「いま更新」を押すと新しくなります。</p></div>`;
   bindInstall();
+  $('#sSimple').onchange = e => { setSimple(e.target.checked); render(); toast(e.target.checked ? '👀 シンプルモードにしました' : 'ふつうの表示にもどしました'); };
   $('#wnBtn').onclick = openWhatsNew;
   $('#updBtn').onclick = checkUpdate;
   $('#sMulti').onchange = async e => {
@@ -648,8 +653,12 @@ async function openLogForm(l, onSaved) {
   };
 }
 
+/* ===== シンプルモード（この端末だけ。localStorage） ===== */
+function setSimple(on) { try { localStorage.setItem('saien_simple', on ? '1' : '0'); } catch (e) {} document.body.classList.toggle('simple', on); }
+
 /* ===== はじめに ===== */
 function start() {
+  document.body.classList.toggle('simple', simpleOn());
   $('#backBtn').onclick = goBack;
   $('#fieldSel').onchange = async e => { data.settings.cur = e.target.value; await save(); render(); };
   document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
