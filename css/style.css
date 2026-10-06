@@ -231,3 +231,14 @@ label.sw { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-
 .card.inst { display: flex; align-items: center; gap: 10px; background: var(--acc-soft); }
 .card.inst > span { font-size: 26px; } .card.inst p { flex: 1; margin: 0; } .card.inst small { color: var(--muted); }
 .card.inst .x { border: 0; background: none; font-size: 20px; color: var(--muted); padding: 4px; cursor: pointer; }
+/* 育ち具合の絵（畑のカード・野菜の画面） */
+.crop .emo.grow, .detail-top .emo.grow { width: 64px; height: auto; padding: 4px 2px 5px; display: flex; flex-direction: column; align-items: center; gap: 0; font-size: 18px; line-height: 1.1; }
+.emo.grow { background: var(--acc-soft); border-radius: 12px; flex-shrink: 0; }
+.emo.grow .e { font-size: 18px; line-height: 1; }
+.emo.grow .growpic { display: block; margin: 1px 0; }
+.emo.grow small { font-size: 10.5px; font-weight: 700; color: var(--acc); white-space: nowrap; }
+.emo.grow[data-st="before"] small, .emo.grow[data-st="end"] small { color: var(--muted); }
+.detail-top .emo.grow.big { width: 100px; } .detail-top .emo.grow.big .e { font-size: 24px; } .detail-top .emo.grow.big small { font-size: 12px; }
+.emo.grow .gbar { display: block; width: 84px; height: 6px; border-radius: 3px; background: var(--line); margin: 4px 0 1px; overflow: hidden; }
+.emo.grow .gbar b { display: block; height: 100%; background: #2e7d32; }
+.emo.grow .gbar + small { font-weight: 400; color: var(--muted); font-size: 11px; }
