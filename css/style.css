@@ -378,3 +378,7 @@ body.simple { font-size: 18px; }
 .stl .k { font-size: 22px; } .stl > div { flex: 1; min-width: 0; } .stl b { display: block; font-size: 15px; } .stl small { color: var(--muted); font-size: 12.5px; }
 .stl .out { color: #c62828; font-weight: 700; } .stl .near { color: #ef6c00; font-weight: 700; } .stl .pr { font-weight: 700; white-space: nowrap; }
 .seg button { padding: 9px 4px; font-size: 14px; }
+/* 🎤 声で記録 */
+.fab.mic { bottom: calc(150px + env(safe-area-inset-bottom)); width: 48px; height: 48px; font-size: 22px; right: 22px; background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+.vbig { font-size: 20px; padding: 16px; margin-bottom: 8px; }
+.vres { margin-top: 10px; } .vit { display: flex; gap: 8px; align-items: center; padding: 6px 0; font-size: 15px; } .vit input { width: 20px; height: 20px; }

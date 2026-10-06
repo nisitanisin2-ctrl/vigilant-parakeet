@@ -87,6 +87,7 @@ function render() {
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === view.tab));
   $('#backBtn').hidden = !view.cropId;
   $('#fab').hidden = !['crops', 'logs', 'plan'].includes(view.tab) || (view.tab === 'logs' && (logSub === 'sum' || logSub === 'stock'));
+  $('#micFab').hidden = $('#fab').hidden || !data.crops.length || (view.tab === 'crops' && cropSub === 'map' && !view.cropId);
   const fs = $('#fieldSel'), showFs = multiOn() && !view.cropId && ['crops', 'plan', 'logs'].includes(view.tab);
   fs.hidden = !showFs;
   if (showFs) fs.innerHTML = data.fields.map(f => `<option value="${f.id}">📍${esc(f.name)}</option>`).join('') + `<option value="all">📍すべての畑</option>`, fs.value = data.settings.cur;
@@ -787,6 +788,7 @@ function start() {
   document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
   history.replaceState({ base: 1 }, ''); history.pushState({ v: view, d: 1 }, '');
   addEventListener('popstate', onPop);
+  $('#micFab').onclick = openVoice;
   $('#fab').onclick = () => {
     if (view.cropId) openLogForm({ cropId: view.cropId });
     else if (view.tab === 'logs' || view.tab === 'plan') openLogForm({});

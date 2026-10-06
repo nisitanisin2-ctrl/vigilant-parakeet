@@ -299,6 +299,21 @@ srv.listen(0, async () => {
     check('もう一度合わせても増えない', await page.evaluate(async j => { const n = await mergeShare(new File([j], 's.json')); return n.crops + n.logs + n.fields; }, shareJson), 0);
     await page.evaluate(async () => { data.crops = data.crops.filter(c => c.id !== 'famC'); data.logs = data.logs.filter(l => l.id !== 'famL'); data.fields = data.fields.filter(f => f.id !== 'famF'); delete data.crops[0].done[9]; data.settings.multi = false; data.settings.cur = 'all'; data.stock = []; await save(); render(); });
 
+    // ── 🎤 声で記録 ──
+    check('声を読みとる（野菜・作業・量・日）', await page.evaluate(() => [
+      'トマトとダイコンに水やり', 'トマトを五個収穫した', 'きのうダイコンに追肥', 'みんなに水やり', '5月3日 トマトを1.5キロとった', 'ナスに水やり'
+    ].map(t => { const r = voiceParse(t); return r.date.slice(5) + ':' + r.items.map(i => i.c.name + i.type + (i.amount ? i.amount + i.unit : '')).join('+'); }).join(' | ')),
+      '05-10:トマトwater+ダイコンwater | 05-10:トマトharvest5個 | 05-09:ダイコンfertilize | 05-10:' + await page.evaluate(() => activeCrops().map(c => c.name + 'water').join('+')) + ' | 05-03:トマトharvest1.5kg | 05-10:');
+    await page.click('nav [data-tab="crops"]'); await w(150);
+    check('🎤 のボタン', await page.evaluate(() => !$('#micFab').hidden), true);
+    await page.click('#micFab'); await w(150);
+    await page.fill('#vText', 'ダイコンに水やり'); await page.click('#vRead'); await w(100);
+    check('読みとった中身を見せる', await page.evaluate(() => $('.vres .vit').textContent.replace(/\s+/g, '') + '/' + $('#vSave').disabled), '🥬ダイコン：💧水やり/false');
+    const nl = await page.evaluate(() => data.logs.length);
+    await page.click('#vSave'); await w(200);
+    check('記録する', await page.evaluate(n => (data.logs.length - n) + '/' + data.logs[data.logs.length - 1].memo, nl), '1/ダイコンに水やり');
+    await page.evaluate(async () => { data.logs.pop(); await save(); render(); });
+
     // ── バックアップ ──
     const json = await page.evaluate(async () => JSON.stringify({ app: 'saien-note', version: 2, data, photos: {} }));
     await page.evaluate(async () => { data.crops = []; data.logs = []; await save(); });
