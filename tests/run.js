@@ -212,10 +212,11 @@ srv.listen(0, async () => {
     await page.click('nav [data-tab="plan"]'); await w(200);
     check('場所を決めていないときは案内だけ（取りにいかない）', await page.evaluate(() => document.querySelectorAll('.cd .wx').length + '/' + $('.calcard').textContent.includes('設定で場所を決めると')) + '/' + wxCalls, '0/true/0');
     await page.click('nav [data-tab="settings"]'); await w(200);
-    await page.selectOption('#sLoc [data-loc-pref]', '8'); await w(200);
-    check('県から選ぶ', await page.evaluate(() => JSON.stringify(data.fields[0].loc) + '/' + $('#sLoc .locnow b').textContent), '{"name":"栃木 宇都宮","lat":36.57,"lon":139.88}/栃木 宇都宮');
-    await page.selectOption('#sLoc [data-loc-pref]', { label: '兵庫北部（豊岡）' }); await w(200);
-    check('県の一覧に兵庫北部', await page.evaluate(() => JSON.stringify(data.fields[0].loc)), '{"name":"兵庫北部 豊岡","lat":35.54,"lon":134.82}');
+    await page.selectOption('#sLoc [data-loc-pref]', '8-0'); await w(200);
+    check('県から選ぶ', await page.evaluate(() => JSON.stringify(data.fields[0].loc) + '/' + $('#sLoc .locnow b').textContent), '{"name":"栃木 南部 宇都宮","lat":36.57,"lon":139.88}/栃木 南部 宇都宮');
+    check('県と地域：47県・地域ごと（気象庁の分け方）', await page.evaluate(() => document.querySelectorAll('#sLoc optgroup').length + '/' + [...document.querySelectorAll('#sLoc optgroup[label="兵庫"] option')].map(o => o.textContent.replace('兵庫・', '')).slice(0, 6).join(',') + '/' + wxPrefName('大阪', '大阪（大阪）')), '47/南部（神戸）,南部（姫路）,南部（三田）,南部（洲本・淡路）,北部（豊岡）,北部（香美）/大阪');
+    await page.selectOption('#sLoc [data-loc-pref]', { label: '兵庫・北部（豊岡）' }); await w(200);
+    check('兵庫の北部（豊岡）', await page.evaluate(() => JSON.stringify(data.fields[0].loc)), '{"name":"兵庫 北部 豊岡","lat":35.54,"lon":134.82}');
     await page.fill('#sLoc [data-loc-q]', 'つくば'); await page.click('#sLoc [data-loc-find]'); await w(300);
     check('名前でさがす（日本だけ）', await page.evaluate(() => [...document.querySelectorAll('#sLoc [data-loc-i]')].map(b => b.textContent).join(',')), '茨城県 つくば市');
     await page.click('#sLoc [data-loc-i="0"]'); await w(200);
