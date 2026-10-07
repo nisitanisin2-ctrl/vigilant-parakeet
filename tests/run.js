@@ -398,6 +398,13 @@ srv.listen(0, async () => {
     check('名前でさがす（日本だけ）', await page.evaluate(() => [...document.querySelectorAll('#sLoc [data-loc-i]')].map(b => b.textContent).join(',')), '茨城県 つくば市');
     await page.click('#sLoc [data-loc-i="0"]'); await w(200);
     check('さがした場所にする', await page.evaluate(() => data.fields[0].loc.name + '/' + data.fields[0].loc.lat), '茨城県 つくば市/36.08');
+    check('地図の座標を読みとる（数字・全角・Googleマップのリンク）', await page.evaluate(() => ['35.3858049, 134.5715248', '３５．３８５８，１３４．５７１５', 'https://www.google.com/maps/@35.3858049,134.5715248,17z', 'https://www.google.com/maps/place/x/data=!3d35.3858!4d134.5715', 'あいう', '135, 200'].map(t => JSON.stringify(parseLatLon(t))).join(' ')),
+      '{"lat":35.3858,"lon":134.5715} {"lat":35.3858,"lon":134.5715} {"lat":35.3858,"lon":134.5715} {"lat":35.3858,"lon":134.5715} null null');
+    await page.fill('#sLoc [data-loc-ll]', '35.3858049, 134.5715248'); await page.fill('#sLoc [data-loc-llname]', '家の畑'); await page.click('#sLoc [data-loc-llset]'); await w(200);
+    check('座標で地点を決める', await page.evaluate(() => JSON.stringify(data.fields[0].loc)), '{"name":"家の畑","lat":35.3858,"lon":134.5715}');
+    await page.fill('#sLoc [data-loc-ll]', 'ちがう'); await page.click('#sLoc [data-loc-llset]'); await w(100);
+    check('読めないときは知らせて、地点は変えない', await page.evaluate(() => data.fields[0].loc.name + '/' + $('#toast').textContent.slice(0, 13)), '家の畑/座標を読みとれませんでした');
+    await page.fill('#sLoc [data-loc-q]', 'つくば'); await page.click('#sLoc [data-loc-find]'); await w(300); await page.click('#sLoc [data-loc-i="0"]'); await w(200);
     await page.click('nav [data-tab="plan"]'); await w(200); await page.click('#calToday'); await w(500);
     check('カレンダーに16日ぶんの天気（絵と最高/最低）', await page.evaluate(() => document.querySelectorAll('.cd .wx').length + '/' + $('[data-d="2026-05-10"] .wx').textContent + '/' + $('[data-d="2026-05-12"] .wx').textContent + '/' + !document.querySelector('[data-d="2026-05-09"] .wx')), '16/☀️25/14/🌧️25/2/true');
     check('えらんだ日の天気', await page.evaluate(() => $('.wxday').textContent.replace(/\s+/g, '')), '☀️晴れ茨城県つくば市の天気予報25℃/14℃☂10%');

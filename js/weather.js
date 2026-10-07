@@ -137,11 +137,25 @@ function wxNoteHtml(w, loc) {
 
 /* ===== 場所を選ぶ部品（設定・畑の窓で使う） =====
    get()：いまの場所、set(loc)：選んだとき（null は天気を出さない） */
+/* 地図の座標を読みとる：「35.3858049, 134.5715248」、全角やスペース区切り、
+   Googleマップのリンク（…/@35.38,134.57,17z・?q=35.38,134.57・!3d35.38!4d134.57）にも対応。読めなければ null */
+function parseLatLon(raw) {
+  const s = String(raw || '').replace(/[０-９．，－]/g, c => ({ '．': '.', '，': ',', '－': '-' })[c] || String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).trim();
+  let m = s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) || s.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) || s.match(/(-?\d{1,3}(?:\.\d+)?)\s*[,、\s]\s*(-?\d{1,3}(?:\.\d+)?)/);
+  if (!m) return null;
+  const lat = +m[1], lon = +m[2];
+  if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180) || (lat === 0 && lon === 0)) return null;
+  return { lat: Math.round(lat * 10000) / 10000, lon: Math.round(lon * 10000) / 10000 };
+}
 function locPickerHtml(loc) {
   return `<div class="locnow">${loc ? `📍 <b>${esc(loc.name)}</b> <small>（${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}）</small> <button type="button" class="link" data-loc-off>天気を出さない</button>` : '<span class="muted">まだ決めていません（天気は出ません）</span>'}</div>
     <label class="f">県と地域から選ぶ（気象庁の予報の分け方）</label><select data-loc-pref><option value="">― 県と地域を選ぶ ―</option>${WX_PREFS.map(([pf, list], i) => `<optgroup label="${pf}">${list.map((a, j) => `<option value="${i}-${j}">${pf}・${a[0]}</option>`).join('')}</optgroup>`).join('')}</select>
     <label class="f">市町村の名前でさがす</label><div class="row"><input type="text" data-loc-q placeholder="例：つくば・宇都宮・北見" style="flex:1"><button type="button" class="btn" data-loc-find>🔍</button></div>
     <div class="locres" data-loc-res></div>
+    <label class="f">地図の座標（緯度, 経度）で決める</label>
+    <div class="row"><input type="text" data-loc-ll inputmode="decimal" placeholder="例：35.3858049, 134.5715248" style="flex:1"><button type="button" class="btn" data-loc-llset>決める</button></div>
+    <input type="text" data-loc-llname placeholder="地点の名前（なくてもよい。例：家の畑）" style="margin-top:6px">
+    <p class="muted small" style="margin:4px 0 0">Googleマップで畑の所を長押しすると、上に「35.38…, 134.57…」と座標が出ます。それをコピーして貼ってください（地図のリンクを貼っても読みとります）。</p>
     <button type="button" class="btn block" data-loc-gps style="margin-top:8px">📍 今いる場所にする</button>
     <p class="muted small">場所（緯度・経度）を天気のサービス Open-Meteo に送って予報を取ります。</p>`;
 }
@@ -165,6 +179,12 @@ function bindLocPicker(root, get, set) {
     };
     root.querySelector('[data-loc-find]').onclick = find;
     q.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); find(); } };
+    root.querySelector('[data-loc-llset]').onclick = () => {
+      const ll = parseLatLon(root.querySelector('[data-loc-ll]').value);
+      if (!ll) { toast('座標を読みとれませんでした。「35.3858, 134.5715」のように入れてください'); root.querySelector('[data-loc-ll]').focus(); return; }
+      const nm = root.querySelector('[data-loc-llname]').value.trim();
+      pick({ name: nm || `地図の地点（${ll.lat.toFixed(3)}, ${ll.lon.toFixed(3)}）`, lat: ll.lat, lon: ll.lon });
+    };
     root.querySelector('[data-loc-gps]').onclick = () => {
       if (!navigator.geolocation) { toast('この端末では場所を取れません'); return; }
       toast('場所を取っています…');
