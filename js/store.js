@@ -158,7 +158,7 @@ async function migrateExcalc() {
     Object.assign(data.fields[0], { area: area.id, alt: Math.max(0, Math.min(2000, Number(area.alt) || 0)), cold: !!area.cold });
   }
   for (const p of plots) {
-    const id = 'x-' + p.id; if (cropById(id)) continue;
+    const id = 'x-' + String(p.id).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 78); if (cropById(id)) continue;   // id は英数字だけ（normalize の cleanIds と同じ）
     const v = planByName(p.n), mine = my.find(x => x && x.n === p.n);
     data.crops.push({ id, emoji: (v && v.i) || (mine && mine.i) || '🌱', name: p.n, variety: '', place: '', plantedAt: xlYmd(p.s), status: 'growing',
       memo: [p.memo || '', v ? '' : '（表電卓で自分で足した野菜）'].filter(Boolean).join('\n'), plan: v ? v.n : '', as: p.as === 'nae' ? 'nae' : 'seed',
