@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- 決めた場所以外からはプログラムを読み込まない・外へ送らない（CSP）。このページの中に書いたプログラムも動かさない
+     （js/ のファイルだけ動く）。外へつなぐのは天気予報（Open-Meteo）だけ -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com; font-src 'self'; media-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>菜園ノート</title>
 <meta name="description" content="家庭菜園の育て方の予定（種まき・追肥・収穫の日）と、水やり・収穫などの記録をつけるアプリ">
 <meta name="apple-mobile-web-app-title" content="菜園ノート">

@@ -40,8 +40,18 @@ async function kvSet(key, val) {
 const SETTINGS0 = { multi: false, cur: '' };
 let data = { crops: [], logs: [], fields: [], settings: { ...SETTINGS0 } };
 /* 前のかたち（菜園ノートの v1）から読んだときも、足りない項目をうめる */
+/* 番号（id）は、画面の部品やボタンの中にそのまま書き入れて使う。読み込んだファイルにおかしな id（" や < が入ったもの）が
+   仕込まれていてもそこから何も動かないように、英数字と - _ 以外は _ にする（同じ id は同じに変わるので、つながりはそのまま） */
+const ID_KEY = /^(id|\w*Id|bed|cur)$/;
+function cleanIds(o, k) {
+  if (typeof o === 'string') return ID_KEY.test(k || '') ? (o.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80) || '_') : o;
+  if (typeof o === 'number') return ID_KEY.test(k || '') && !isFinite(o) ? '_' : o;
+  if (Array.isArray(o)) return o.map(x => cleanIds(x, k === 'beds' || k === 'crops' || k === 'logs' || k === 'fields' || k === 'stock' || k === 'myPlans' ? '' : k));
+  if (o && typeof o === 'object') { const r = {}; for (const kk of Object.keys(o)) if (kk !== '__proto__') r[kk] = cleanIds(o[kk], kk); return r; }
+  return o;
+}
 function normalize(d) {
-  d = d || {};
+  d = cleanIds(d || {});
   d.crops = Array.isArray(d.crops) ? d.crops : [];
   d.logs = Array.isArray(d.logs) ? d.logs : [];
   d.stock = Array.isArray(d.stock) ? d.stock.filter(s => s && s.id && s.name && STOCK_KINDS[s.kind]) : [];   // 種・資材・費用（share.js）
@@ -86,7 +96,8 @@ async function getPhoto(id) {
   if (photoCache.has(id)) return photoCache.get(id);
   const v = await kvGet('photo:' + id); photoCache.set(id, v); return v;
 }
-async function setPhoto(id, url) { photoCache.set(id, url); await kvSet('photo:' + id, url); }
+async function setPhoto(id, url) { if (typeof url !== 'string' || !/^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(url)) return;   // 写真の形のものだけ（読み込んだファイルに別の物が入っていても入れない）
+  photoCache.set(id, url); await kvSet('photo:' + id, url); }
 async function delPhoto(id) { photoCache.delete(id); await kvSet('photo:' + id, undefined); }
 
 /* ===== バックアップ（写真ごと JSON に） ===== */
@@ -147,7 +158,7 @@ async function migrateExcalc() {
     Object.assign(data.fields[0], { area: area.id, alt: Math.max(0, Math.min(2000, Number(area.alt) || 0)), cold: !!area.cold });
   }
   for (const p of plots) {
-    const id = 'x-' + p.id; if (cropById(id)) continue;
+    const id = 'x-' + String(p.id).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 78); if (cropById(id)) continue;   // id は英数字だけ（normalize の cleanIds と同じ）
     const v = planByName(p.n), mine = my.find(x => x && x.n === p.n);
     data.crops.push({ id, emoji: (v && v.i) || (mine && mine.i) || '🌱', name: p.n, variety: '', place: '', plantedAt: xlYmd(p.s), status: 'growing',
       memo: [p.memo || '', v ? '' : '（表電卓で自分で足した野菜）'].filter(Boolean).join('\n'), plan: v ? v.n : '', as: p.as === 'nae' ? 'nae' : 'seed',

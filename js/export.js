@@ -19,7 +19,8 @@ function exportRows(crops) {
 const ymdSlash = d => d ? d.replace(/-/g, '/') : '';
 
 /* ===== 📊 Excel（CSV。Excel で文字化けしないよう先頭に BOM） ===== */
-const csvCell = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+// = + - @ で始まる文字は、Excel で開いたとき式として動かないように頭に ' を付ける（数字・日付はそのまま）
+const csvCell = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s) && !/^[\d\s+\-.,:\/()%]*$/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 const csvBlob = rows => new Blob(['﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv' });
 function planCsv(crops) {
   const out = [['野菜', '畑', '場所', '植えた日', '作業', 'はじめ', 'おわり', 'いま']];

@@ -443,6 +443,21 @@ srv.listen(0, async () => {
     check('新しい版：「いま更新」で入れかえを頼む', await page.evaluate(() => $('#noticeBar .nb-t').textContent), '新しい版が用意できました');
     await page.click('#noticeBar .nb-yes'); await w(100);
     check('SKIP_WAITING を送る', await page.evaluate(() => window.__msg), 'SKIP_WAITING');
+    // ── セキュリティ（v26）：仕込みのあるファイルを読み込んでも、プログラムは動かない ──
+    check('CSP：決めたファイル以外のプログラムは動かさない', await page.evaluate(() => { const m = document.querySelector('meta[http-equiv="Content-Security-Policy"]'); const c = m ? m.content : ''; return /script-src 'self';/.test(c) && !/unsafe/.test(c.split(';').find(x => /script-src/.test(x))) && /connect-src 'self' https:\/\/api\.open-meteo\.com https:\/\/geocoding-api\.open-meteo\.com;/.test(c); }), true);
+    await page.evaluate(() => { document.body.insertAdjacentHTML('beforeend', '<img id="xssT" src="x" onerror="window.__pwn=1">'); }); await w(300);
+    check('CSP：画面に入りこんだ onerror は動かない', await page.evaluate(() => { const e = document.getElementById('xssT'); if (e) e.remove(); return window.__pwn || 0; }), 0);
+    const BAD = 'x"><img src=x onerror=window.__pwn=2>';
+    await page.evaluate(async bad => {
+      const j = { app: 'saien-note', version: 3, data: { fields: [{ id: bad, name: '畑', area: 'kanto' }], crops: [{ id: bad, name: 'トマト', plan: 'トマト', as: 'nae', plantedAt: '2026-04-20', status: 'growing', done: {}, fieldId: bad }],
+        logs: [{ id: bad, cropId: bad, date: '2026-05-01', type: 'water', memo: '', hasPhoto: true }], settings: { cur: bad } }, photos: { [bad]: 'javascript:alert(1)' } };
+      await importData(new File([JSON.stringify(j)], 'a.json')); render();
+    }, BAD); await w(300);
+    await page.evaluate(() => go('crops')); await w(300);
+    check('おかしな id は英数字にして読む（つながりはそのまま）', await page.evaluate(() => [data.fields[0].id, data.crops[0].id, data.crops[0].fieldId === data.fields[0].id, data.logs[0].cropId === data.crops[0].id].join('/')), 'x___img_src_x_onerror_window___pwn_2_/x___img_src_x_onerror_window___pwn_2_/true/true');
+    check('写真でないものは写真として入れない', await page.evaluate(async () => (await getPhoto('x"><img src=x onerror=window.__pwn=2>')) || 'なし'), 'なし');
+    check('読み込んだあとも何も動かない', await page.evaluate(() => (window.__pwn || 0) + '/' + document.querySelectorAll('img[onerror]').length), '0/0');
+    check('CSV：= + - @ で始まる文字は式にしない（数字・電話番号はそのまま）', await page.evaluate(() => ['=1+1', '@SUM(A1)', '+cmd|x', '-5', '+81 90-1234-5678', '2026-05-10', 'トマト'].map(csvCell).join(' ')), "'=1+1 '@SUM(A1) '+cmd|x -5 +81 90-1234-5678 2026-05-10 トマト");
     check('エラーなし', errs.join(' | '), '');
   } catch (e) { fail++; console.log('✗ 止まりました：', e.message.split('\n')[0], pass, await page.evaluate(() => JSON.stringify([view, history.state, history.length])).catch(() => '')); }
   await browser.close(); srv.close();
